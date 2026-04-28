@@ -15,6 +15,13 @@ const getHeaders = () => {
   };
 };
 
+const getHeadersWithoutContentType = () => {
+  const token = localStorage.getItem(TOKEN_KEY);
+  return {
+    ...(token && { 'Authorization': `Bearer ${token}` })
+  };
+};
+
 const handleResponse = async (response: Response) => {
   const data = await response.json();
   if (!response.ok) {
@@ -55,12 +62,27 @@ export const api = {
     }).then(handleResponse),
 
   // Posts
-  createPost: (data: any) => 
-    fetch(`${BASE_URL}/posts`, {
-      method: 'POST',
-      headers: getHeaders(),
-      body: JSON.stringify(data)
-    }).then(handleResponse),
+  createPost: (data: any, imageFile?: File) => {
+    if (imageFile) {
+      // Use FormData for multipart upload
+      const formData = new FormData();
+      formData.append('content', data.content || '');
+      formData.append('image', imageFile);
+
+      return fetch(`${BASE_URL}/posts`, {
+        method: 'POST',
+        headers: getHeadersWithoutContentType(),
+        body: formData
+      }).then(handleResponse);
+    } else {
+      // Use JSON for text-only posts
+      return fetch(`${BASE_URL}/posts`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify(data)
+      }).then(handleResponse);
+    }
+  },
 
   getPosts: () => 
     fetch(`${BASE_URL}/posts`, {

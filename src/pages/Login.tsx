@@ -34,7 +34,7 @@ const Login = () => {
       <div className="uk-width-large uk-margin-large-top">
         <div className="uk-card uk-card-default uk-card-body uk-box-shadow-large">
           <h2 className="uk-card-title uk-text-center uk-text-bold">Entrar</h2>
-          <p className="uk-text-muted uk-text-center uk-margin-remove-top">Bem-vindo ao Portal Youth Church</p>
+          <p className="uk-text-muted uk-text-center uk-margin-remove-top">Bem-vindo ao Portal Ichurch</p>
           
           <form className="uk-form-stacked uk-margin-medium-top" onSubmit={handleLogin}>
             <div className="uk-margin">

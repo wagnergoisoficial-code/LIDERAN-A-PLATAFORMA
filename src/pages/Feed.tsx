@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
+import ImageUploadInput from '../components/ImageUploadInput';
 import UIkit from 'uikit';
 
 interface Comment {
@@ -21,6 +22,8 @@ interface Post {
 const Feed = () => {
   const [posts, setPosts] = useState<Post[]>([]);
   const [newPostContent, setNewPostContent] = useState('');
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingPosts, setLoadingPosts] = useState(true);
 
@@ -41,20 +44,39 @@ const Feed = () => {
     }
   };
 
+  const handleImageSelect = (file: File | null) => {
+    setSelectedImage(file);
+
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setImagePreview(null);
+    }
+  };
+
   const handleCreatePost = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newPostContent.trim()) return;
+    if (!newPostContent.trim() && !selectedImage) {
+      UIkit.notification({ message: 'Escreva algo ou selecione uma imagem', status: 'warning' });
+      return;
+    }
 
     setLoading(true);
     try {
-      const result = await api.createPost({ content: newPostContent });
+      const result = await api.createPost({ content: newPostContent }, selectedImage || undefined);
       if (result.success) {
         setNewPostContent('');
+        setSelectedImage(null);
+        setImagePreview(null);
         await loadPosts();
         UIkit.notification({ message: 'Post publicado!', status: 'success' });
       }
     } catch (err: any) {
-      UIkit.notification({ message: 'Erro ao publicar post', status: 'danger' });
+      UIkit.notification({ message: err.message || 'Erro ao publicar post', status: 'danger' });
     } finally {
       setLoading(false);
     }
@@ -74,9 +96,7 @@ const Feed = () => {
 
   return (
     <div className="uk-grid uk-grid-medium" uk-grid="">
-      {/* Main Feed Column */}
       <div className="uk-width-expand@m">
-        {/* Create Post Card */}
         <div className="uk-card uk-card-default uk-card-body uk-margin-bottom">
           <form onSubmit={handleCreatePost}>
             <div className="uk-margin">
@@ -86,14 +106,19 @@ const Feed = () => {
                 placeholder="O que está acontecendo na sua caminhada com Deus?"
                 value={newPostContent}
                 onChange={(e) => setNewPostContent(e.target.value)}
-                required
               ></textarea>
             </div>
+
+            <ImageUploadInput 
+              onImageSelect={handleImageSelect}
+              imagePreview={imagePreview}
+            />
+
             <div className="uk-flex uk-flex-right">
               <button 
                 className="uk-button uk-button-primary uk-border-rounded" 
                 type="submit"
-                disabled={loading}
+                disabled={loading || (!newPostContent.trim() && !selectedImage)}
               >
                 {loading ? <span uk-spinner="ratio: 0.6"></span> : 'Publicar'}
               </button>
@@ -101,7 +126,6 @@ const Feed = () => {
           </form>
         </div>
 
-        {/* Post List */}
         {loadingPosts ? (
           <div className="uk-text-center uk-margin-large-top">
             <span uk-spinner="ratio: 2"></span>
@@ -117,7 +141,6 @@ const Feed = () => {
         )}
       </div>
 
-      {/* Sidebar Suggestions */}
       <div className="uk-width-1-3@m uk-visible@m">
         <div className="uk-card uk-card-default uk-card-body" uk-sticky="offset: 100">
           <h4 className="uk-text-bold">Sugestões</h4>
@@ -174,12 +197,24 @@ const PostCard = ({ post, onComment }: { post: Post, onComment: (id: string, con
           </div>
         </div>
       </div>
+      {post.imageUrl && (
+        <div className="uk-card-media-top">
+          <img 
+            src={post.imageUrl} 
+            alt="Post content" 
+            style={{
+              width: '100%',
+              maxHeight: '400px',
+              objectFit: 'cover',
+              display: 'block'
+            }}
+          />
+        </div>
+      )}
+      
       <div className="uk-card-body uk-padding-small">
-        <p className="uk-text-default">{post.content}</p>
-        {post.imageUrl && (
-          <div className="uk-margin-top">
-            <img src={post.imageUrl} alt="Post content" className="uk-border-rounded" />
-          </div>
+        {post.content && (
+          <p className="uk-text-default uk-margin-bottom">{post.content}</p>
         )}
       </div>
       <div className="uk-card-footer uk-padding-small">
@@ -195,7 +230,6 @@ const PostCard = ({ post, onComment }: { post: Post, onComment: (id: string, con
           </div>
         </div>
         
-        {/* Comments Section */}
         {post.comments.length > 0 && (
           <ul className="uk-list uk-list-divider uk-margin-small-top">
             {post.comments.map((comment) => (
@@ -215,7 +249,6 @@ const PostCard = ({ post, onComment }: { post: Post, onComment: (id: string, con
           </ul>
         )}
 
-        {/* Comment Form */}
         <form onSubmit={submitComment} className="uk-margin-small-top">
           <div className="uk-grid-small" uk-grid="">
             <div className="uk-width-expand">
