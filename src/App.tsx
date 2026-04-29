@@ -6,6 +6,7 @@ import { useAuth } from './context/AuthContext';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Feed from './pages/Feed';
+import Posts from './pages/Posts';
 import Devotionals from './pages/Devotionals';
 import Users from './pages/Users';
 
@@ -33,6 +34,7 @@ const Navbar = () => {
           </Link>
           <ul className="uk-navbar-nav uk-visible@m">
             <li className={isActive('/')}><Link to="/">Feed</Link></li>
+            <li className={isActive('/posts')}><Link to="/posts">Criar Post</Link></li>
             <li className={isActive('/devotionals')}><Link to="/devotionals">Devocionais</Link></li>
             <li className={isActive('/users')}><Link to="/users">Membros</Link></li>
           </ul>
@@ -74,6 +76,7 @@ export default function App() {
             <Route path="/register" element={<Register />} />
             
             <Route path="/" element={<PrivateRoute><Feed /></PrivateRoute>} />
+            <Route path="/posts" element={<PrivateRoute><Posts /></PrivateRoute>} />
             <Route path="/devotionals" element={<PrivateRoute><Devotionals /></PrivateRoute>} />
             <Route path="/users" element={<PrivateRoute><Users /></PrivateRoute>} />
             

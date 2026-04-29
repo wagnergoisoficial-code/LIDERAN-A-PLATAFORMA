@@ -16,9 +16,9 @@ body {
 }
 
 .uk-card {
-  border-radius: 12px;
+  border-radius: 18px;
   border: 1px solid #f0f0f0 !important;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03) !important;
+  box-shadow: 0 4px 4px rgba(0, 0, 0, 0.03) !important;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
@@ -35,9 +35,13 @@ body {
 
 .uk-navbar {
   border-bottom: 1px solid #f0f0f0;
-  /* background: rgba(255, 255, 255, 0.8) !important; */
-  background-color: rgba(37, 161, 214, 0.8) !important;
+  background: rgba(255, 255, 255, 0.8) !important;
+  /* background-color: rgba(230, 23, 192, 0.8) !important; */
   backdrop-filter: blur(10px);
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  align-content: center;
 }
 
 .uk-input, .uk-select, .uk-textarea {
