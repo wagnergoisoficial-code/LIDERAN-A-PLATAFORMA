@@ -61,6 +61,68 @@ export const api = {
       headers: getHeaders()
     }).then(handleResponse),
 
+  getUserProfile: (id: string) =>
+    fetch(`${BASE_URL}/users/${id}`, {
+      headers: getHeaders()
+    }).then(handleResponse),
+
+  updateUserProfile: (data: any) =>
+    fetch(`${BASE_URL}/users/profile`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    }).then(handleResponse),
+
+  createUser: (data: any) =>
+    fetch(`${BASE_URL}/users`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    }).then(handleResponse),
+
+  // Social Links
+  addSocialLink: (data: any) =>
+    fetch(`${BASE_URL}/users/social-links`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    }).then(handleResponse),
+
+  getSocialLinks: (userId: string) =>
+    fetch(`${BASE_URL}/users/${userId}/social-links`, {
+      headers: getHeaders()
+    }).then(handleResponse),
+
+  removeSocialLink: (linkId: string) =>
+    fetch(`${BASE_URL}/users/social-links/${linkId}`, {
+      method: 'DELETE',
+      headers: getHeaders()
+    }).then(handleResponse),
+
+  // Achievements
+  getAchievements: (userId: string) =>
+    fetch(`${BASE_URL}/users/${userId}/achievements`, {
+      headers: getHeaders()
+    }).then(handleResponse),
+
+  // Block Users
+  blockUser: (blockedId: string) =>
+    fetch(`${BASE_URL}/users/block/${blockedId}`, {
+      method: 'POST',
+      headers: getHeaders()
+    }).then(handleResponse),
+
+  unblockUser: (blockedId: string) =>
+    fetch(`${BASE_URL}/users/block/${blockedId}`, {
+      method: 'DELETE',
+      headers: getHeaders()
+    }).then(handleResponse),
+
+  getBlockedUsers: () =>
+    fetch(`${BASE_URL}/users/blocked`, {
+      headers: getHeaders()
+    }).then(handleResponse),
+
   // Posts
   createPost: (data: any, imageFile?: File) => {
     if (imageFile) {
@@ -107,5 +169,17 @@ export const api = {
   getDevotionals: () => 
     fetch(`${BASE_URL}/devotionals`, {
       headers: getHeaders()
-    }).then(handleResponse)
+    }).then(handleResponse),
+
+  markDevotionalInactive: (devotionalId: string) =>
+    fetch(`${BASE_URL}/devotionals/${devotionalId}/inactive`, {
+      method: 'PUT',
+      headers: getHeaders()
+    }).then(handleResponse),
+
+  reactivateDevotional: (devotionalId: string) =>
+    fetch(`${BASE_URL}/devotionals/${devotionalId}/reactivate`, {
+      method: 'PUT',
+      headers: getHeaders()
+    }).then(handleResponse),
 };

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '../services/api';
 import UIkit from 'uikit';
 
@@ -83,12 +84,9 @@ const Users = () => {
                     </span>
                   </td>
                   <td className="uk-text-right">
-                    <button className="uk-button uk-button-text uk-text-primary" uk-tooltip="Ver perfil">
+                    <Link to={`/profile/${u.id}`} className="uk-button uk-button-text uk-text-primary" uk-tooltip="Ver perfil">
                       <span uk-icon="search"></span>
-                    </button>
-                    <button className="uk-button uk-button-text uk-text-muted uk-margin-small-left" uk-tooltip="Enviar mensagem">
-                      <span uk-icon="mail"></span>
-                    </button>
+                    </Link>
                   </td>
                 </tr>
               ))}
