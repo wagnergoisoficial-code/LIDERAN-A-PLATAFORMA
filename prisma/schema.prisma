@@ -1,0 +1,179 @@
+// This is your Prisma schema file.
+// Learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Church/Organization
+model Church {
+  id        String   @id @default(cuid())
+  name      String
+  title     String?              // Nome da Igreja
+  description String?            // Descrição da comunidade
+  imageUrl  String?              // Logo/imagem da comunidade
+  cultosDias String?             // Dias de culto (JSON: ["segunda", "quarta", "domingo"])
+  leaderID  String?              // ID do líder que criou
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  users      User[]
+  posts      Post[]
+  devotionals Devotional[]
+
+  @@map("churches")
+}
+
+// User with role-based access
+model User {
+  id                String   @id @default(cuid())
+  email             String   @unique
+  name              String
+  password          String
+  role              String   @default("member") // member, leader, admin
+  
+  // Profile fields
+  age               Int?
+  bio               String?
+  skills            String? // JSON string of skills
+  profileImage      String?
+  backgroundTheme   String   @default("light")
+  location          String?
+  title             String?  // Job title or church role
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Foreign keys
+  churchId  String?
+  church    Church?   @relation(fields: [churchId], references: [id], onDelete: SetNull)
+  
+  leaderId  String?   // ID do líder que registrou este membro
+
+  // Relations
+  posts              Post[]
+  comments           Comment[]
+  devotionals        Devotional[]
+  socialLinks        SocialLink[]
+  achievements       Achievement[]
+  blockedByUsers     BlockedUser[] @relation("blocker")
+  blockedUsers       BlockedUser[] @relation("blocked")
+
+  @@index([churchId])
+  @@map("users")
+}
+
+// Social Links
+model SocialLink {
+  id        String   @id @default(cuid())
+  platform  String   // whatsapp, linkedin, facebook, instagram
+  url       String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("social_links")
+}
+
+// Achievements/Badges
+model Achievement {
+  id        String   @id @default(cuid())
+  name      String   // "Top Commenter", "Top Fan", etc.
+  description String?
+  icon      String?
+  createdAt DateTime @default(now())
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("achievements")
+}
+
+// Blocked Users
+model BlockedUser {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  blockerId String
+  blocker   User     @relation("blocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  
+  blockedId String
+  blocked   User     @relation("blocked", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerId, blockedId])
+  @@index([blockerId])
+  @@index([blockedId])
+  @@map("blocked_users")
+}
+
+// Church Posts/Feed
+model Post {
+  id        String   @id @default(cuid())
+  content   String
+  imageUrl  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Foreign keys
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  churchId  String
+  church    Church   @relation(fields: [churchId], references: [id], onDelete: Cascade)
+
+  // Relations
+  comments  Comment[]
+
+  @@index([userId])
+  @@index([churchId])
+  @@map("posts")
+}
+
+// Comments on Posts
+model Comment {
+  id        String   @id @default(cuid())
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Foreign keys
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+  @@index([userId])
+  @@map("comments")
+}
+
+// Devotionals (Bible messages)
+model Devotional {
+  id        String   @id @default(cuid())
+  title     String
+  content   String
+  verse     String?
+  isActive  Boolean  @default(true)  // true = active, false = archived
+  activatedAt DateTime @default(now())  // When it was activated (or reactivated)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Foreign keys
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  churchId  String
+  church    Church   @relation(fields: [churchId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([churchId])
+  @@map("devotionals")
+}
