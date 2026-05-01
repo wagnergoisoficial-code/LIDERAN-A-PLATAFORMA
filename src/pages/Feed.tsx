@@ -88,12 +88,14 @@ const Feed = () => {
         ) : posts.length === 0 ? (
           <div style={{
             background: 'white',
-            padding: '24px',
+            padding: '48px 24px',
             borderRadius: '12px',
             boxShadow: '0 1px 3px rgba(0, 0, 0, 0.08)',
             textAlign: 'center'
           }}>
-            <p className="uk-text-muted">Nenhum post encontrado. Vá para a página de Posts para criar um!</p>
+            <div style={{ fontSize: '48px', marginBottom: '16px' }}>📝</div>
+            <p style={{ fontSize: '16px', color: '#6c757d', margin: '0' }}>Nenhum post compartilhado ainda</p>
+            <p style={{ fontSize: '14px', color: '#adb5bd', margin: '8px 0 0 0' }}>Seja o primeiro a compartilhar algo inspirador!</p>
           </div>
         ) : (
           posts.map((post: Post) => (

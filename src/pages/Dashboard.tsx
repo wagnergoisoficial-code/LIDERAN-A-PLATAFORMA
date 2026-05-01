@@ -2,320 +2,339 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import UIkit from 'uikit';
+import ChurchCreate from '../components/ChurchCreate';
+import ChurchMembers from '../components/ChurchMembers';
 
-interface User {
+interface Church {
   id: string;
   name: string;
-  email: string;
-  role: string;
-}
-
-interface DevotionalFormData {
-  title: string;
-  verse: string;
-  content: string;
+  title?: string;
+  description?: string;
+  cultosDias?: string[];
+  users?: any[];
 }
 
 const Dashboard = () => {
   const { user } = useAuth();
-  const [users, setUsers] = useState<User[]>([]);
+  const [churches, setChurches] = useState<Church[]>([]);
+  const [selectedChurch, setSelectedChurch] = useState<Church | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'jovens' | 'devocionais'>('jovens');
-
-  // Form states for new member
-  const [memberForm, setMemberForm] = useState({
-    name: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-  });
-  const [submittingMember, setSubmittingMember] = useState(false);
-
-  // Form states for devotional
-  const [devotionalForm, setDevotionalForm] = useState<DevotionalFormData>({
-    title: '',
-    verse: '',
-    content: '',
-  });
-  const [submittingDevotional, setSubmittingDevotional] = useState(false);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showMembersModal, setShowMembersModal] = useState(false);
 
   useEffect(() => {
-    loadUsers();
+    loadChurches();
   }, []);
 
-  const loadUsers = async () => {
+  const loadChurches = async () => {
+    setLoading(true);
     try {
-      const result = await api.getUsers();
+      const result = await api.getMyChurches();
       if (result.success) {
-        setUsers(result.data);
+        setChurches(result.data || []);
+        if (result.data && result.data.length > 0) {
+          setSelectedChurch(result.data[0]);
+        }
       }
-    } catch (err) {
-      UIkit.notification({ message: 'Erro ao carregar membros', status: 'danger' });
+    } catch (err: any) {
+      console.error('Erro ao carregar comunidades:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleMemberSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSubmittingMember(true);
-
-    try {
-      if (memberForm.password !== memberForm.confirmPassword) {
-        throw new Error('As senhas não coincidem');
-      }
-
-      const result = await api.createUser({
-        name: memberForm.name,
-        email: memberForm.email,
-        password: memberForm.password,
-        role: 'member',
-      });
-
-      if (result.success) {
-        setMemberForm({ name: '', email: '', password: '', confirmPassword: '' });
-        loadUsers();
-        UIkit.notification({ message: 'Jovem cadastrado com sucesso!', status: 'success', pos: 'top-right' });
-      }
-    } catch (err: any) {
-      UIkit.notification({ message: err.message || 'Erro ao cadastrar jovem', status: 'danger', pos: 'top-right' });
-    } finally {
-      setSubmittingMember(false);
-    }
-  };
-
-  const handleDevotionalSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSubmittingDevotional(true);
-
-    try {
-      const result = await api.createDevotional(devotionalForm);
-
-      if (result.success) {
-        setDevotionalForm({ title: '', verse: '', content: '' });
-        UIkit.notification({ message: 'Devocional criado com sucesso!', status: 'success', pos: 'top-right' });
-      }
-    } catch (err: any) {
-      UIkit.notification({ message: err.message || 'Erro ao criar devocional', status: 'danger', pos: 'top-right' });
-    } finally {
-      setSubmittingDevotional(false);
-    }
+  const handleChurchCreated = () => {
+    loadChurches();
+    setShowCreateForm(false);
   };
 
   return (
-    <div className="uk-section">
-      <div className="uk-container">
-        <div className="uk-margin-bottom">
-          <h1 className="uk-text-bold">Painel de Controle</h1>
-          <p className="uk-text-muted">Bem-vindo, {user?.name}! Gerencie jovens e devocionais aqui.</p>
+    <div style={{ display: 'flex', minHeight: 'calc(100vh - 80px)' }}>
+      {/* SIDEBAR ESQUERDA */}
+      <div style={{ 
+        width: '320px',
+        backgroundColor: '#f8f9fa',
+        borderRight: '1px solid #e9ecef',
+        display: 'flex',
+        flexDirection: 'column',
+        padding: '24px 0',
+        overflowY: 'auto'
+      }}>
+        {/* Header do Sidebar */}
+        <div style={{ padding: '0 20px', marginBottom: '24px' }}>
+          <h3 style={{ margin: '0 0 8px 0', fontSize: '16px', fontWeight: '600', color: '#212529' }}>
+            Painel do Líder
+          </h3>
+          <p style={{ margin: '0', fontSize: '13px', color: '#6c757d' }}>
+            Gerencie suas comunidades
+          </p>
         </div>
 
-        {/* Tabs */}
-        <div className="uk-margin-large-bottom">
-          <ul className="uk-tab" uk-tab="true">
-            <li className={activeTab === 'jovens' ? 'uk-active' : ''}>
-              <a 
-                href="#" 
-                onClick={(e) => { e.preventDefault(); setActiveTab('jovens'); }}
-              >
-                <span uk-icon="users" className="uk-margin-small-right"></span>
-                Cadastrar Jovens
-              </a>
-            </li>
-            <li className={activeTab === 'devocionais' ? 'uk-active' : ''}>
-              <a 
-                href="#" 
-                onClick={(e) => { e.preventDefault(); setActiveTab('devocionais'); }}
-              >
-                <span uk-icon="bookmark" className="uk-margin-small-right"></span>
-                Criar Devocional
-              </a>
-            </li>
-          </ul>
+        {/* Botão Criar Comunidade */}
+        <div style={{ padding: '0 12px', marginBottom: '20px' }}>
+          <button
+            onClick={() => setShowCreateForm(!showCreateForm)}
+            style={{
+              width: '100%',
+              padding: '10px 16px',
+              backgroundColor: showCreateForm ? '#0d6efd' : '#6c757d',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: '500',
+              transition: 'all 0.2s'
+            }}
+            onMouseEnter={(e) => {
+              if (!showCreateForm) {
+                e.currentTarget.style.backgroundColor = '#5a6268';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!showCreateForm) {
+                e.currentTarget.style.backgroundColor = '#6c757d';
+              }
+            }}
+          >
+            {showCreateForm ? '✕ Cancelar' : '+ Nova Comunidade'}
+          </button>
         </div>
 
-        {/* Jovens Tab */}
-        {activeTab === 'jovens' && (
-          <div className="uk-grid uk-grid-medium" uk-grid="true">
-            {/* Form */}
-            <div className="uk-width-1-3@m">
-              <div className="uk-card uk-card-default uk-card-body uk-border-rounded">
-                <h3 className="uk-card-title uk-text-bold">Novo Jovem</h3>
-                <form className="uk-form-stacked" onSubmit={handleMemberSubmit}>
-                  <div className="uk-margin">
-                    <label className="uk-form-label">Nome</label>
-                    <input
-                      className="uk-input uk-border-rounded"
-                      type="text"
-                      placeholder="Nome completo"
-                      value={memberForm.name}
-                      onChange={(e) => setMemberForm({ ...memberForm, name: e.target.value })}
-                      required
-                    />
+        {/* Divisor */}
+        <div style={{ height: '1px', backgroundColor: '#e9ecef', margin: '12px 0' }}></div>
+
+        {/* Lista de Comunidades */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '0' }}>
+          {loading ? (
+            <div style={{ padding: '20px', textAlign: 'center', color: '#6c757d' }}>
+              <div uk-spinner="ratio: 0.8"></div>
+            </div>
+          ) : churches.length === 0 ? (
+            <div style={{ padding: '20px', color: '#6c757d', fontSize: '13px', textAlign: 'center' }}>
+              Nenhuma comunidade criada
+            </div>
+          ) : (
+            churches.map((church: Church) => (
+              <button
+                key={church.id}
+                onClick={() => setSelectedChurch(church)}
+                style={{
+                  width: '100%',
+                  padding: '12px 16px',
+                  backgroundColor: selectedChurch?.id === church.id ? '#0d6efd' : 'transparent',
+                  color: selectedChurch?.id === church.id ? 'white' : '#212529',
+                  border: 'none',
+                  borderLeft: selectedChurch?.id === church.id ? '4px solid #0d6efd' : '4px solid transparent',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  transition: 'all 0.2s',
+                  fontSize: '14px'
+                }}
+                onMouseEnter={(e) => {
+                  if (selectedChurch?.id !== church.id) {
+                    e.currentTarget.style.backgroundColor = '#e9ecef';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (selectedChurch?.id !== church.id) {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                  }
+                }}
+              >
+                <div style={{ fontWeight: '600', marginBottom: '4px' }}>
+                  {church.name}
+                </div>
+                {church.users && (
+                  <div style={{ fontSize: '12px', opacity: 0.8 }}>
+                    👥 {church.users.length} membro{church.users.length !== 1 ? 's' : ''}
                   </div>
-                  <div className="uk-margin">
-                    <label className="uk-form-label">E-mail</label>
-                    <input
-                      className="uk-input uk-border-rounded"
-                      type="email"
-                      placeholder="email@exemplo.com"
-                      value={memberForm.email}
-                      onChange={(e) => setMemberForm({ ...memberForm, email: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div className="uk-margin">
-                    <label className="uk-form-label">Senha</label>
-                    <input
-                      className="uk-input uk-border-rounded"
-                      type="password"
-                      placeholder="Mínimo 8 caracteres"
-                      value={memberForm.password}
-                      onChange={(e) => setMemberForm({ ...memberForm, password: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div className="uk-margin">
-                    <label className="uk-form-label">Confirmar Senha</label>
-                    <input
-                      className="uk-input uk-border-rounded"
-                      type="password"
-                      placeholder="Confirme a senha"
-                      value={memberForm.confirmPassword}
-                      onChange={(e) => setMemberForm({ ...memberForm, confirmPassword: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <button
-                    className="uk-button uk-button-primary uk-width-1-1 uk-border-rounded"
-                    type="submit"
-                    disabled={submittingMember}
-                  >
-                    {submittingMember ? <span uk-spinner="ratio: 0.6"></span> : 'Cadastrar Jovem'}
-                  </button>
-                </form>
+                )}
+              </button>
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* CONTEÚDO PRINCIPAL DIREITA */}
+      <div style={{ flex: 1, padding: '32px', overflowY: 'auto', backgroundColor: 'white' }}>
+        {showCreateForm ? (
+          <div>
+            <h2 style={{ marginTop: '0', marginBottom: '24px', fontSize: '24px', fontWeight: '600' }}>
+              Criar Nova Comunidade
+            </h2>
+            <div style={{ maxWidth: '600px' }}>
+              <ChurchCreate onChurchCreated={handleChurchCreated} />
+            </div>
+          </div>
+        ) : selectedChurch ? (
+          <div>
+            {/* HEADER COM INFO DA COMUNIDADE */}
+            <div style={{ marginBottom: '32px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <div>
+                  <h2 style={{ margin: '0 0 8px 0', fontSize: '28px', fontWeight: '700', color: '#212529' }}>
+                    {selectedChurch.name}
+                  </h2>
+                  {selectedChurch.title && (
+                    <p style={{ margin: '0 0 12px 0', fontSize: '15px', color: '#6c757d' }}>
+                      {selectedChurch.title}
+                    </p>
+                  )}
+                </div>
+                <button
+                  onClick={() => setShowMembersModal(true)}
+                  style={{
+                    padding: '10px 20px',
+                    backgroundColor: '#28a745',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    transition: 'background-color 0.2s',
+                    whiteSpace: 'nowrap'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#218838';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = '#28a745';
+                  }}
+                >
+                  👥 Ver Membros
+                </button>
               </div>
             </div>
 
-            {/* List */}
-            <div className="uk-width-2-3@m">
-              <div className="uk-card uk-card-default uk-border-rounded">
-                <div className="uk-card-header">
-                  <h3 className="uk-card-title uk-text-bold uk-margin-remove">Jovens Cadastrados</h3>
-                </div>
-                {loading ? (
-                  <div className="uk-card-body uk-text-center">
-                    <span uk-spinner="ratio: 2"></span>
-                  </div>
-                ) : users.length === 0 ? (
-                  <div className="uk-card-body uk-text-center">
-                    <span uk-icon="icon: info; ratio: 1.5" className="uk-text-muted"></span>
-                    <p className="uk-text-muted uk-margin-top">Nenhum jovem cadastrado ainda.</p>
-                  </div>
-                ) : (
-                  <div className="uk-overflow-auto">
-                    <table className="uk-table uk-table-hover uk-table-divider uk-table-middle">
-                      <thead>
-                        <tr>
-                          <th>Nome</th>
-                          <th>E-mail</th>
-                          <th>Cargo</th>
-                          <th className="uk-text-right">Ações</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {users.map((u) => (
-                          <tr key={u.id}>
-                            <td className="uk-text-bold">{u.name}</td>
-                            <td>{u.email}</td>
-                            <td>
-                              <span className={`uk-label uk-border-rounded ${u.role === 'leader' ? 'uk-label-warning' : 'uk-label-info'}`}>
-                                {u.role === 'leader' ? 'Líder' : 'Membro'}
-                              </span>
-                            </td>
-                            <td className="uk-text-right">
-                              <button className="uk-button uk-button-text uk-text-primary" uk-tooltip="Ver perfil">
-                                <span uk-icon="search"></span>
-                              </button>
-                            </td>
-                          </tr>
+            {/* GRID COM INFO E MEMBROS */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+              {/* COLUNA ESQUERDA - INFO */}
+              <div>
+                <div style={{
+                  backgroundColor: '#f8f9fa',
+                  border: '1px solid #e9ecef',
+                  borderRadius: '8px',
+                  padding: '20px'
+                }}>
+                  <h4 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: '600', color: '#212529' }}>
+                    Informações da Comunidade
+                  </h4>
+
+                  {selectedChurch.description && (
+                    <div style={{ marginBottom: '16px' }}>
+                      <p style={{ margin: '0 0 8px 0', fontSize: '13px', fontWeight: '600', color: '#6c757d' }}>
+                        Descrição
+                      </p>
+                      <p style={{ margin: '0', fontSize: '14px', color: '#212529', lineHeight: '1.5' }}>
+                        {selectedChurch.description}
+                      </p>
+                    </div>
+                  )}
+
+                  {selectedChurch.cultosDias && selectedChurch.cultosDias.length > 0 && (
+                    <div>
+                      <p style={{ margin: '0 0 8px 0', fontSize: '13px', fontWeight: '600', color: '#6c757d' }}>
+                        Dias de Culto
+                      </p>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                        {selectedChurch.cultosDias.map((dia: string) => (
+                          <span
+                            key={dia}
+                            style={{
+                              display: 'inline-block',
+                              backgroundColor: '#0d6efd',
+                              color: 'white',
+                              padding: '6px 12px',
+                              borderRadius: '4px',
+                              fontSize: '12px',
+                              fontWeight: '500',
+                              textTransform: 'capitalize'
+                            }}
+                          >
+                            {dia}
+                          </span>
                         ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* COLUNA DIREITA - MEMBROS */}
+              <div>
+                <ChurchMembers
+                  churchId={selectedChurch.id}
+                  churchName={selectedChurch.name}
+                />
               </div>
             </div>
           </div>
-        )}
-
-        {/* Devocionais Tab */}
-        {activeTab === 'devocionais' && (
-          <div className="uk-grid uk-grid-medium" uk-grid="true">
-            <div className="uk-width-1-3@m">
-              <div className="uk-card uk-card-default uk-card-body uk-border-rounded">
-                <h3 className="uk-card-title uk-text-bold">Novo Devocional</h3>
-                <form className="uk-form-stacked" onSubmit={handleDevotionalSubmit}>
-                  <div className="uk-margin">
-                    <label className="uk-form-label">Título</label>
-                    <input
-                      className="uk-input uk-border-rounded"
-                      type="text"
-                      placeholder="Ex: Fé em Ação"
-                      value={devotionalForm.title}
-                      onChange={(e) => setDevotionalForm({ ...devotionalForm, title: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div className="uk-margin">
-                    <label className="uk-form-label">Versículo Chave</label>
-                    <input
-                      className="uk-input uk-border-rounded"
-                      type="text"
-                      placeholder="Ex: João 3:16"
-                      value={devotionalForm.verse}
-                      onChange={(e) => setDevotionalForm({ ...devotionalForm, verse: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div className="uk-margin">
-                    <label className="uk-form-label">Conteúdo</label>
-                    <textarea
-                      className="uk-textarea uk-border-rounded"
-                      placeholder="Escreva o devocional aqui..."
-                      rows={6}
-                      value={devotionalForm.content}
-                      onChange={(e) => setDevotionalForm({ ...devotionalForm, content: e.target.value })}
-                      required
-                    ></textarea>
-                  </div>
-                  <button
-                    className="uk-button uk-button-primary uk-width-1-1 uk-border-rounded"
-                    type="submit"
-                    disabled={submittingDevotional}
-                  >
-                    {submittingDevotional ? <span uk-spinner="ratio: 0.6"></span> : 'Publicar Devocional'}
-                  </button>
-                </form>
-              </div>
-            </div>
-            <div className="uk-width-2-3@m">
-              <div className="uk-card uk-card-default uk-card-body uk-border-rounded">
-                <h3 className="uk-card-title uk-text-bold">Dica: Seus devocionais publicados</h3>
-                <p className="uk-text-muted">
-                  Os devocionais que você criar aparecerão aqui e ficarão visíveis para todos os membros da comunidade.
-                </p>
-                <div className="uk-alert uk-alert-primary uk-border-rounded">
-                  <span uk-icon="info"></span>
-                  Os devocionais devem ter um título significativo, um versículo para reflexão e um conteúdo de qualidade.
-                </div>
-              </div>
-            </div>
+        ) : (
+          <div style={{ textAlign: 'center', padding: '60px 20px', color: '#6c757d' }}>
+            <div style={{ fontSize: '48px', marginBottom: '16px' }}>📋</div>
+            <p style={{ fontSize: '16px', margin: '0' }}>
+              Selecione uma comunidade ou crie uma nova
+            </p>
           </div>
         )}
       </div>
+
+      {/* MODAL DE MEMBROS */}
+      {showMembersModal && selectedChurch && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '8px',
+            padding: '30px',
+            width: '90%',
+            maxWidth: '1000px',
+            maxHeight: '85vh',
+            overflowY: 'auto',
+            boxShadow: '0 10px 40px rgba(0, 0, 0, 0.2)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+              <h3 style={{ margin: '0', fontSize: '24px', fontWeight: '700', color: '#212529' }}>
+                Membros de {selectedChurch.name}
+              </h3>
+              <button
+                onClick={() => setShowMembersModal(false)}
+                style={{
+                  backgroundColor: '#dc3545',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  padding: '8px 16px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '600'
+                }}
+              >
+                ✕ Fechar
+              </button>
+            </div>
+            <ChurchMembers
+              churchId={selectedChurch.id}
+              churchName={selectedChurch.name}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
 export default Dashboard;
+

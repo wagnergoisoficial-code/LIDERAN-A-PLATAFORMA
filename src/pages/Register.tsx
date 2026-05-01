@@ -8,21 +8,27 @@ const Register = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [churchId, setChurchId] = useState('cmofp5hpa0000p0ix3apqd9fz'); // Default Church ID from guide
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { login } = useAuth();
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (password !== confirmPassword) {
+      UIkit.notification({ message: 'As senhas não conferem', status: 'danger', pos: 'top-right' });
+      return;
+    }
+
     setLoading(true);
 
     try {
-      const response = await api.register({ name, email, password, churchId });
+      const response = await api.register({ name, email, password, confirmPassword, role: 'leader' });
       if (response.success) {
         login(response.data.user, response.data.token);
-        UIkit.notification({ message: 'Conta criada com sucesso!', status: 'success', pos: 'top-right' });
-        navigate('/');
+        UIkit.notification({ message: 'Conta criada com sucesso! Agora crie sua comunidade.', status: 'success', pos: 'top-right' });
+        navigate('/dashboard');
       }
     } catch (err: any) {
       UIkit.notification({ message: err.message || 'Erro ao criar conta', status: 'danger', pos: 'top-right' });
@@ -79,6 +85,22 @@ const Register = () => {
                   placeholder="Mínimo 6 caracteres"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  required 
+                  minLength={6}
+                />
+              </div>
+            </div>
+
+            <div className="uk-margin">
+              <label className="uk-form-label">Confirmar Senha</label>
+              <div className="uk-inline uk-width-1-1">
+                <span className="uk-form-icon" uk-icon="icon: lock"></span>
+                <input 
+                  className="uk-input" 
+                  type="password" 
+                  placeholder="Confirme sua senha"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
                   required 
                   minLength={6}
                 />

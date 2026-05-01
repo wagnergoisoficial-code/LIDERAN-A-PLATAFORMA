@@ -97,9 +97,16 @@ const Devotionals = () => {
           <span uk-spinner="ratio: 2"></span>
         </div>
       ) : activeDevotionals.length === 0 ? (
-        <div className="uk-card uk-card-default uk-card-body uk-text-center">
-          <span uk-icon="icon: bookmark; ratio: 2" className="uk-text-muted"></span>
-          <p className="uk-text-muted uk-margin-top">Ainda não há devocionais ativos. Volte em breve!</p>
+        <div style={{
+          background: 'white',
+          padding: '48px 24px',
+          borderRadius: '12px',
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.08)',
+          textAlign: 'center'
+        }}>
+          <div style={{ fontSize: '48px', marginBottom: '16px' }}>🙏</div>
+          <p style={{ fontSize: '16px', color: '#6c757d', margin: '0' }}>Nenhum devocional ativo no momento</p>
+          <p style={{ fontSize: '14px', color: '#adb5bd', margin: '8px 0 0 0' }}>Volte mais tarde para novas reflexões espirituais</p>
         </div>
       ) : (
         <div className="uk-grid uk-grid-medium" uk-grid="masonry: true">

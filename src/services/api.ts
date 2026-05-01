@@ -182,4 +182,47 @@ export const api = {
       method: 'PUT',
       headers: getHeaders()
     }).then(handleResponse),
+
+  // Churches/Communities
+  createChurch: (data: any) =>
+    fetch(`${BASE_URL}/churches`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    }).then(handleResponse),
+
+  getChurch: (churchId: string) =>
+    fetch(`${BASE_URL}/churches/${churchId}`, {
+      headers: getHeaders()
+    }).then(handleResponse),
+
+  getMyChurches: () =>
+    fetch(`${BASE_URL}/churches/leader/my-churches`, {
+      headers: getHeaders()
+    }).then(handleResponse),
+
+  updateChurch: (churchId: string, data: any) =>
+    fetch(`${BASE_URL}/churches/${churchId}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    }).then(handleResponse),
+
+  deleteChurch: (churchId: string) =>
+    fetch(`${BASE_URL}/churches/${churchId}`, {
+      method: 'DELETE',
+      headers: getHeaders()
+    }).then(handleResponse),
+
+  getChurchMembers: (churchId: string) =>
+    fetch(`${BASE_URL}/churches/${churchId}/members`, {
+      headers: getHeaders()
+    }).then(handleResponse),
+
+  registerMemberInChurch: (data: any) =>
+    fetch(`${BASE_URL}/auth/register-member`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    }).then(handleResponse),
 };
