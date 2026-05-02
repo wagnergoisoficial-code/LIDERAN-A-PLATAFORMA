@@ -26,6 +26,7 @@ model Church {
   users      User[]
   posts      Post[]
   devotionals Devotional[]
+  messages   Message[]
 
   @@map("churches")
 }
@@ -64,6 +65,7 @@ model User {
   achievements       Achievement[]
   blockedByUsers     BlockedUser[] @relation("blocker")
   blockedUsers       BlockedUser[] @relation("blocked")
+  messages           Message[]
 
   @@index([churchId])
   @@map("users")
@@ -176,4 +178,23 @@ model Devotional {
   @@index([userId])
   @@index([churchId])
   @@map("devotionals")
+}
+
+// Chat Messages
+model Message {
+  id        String   @id @default(cuid())
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Foreign keys
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  churchId  String
+  church    Church   @relation(fields: [churchId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([churchId])
+  @@index([createdAt])
+  @@map("messages")
 }

@@ -12,6 +12,7 @@ const userRoutes = require('./routes/user.routes');
 const postRoutes = require('./routes/post.routes');
 const devotionalRoutes = require('./routes/devotional.routes');
 const churchRoutes = require('./routes/church.routes');
+const chatRoutes = require('./routes/chat.routes');
 
 class App {
   constructor() {
@@ -84,6 +85,7 @@ class App {
     this.app.use('/api/posts', postRoutes);
     this.app.use('/api/devotionals', devotionalRoutes);
     this.app.use('/api/churches', churchRoutes);
+    this.app.use('/api/chat', chatRoutes);
 
     // 404 handler
     this.app.use((req, res) => {
