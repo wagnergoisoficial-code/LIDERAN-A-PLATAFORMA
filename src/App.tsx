@@ -11,6 +11,7 @@ import Devotionals from './pages/Devotionals';
 import Users from './pages/Users';
 import Dashboard from './pages/Dashboard';
 import Profile from './pages/Profile';
+import Chat from './pages/Chat';
 
 const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, isLoading } = useAuth();
@@ -52,6 +53,7 @@ const Navbar = () => {
             <li className={isActive('/')}><Link to="/">Feed</Link></li>
             <li className={isActive('/posts')}><Link to="/posts">Criar Post</Link></li>
             <li className={isActive('/devotionals')}><Link to="/devotionals">Devocionais</Link></li>
+            <li className={isActive('/chat')}><Link to="/chat">Chat</Link></li>
             <li className={isActive('/users')}><Link to="/users">Membros</Link></li>
           </ul>
         </div>
@@ -95,6 +97,7 @@ export default function App() {
             <Route path="/" element={<PrivateRoute><Feed /></PrivateRoute>} />
             <Route path="/posts" element={<PrivateRoute><Posts /></PrivateRoute>} />
             <Route path="/devotionals" element={<PrivateRoute><Devotionals /></PrivateRoute>} />
+            <Route path="/chat" element={<PrivateRoute><Chat /></PrivateRoute>} />
             <Route path="/users" element={<PrivateRoute><Users /></PrivateRoute>} />
             <Route path="/profile/:userId" element={<PrivateRoute><Profile /></PrivateRoute>} />
             <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />

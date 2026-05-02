@@ -225,4 +225,28 @@ export const api = {
       headers: getHeaders(),
       body: JSON.stringify(data)
     }).then(handleResponse),
+
+  // Chat
+  getMessages: (limit: number = 50, lastMessageId?: string) => {
+    const params = new URLSearchParams({ limit: limit.toString() });
+    if (lastMessageId) {
+      params.append('lastMessageId', lastMessageId);
+    }
+    return fetch(`${BASE_URL}/chat/messages?${params}`, {
+      headers: getHeaders()
+    }).then(handleResponse);
+  },
+
+  sendMessage: (content: string) =>
+    fetch(`${BASE_URL}/chat/messages`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ content })
+    }).then(handleResponse),
+
+  deleteMessage: (messageId: string) =>
+    fetch(`${BASE_URL}/chat/messages/${messageId}`, {
+      method: 'DELETE',
+      headers: getHeaders()
+    }).then(handleResponse),
 };
