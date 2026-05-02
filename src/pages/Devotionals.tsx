@@ -33,7 +33,8 @@ const Devotionals = () => {
         setDevotionals(result.data);
       }
     } catch (err) {
-      UIkit.notification({ message: 'Erro ao carregar devocionais', status: 'danger' });
+      console.error('Erro ao carregar devocionais:', err);
+      setDevotionals([]);
     } finally {
       setLoading(false);
     }

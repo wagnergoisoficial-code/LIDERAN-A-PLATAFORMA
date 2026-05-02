@@ -37,7 +37,8 @@ const Feed = () => {
         setPosts(result.data);
       }
     } catch (err: any) {
-      UIkit.notification({ message: 'Erro ao carregar posts', status: 'danger' });
+      console.error('Erro ao carregar posts:', err);
+      setPosts([]);
     } finally {
       setLoadingPosts(false);
     }
