@@ -180,6 +180,11 @@ const Chat = () => {
           display: flex;
           gap: 12px;
           animation: fadeIn 0.3s ease-out;
+          align-items: flex-end;
+        }
+
+        .message-item.own {
+          flex-direction: row-reverse;
         }
 
         @keyframes fadeIn {
@@ -222,11 +227,20 @@ const Chat = () => {
           gap: 4px;
         }
 
+        .message-item.own .message-body {
+          align-items: flex-end;
+        }
+
         .message-header {
           display: flex;
           align-items: center;
           gap: 8px;
           font-size: 14px;
+          padding: 0 12px;
+        }
+
+        .message-item.own .message-header {
+          justify-content: flex-end;
         }
 
         .message-name {
@@ -239,21 +253,41 @@ const Chat = () => {
           font-size: 12px;
         }
 
-        .message-text {
-          color: #333;
-          font-size: 14px;
-          line-height: 1.4;
+        .message-bubble {
+          max-width: 60%;
+          padding: 10px 14px;
+          border-radius: 16px;
           word-wrap: break-word;
           word-break: break-word;
+          line-height: 1.4;
+          font-size: 14px;
+        }
+
+        .message-bubble.other {
+          background: #f0f0f0;
+          color: #333;
+          border-bottom-left-radius: 4px;
+        }
+
+        .message-bubble.own {
+          background: #1e87f0;
+          color: white;
+          border-bottom-right-radius: 4px;
         }
 
         .message-actions {
           display: none;
           gap: 8px;
           margin-top: 4px;
+          padding: 0 12px;
         }
 
-        .message-item:hover .message-actions {
+        .message-item.own:hover .message-actions {
+          display: flex;
+          justify-content: flex-end;
+        }
+
+        .message-item:not(.own):hover .message-actions {
           display: flex;
         }
 
@@ -371,40 +405,45 @@ const Chat = () => {
               <p className="empty-text">Nenhuma mensagem ainda. Seja o primeiro a conversar!</p>
             </div>
           ) : (
-            messages.map((message) => (
-              <div key={message.id} className="message-item">
-                {message.user.profileImage ? (
-                  <img
-                    src={message.user.profileImage}
-                    alt={message.user.name}
-                    className="message-avatar"
-                  />
-                ) : (
-                  <div className="message-avatar-placeholder">
-                    {message.user.name.charAt(0).toUpperCase()}
-                  </div>
-                )}
-
-                <div className="message-body">
-                  <div className="message-header">
-                    <span className="message-name">{message.user.name}</span>
-                    <span className="message-time">{formatDate(message.createdAt)}</span>
-                  </div>
-                  <div className="message-text">{message.content}</div>
-                  {user?.id === message.user.id && (
-                    <div className="message-actions">
-                      <button
-                        className="delete-btn"
-                        onClick={() => handleDeleteMessage(message.id, message.user.id)}
-                        title="Deletar mensagem"
-                      >
-                        Deletar
-                      </button>
+            messages.map((message) => {
+              const isOwnMessage = user?.id === message.user.id;
+              return (
+                <div key={message.id} className={`message-item ${isOwnMessage ? 'own' : ''}`}>
+                  {message.user.profileImage ? (
+                    <img
+                      src={message.user.profileImage}
+                      alt={message.user.name}
+                      className="message-avatar"
+                    />
+                  ) : (
+                    <div className="message-avatar-placeholder">
+                      {message.user.name.charAt(0).toUpperCase()}
                     </div>
                   )}
+
+                  <div className="message-body">
+                    <div className="message-header">
+                      <span className="message-name">{message.user.name}</span>
+                      <span className="message-time">{formatDate(message.createdAt)}</span>
+                    </div>
+                    <div className="message-bubble" style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
+                      <div className={`message-bubble ${isOwnMessage ? 'own' : 'other'}`}>
+                        {message.content}
+                      </div>
+                      {isOwnMessage && (
+                        <button
+                          className="delete-btn"
+                          onClick={() => handleDeleteMessage(message.id, message.user.id)}
+                          title="Deletar mensagem"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
           <div ref={messagesEndRef} />
         </div>
