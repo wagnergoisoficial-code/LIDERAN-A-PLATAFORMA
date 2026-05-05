@@ -70,6 +70,24 @@ class UserController {
     }
   }
 
+  async updateProfileAvatar(req, res, next) {
+    try {
+      if (!req.body.imageUrl) {
+        return res.status(400).json({ success: false, message: 'Nenhuma imagem enviada' });
+      }
+
+      const profile = await this.userService.updateProfile(req.user.id, { profileImage: req.body.imageUrl });
+
+      res.status(200).json({
+        success: true,
+        message: 'Avatar atualizado com sucesso',
+        data: profile,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async addSocialLink(req, res, next) {
     try {
       const AddSocialLinkDto = require('../dtos/AddSocialLinkDto');

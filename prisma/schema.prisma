@@ -172,8 +172,8 @@ model Devotional {
   // Foreign keys
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  churchId  String
-  church    Church   @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  churchId  String?
+  church    Church?  @relation(fields: [churchId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([churchId])

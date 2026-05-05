@@ -32,9 +32,8 @@ class CreateDevotionalDto {
       throw new ValidationError('User ID is required');
     }
 
-    if (ValidationUtil.isEmpty(this.churchId)) {
-      throw new ValidationError('Church ID is required');
-    }
+    // churchId is optional - allows admins without a church to create devotionals
+    // If no churchId, the devotional becomes a global/system devotional
 
     return true;
   }
