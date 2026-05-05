@@ -60,8 +60,16 @@ const Navbar = () => {
         <div className="uk-navbar-right uk-margin-right">
           <ul className="uk-navbar-nav">
             <li>
-              <a href="#">
-                <span className="uk-margin-small-right" uk-icon="user"></span>
+              <a href="#" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {user?.profileImage ? (
+                  <img
+                    src={user.profileImage}
+                    alt={user.name}
+                    style={{ width: '30px', height: '30px', borderRadius: '50%', objectFit: 'cover' }}
+                  />
+                ) : (
+                  <span uk-icon="user"></span>
+                )}
                 <span className="uk-visible@s">{user?.name}</span>
               </a>
               <div className="uk-navbar-dropdown">

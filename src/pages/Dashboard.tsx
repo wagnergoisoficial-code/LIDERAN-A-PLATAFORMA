@@ -51,8 +51,8 @@ const Dashboard = () => {
   return (
     <div style={{ display: 'flex', minHeight: 'calc(100vh - 80px)' }}>
       {/* SIDEBAR ESQUERDA */}
-      <div style={{ 
-        width: '320px',
+      <div style={{
+        width: '240px',
         backgroundColor: '#f8f9fa',
         borderRight: '1px solid #e9ecef',
         display: 'flex',
@@ -157,7 +157,7 @@ const Dashboard = () => {
       </div>
 
       {/* CONTEÚDO PRINCIPAL DIREITA */}
-      <div style={{ flex: 1, padding: '32px', overflowY: 'auto', backgroundColor: 'white' }}>
+      <div style={{ flex: 1, padding: '24px', overflowY: 'auto', backgroundColor: 'white' }}>
         {showCreateForm ? (
           <div>
             <h2 style={{ marginTop: '0', marginBottom: '24px', fontSize: '24px', fontWeight: '600' }}>
@@ -209,7 +209,7 @@ const Dashboard = () => {
             </div>
 
             {/* GRID COM INFO E MEMBROS */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
               {/* COLUNA ESQUERDA - INFO */}
               <div>
                 <div style={{

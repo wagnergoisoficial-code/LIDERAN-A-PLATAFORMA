@@ -7,6 +7,7 @@ interface User {
   email: string;
   role: 'member' | 'leader' | 'admin';
   churchId: string;
+  profileImage?: string;
 }
 
 interface AuthContextType {
@@ -14,6 +15,7 @@ interface AuthContextType {
   token: string | null;
   login: (userData: User, token: string) => void;
   logout: () => void;
+  updateUser: (userData: Partial<User>) => void;
   isAuthenticated: boolean;
   isLoading: boolean;
 }
@@ -56,14 +58,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     window.location.href = '/login';
   };
 
+  const updateUser = (userData: Partial<User>) => {
+    setUser(prev => {
+      if (!prev) return null;
+      const updated = { ...prev, ...userData };
+      localStorage.setItem(USER_KEY, JSON.stringify(updated));
+      return updated;
+    });
+  };
+
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      token, 
-      login, 
-      logout, 
-      isAuthenticated: !!token, 
-      isLoading 
+    <AuthContext.Provider value={{
+      user,
+      token,
+      login,
+      logout,
+      updateUser,
+      isAuthenticated: !!token,
+      isLoading
     }}>
       {children}
     </AuthContext.Provider>

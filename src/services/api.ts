@@ -73,6 +73,16 @@ export const api = {
       body: JSON.stringify(data)
     }).then(handleResponse),
 
+  uploadProfileImage: (file: File) => {
+    const formData = new FormData();
+    formData.append('image', file);
+    return fetch(`${BASE_URL}/users/profile/avatar`, {
+      method: 'PUT',
+      headers: getHeadersWithoutContentType(),
+      body: formData
+    }).then(handleResponse);
+  },
+
   createUser: (data: any) =>
     fetch(`${BASE_URL}/users`, {
       method: 'POST',

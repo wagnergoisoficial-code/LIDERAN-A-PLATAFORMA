@@ -18,11 +18,12 @@ interface Devotional {
 const Devotionals = () => {
   const [devotionals, setDevotionals] = useState<Devotional[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
   const { user } = useAuth();
 
   useEffect(() => {
     loadDevotionals();
-    const interval = setInterval(loadDevotionals, 60000); // Refresh every minute
+    const interval = setInterval(loadDevotionals, 60000);
     return () => clearInterval(interval);
   }, []);
 
@@ -82,9 +83,9 @@ const Devotionals = () => {
         </div>
         {isLeaderOrAdmin && (
           <div className="uk-width-auto">
-            <button 
-              className="uk-button uk-button-primary uk-border-rounded" 
-              uk-toggle="target: #modal-create-devotional"
+            <button
+              className="uk-button uk-button-primary uk-border-rounded"
+              onClick={() => setShowModal(true)}
             >
               <span uk-icon="plus" className="uk-margin-small-right"></span>
               Novo Devocional
@@ -102,7 +103,7 @@ const Devotionals = () => {
           background: 'white',
           padding: '48px 24px',
           borderRadius: '12px',
-          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.08)',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
           textAlign: 'center'
         }}>
           <div style={{ fontSize: '48px', marginBottom: '16px' }}>🙏</div>
@@ -118,26 +119,20 @@ const Devotionals = () => {
                   <h3 className="uk-card-title uk-text-bold uk-margin-remove">{dev.title}</h3>
                   {getStatusBadge(dev)}
                 </div>
-                
+
                 <p className="uk-text-meta uk-text-small uk-margin-small">
                   Por {dev.user?.name}
                 </p>
-                
-                {!dev.isActive && (
-                  <div className="uk-alert uk-alert-danger uk-border-rounded uk-margin-small">
-                    Este devocional expirou e não está mais disponível.
-                  </div>
-                )}
-                
+
                 <blockquote className="uk-margin-medium-top" style={{ borderLeft: '3px solid #1e87f0', paddingLeft: '15px' }}>
                   <p className="uk-text-italic uk-text-small">{dev.verse}</p>
                 </blockquote>
-                
+
                 <p className="uk-margin-medium-top uk-text-justify">{dev.content}</p>
 
                 {isLeaderOrAdmin && dev.isActive && (
                   <div className="uk-margin-top uk-flex uk-flex-right">
-                    <button 
+                    <button
                       className="uk-button uk-button-text uk-text-danger uk-button-small"
                       onClick={() => handleMarkInactive(dev.id)}
                     >
@@ -149,7 +144,7 @@ const Devotionals = () => {
 
                 {isLeaderOrAdmin && !dev.isActive && (
                   <div className="uk-margin-top">
-                    <button 
+                    <button
                       className="uk-button uk-button-text uk-text-primary uk-button-small"
                       onClick={() => handleReactivate(dev.id)}
                     >
@@ -175,7 +170,7 @@ const Devotionals = () => {
                     <td className="uk-text-bold">{dev.title}</td>
                     <td className="uk-text-small uk-text-muted">{dev.user?.name}</td>
                     <td className="uk-text-right">
-                      <button 
+                      <button
                         className="uk-button uk-button-link uk-button-small"
                         onClick={() => handleReactivate(dev.id)}
                       >
@@ -190,13 +185,23 @@ const Devotionals = () => {
         </div>
       )}
 
-      {/* Modal create devotional */}
-      <CreateDevotionalModal onCreated={loadDevotionals} />
+      {showModal && (
+        <CreateDevotionalModal
+          onCreated={() => { loadDevotionals(); setShowModal(false); }}
+          onClose={() => setShowModal(false)}
+        />
+      )}
     </div>
   );
 };
 
-const CreateDevotionalModal = ({ onCreated }: { onCreated: () => void }) => {
+const CreateDevotionalModal = ({
+  onCreated,
+  onClose,
+}: {
+  onCreated: () => void;
+  onClose: () => void;
+}) => {
   const [title, setTitle] = useState('');
   const [verse, setVerse] = useState('');
   const [content, setContent] = useState('');
@@ -208,63 +213,108 @@ const CreateDevotionalModal = ({ onCreated }: { onCreated: () => void }) => {
 
     try {
       const result = await api.createDevotional({ title, verse, content });
+
       if (result.success) {
-        setTitle('');
-        setVerse('');
-        setContent('');
-        UIkit.modal('#modal-create-devotional').hide();
+        UIkit.notification({ message: 'Devocional criado com sucesso!', status: 'success' });
         onCreated();
-        UIkit.notification({ message: 'Devocional criado!', status: 'success' });
+      } else {
+        UIkit.notification({
+          message: result.message || 'Erro ao criar devocional',
+          status: 'danger',
+        });
       }
     } catch (err: any) {
-      UIkit.notification({ message: err.message || 'Erro ao criar devocional', status: 'danger' });
+      const msg = err?.data?.message || err?.message || 'Erro ao criar devocional';
+      UIkit.notification({ message: msg, status: 'danger' });
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div id="modal-create-devotional" uk-modal="">
-      <div className="uk-modal-dialog uk-modal-body uk-border-rounded">
-        <button className="uk-modal-close-default" type="button" uk-close=""></button>
-        <h2 className="uk-modal-title uk-text-bold">Novo Devocional</h2>
-        <form className="uk-form-stacked uk-margin-medium-top" onSubmit={handleSubmit}>
+    <div
+      style={{
+        position: 'fixed',
+        top: 0, left: 0, right: 0, bottom: 0,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000,
+      }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div style={{
+        backgroundColor: 'white',
+        borderRadius: '8px',
+        padding: '32px',
+        width: '90%',
+        maxWidth: '600px',
+        maxHeight: '90vh',
+        overflowY: 'auto',
+        boxShadow: '0 10px 40px rgba(0,0,0,0.2)',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+          <h2 style={{ margin: 0, fontSize: '22px', fontWeight: '700' }}>Novo Devocional</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#6c757d' }}
+          >
+            ✕
+          </button>
+        </div>
+
+        <form className="uk-form-stacked" onSubmit={handleSubmit}>
           <div className="uk-margin">
             <label className="uk-form-label">Título</label>
-            <input 
-              className="uk-input" 
-              type="text" 
-              placeholder="Ex: Fé em Ação" 
+            <input
+              className="uk-input uk-border-rounded"
+              type="text"
+              placeholder="Ex: Fé em Ação"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              required 
+              required
+              minLength={3}
             />
           </div>
           <div className="uk-margin">
             <label className="uk-form-label">Versículo Chave</label>
-            <input 
-              className="uk-input" 
-              type="text" 
-              placeholder="Ex: João 3:16" 
+            <input
+              className="uk-input uk-border-rounded"
+              type="text"
+              placeholder="Ex: João 3:16"
               value={verse}
               onChange={(e) => setVerse(e.target.value)}
-              required 
+              required
             />
           </div>
           <div className="uk-margin">
             <label className="uk-form-label">Mensagem</label>
-            <textarea 
-              className="uk-textarea" 
-              rows={6} 
-              placeholder="Escreva a reflexão de hoje..." 
+            <textarea
+              className="uk-textarea uk-border-rounded"
+              rows={6}
+              placeholder="Escreva a reflexão de hoje..."
               value={content}
               onChange={(e) => setContent(e.target.value)}
               required
+              minLength={10}
             ></textarea>
           </div>
-          <div className="uk-modal-footer uk-text-right uk-padding-remove-bottom">
-            <button className="uk-button uk-button-default uk-modal-close uk-border-rounded uk-margin-small-right" type="button">Cancelar</button>
-            <button className="uk-button uk-button-primary uk-border-rounded" type="submit" disabled={loading}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '24px' }}>
+            <button
+              type="button"
+              className="uk-button uk-button-default uk-border-rounded"
+              onClick={onClose}
+              disabled={loading}
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className="uk-button uk-button-primary uk-border-rounded"
+              disabled={loading}
+            >
               {loading ? <span uk-spinner="ratio: 0.6"></span> : 'Salvar'}
             </button>
           </div>

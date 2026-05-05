@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import UIkit from 'uikit';
@@ -29,12 +29,13 @@ interface SocialLink {
 
 const Profile = () => {
   const { userId } = useParams<{ userId: string }>();
-  const navigate = useNavigate();
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, updateUser } = useAuth();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [isOwnProfile, setIsOwnProfile] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [profileImagePreview, setProfileImagePreview] = useState('');
 
   const [editForm, setEditForm] = useState({
     name: '',
@@ -44,6 +45,7 @@ const Profile = () => {
     title: '',
     backgroundTheme: 'light',
     skills: [] as string[],
+    profileImage: '',
   });
 
   useEffect(() => {
@@ -67,12 +69,35 @@ const Profile = () => {
           title: result.data.title || '',
           backgroundTheme: result.data.backgroundTheme || 'light',
           skills: result.data.skills || [],
+          profileImage: result.data.profileImage || '',
         });
       }
     } catch (err) {
       UIkit.notification({ message: 'Erro ao carregar perfil', status: 'danger' });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const previewUrl = URL.createObjectURL(file);
+    setProfileImagePreview(previewUrl);
+
+    setUploadingImage(true);
+    try {
+      const result = await api.uploadProfileImage(file);
+      if (result.success) {
+        setEditForm(prev => ({ ...prev, profileImage: result.data.profileImage }));
+        UIkit.notification({ message: 'Foto carregada! Clique em Salvar para confirmar.', status: 'success' });
+      }
+    } catch (err: any) {
+      UIkit.notification({ message: err.message || 'Erro ao enviar foto', status: 'danger' });
+      setProfileImagePreview('');
+    } finally {
+      setUploadingImage(false);
     }
   };
 
@@ -88,11 +113,14 @@ const Profile = () => {
         backgroundTheme: editForm.backgroundTheme,
         skills: editForm.skills.filter(s => s.trim()),
         socialLinks: profile?.socialLinks,
+        profileImage: editForm.profileImage || undefined,
       });
 
       if (result.success) {
         setProfile(result.data);
         setIsEditing(false);
+        setProfileImagePreview('');
+        updateUser({ name: result.data.name, profileImage: result.data.profileImage });
         UIkit.notification({ message: 'Perfil atualizado com sucesso!', status: 'success' });
       }
     } catch (err: any) {
@@ -102,23 +130,17 @@ const Profile = () => {
 
   const getRoleBadgeClass = (role: string) => {
     switch (role) {
-      case 'admin':
-        return 'uk-label-danger';
-      case 'leader':
-        return 'uk-label-warning';
-      default:
-        return 'uk-label-info';
+      case 'admin': return 'uk-label-danger';
+      case 'leader': return 'uk-label-warning';
+      default: return 'uk-label-info';
     }
   };
 
   const getRoleLabel = (role: string) => {
     switch (role) {
-      case 'admin':
-        return 'Administrador';
-      case 'leader':
-        return 'Líder';
-      default:
-        return 'Membro';
+      case 'admin': return 'Administrador';
+      case 'leader': return 'Líder';
+      default: return 'Membro';
     }
   };
 
@@ -138,7 +160,7 @@ const Profile = () => {
     );
   }
 
-  const backgroundThemes = {
+  const backgroundThemes: Record<string, string> = {
     light: '#ffffff',
     dark: '#2c3e50',
     blue: '#3498db',
@@ -146,29 +168,26 @@ const Profile = () => {
     purple: '#8e44ad',
   };
 
+  const currentAvatarSrc = profileImagePreview || editForm.profileImage || profile.profileImage;
+
   return (
     <div>
       {/* Header with background */}
-      <div 
+      <div
         className="uk-padding uk-padding-large uk-border-rounded uk-margin-bottom"
-        style={{ 
-          backgroundColor: backgroundThemes[editForm.backgroundTheme as keyof typeof backgroundThemes] || '#ffffff',
-          color: ['dark', 'blue', 'green', 'purple'].includes(editForm.backgroundTheme) ? '#fff' : '#000'
+        style={{
+          backgroundColor: backgroundThemes[profile.backgroundTheme || 'light'] || '#ffffff',
+          color: ['dark', 'blue', 'green', 'purple'].includes(profile.backgroundTheme || '') ? '#fff' : '#000'
         }}
       >
         <div className="uk-grid uk-grid-medium uk-flex-middle" uk-grid="true">
           <div className="uk-width-auto">
-            <div 
+            <div
               className="uk-border-circle uk-flex uk-flex-center uk-flex-middle"
-              style={{
-                width: '120px',
-                height: '120px',
-                backgroundColor: '#ddd',
-                fontSize: '48px'
-              }}
+              style={{ width: '120px', height: '120px', backgroundColor: '#ddd', fontSize: '48px', overflow: 'hidden' }}
             >
               {profile.profileImage ? (
-                <img src={profile.profileImage} alt={profile.name} style={{ borderRadius: '50%', width: '100%', height: '100%', objectFit: 'cover' }} />
+                <img src={profile.profileImage} alt={profile.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               ) : (
                 <span uk-icon="icon: user; ratio: 2"></span>
               )}
@@ -191,7 +210,7 @@ const Profile = () => {
           </div>
           {isOwnProfile && (
             <div className="uk-width-auto">
-              <button 
+              <button
                 className="uk-button uk-button-primary uk-border-rounded"
                 onClick={() => setIsEditing(!isEditing)}
               >
@@ -209,6 +228,58 @@ const Profile = () => {
           <h3 className="uk-card-title">Editar Perfil</h3>
           <form onSubmit={handleSaveProfile} className="uk-form-stacked">
             <div className="uk-grid uk-grid-medium" uk-grid="true">
+
+              {/* Foto de Perfil */}
+              <div className="uk-width-1-1">
+                <label className="uk-form-label">Foto de Perfil</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginTop: '8px' }}>
+                  <div
+                    style={{
+                      width: '80px',
+                      height: '80px',
+                      borderRadius: '50%',
+                      backgroundColor: '#e9ecef',
+                      overflow: 'hidden',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      border: '2px dashed #adb5bd',
+                      cursor: 'pointer',
+                      flexShrink: 0,
+                    }}
+                    onClick={() => document.getElementById('profileImageInput')?.click()}
+                  >
+                    {currentAvatarSrc ? (
+                      <img src={currentAvatarSrc} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      <span uk-icon="icon: camera; ratio: 1.5" style={{ color: '#adb5bd' }}></span>
+                    )}
+                  </div>
+                  <div>
+                    <input
+                      id="profileImageInput"
+                      type="file"
+                      accept="image/jpeg,image/png,image/gif,image/webp"
+                      style={{ display: 'none' }}
+                      onChange={handleImageSelect}
+                    />
+                    <button
+                      type="button"
+                      className="uk-button uk-button-default uk-border-rounded"
+                      onClick={() => document.getElementById('profileImageInput')?.click()}
+                      disabled={uploadingImage}
+                    >
+                      {uploadingImage ? 'Enviando...' : 'Alterar Foto'}
+                    </button>
+                    {editForm.profileImage && !uploadingImage && (
+                      <p className="uk-text-small uk-text-success" style={{ marginTop: '6px', marginBottom: 0 }}>
+                        ✓ Foto pronta para salvar
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               <div className="uk-width-1-2@m">
                 <label className="uk-form-label">Nome</label>
                 <input
@@ -327,7 +398,7 @@ const Profile = () => {
                 instagram: 'instagram',
               };
               return (
-                <a 
+                <a
                   key={link.id}
                   href={link.url}
                   target="_blank"
