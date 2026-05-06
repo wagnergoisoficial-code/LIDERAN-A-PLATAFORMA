@@ -109,6 +109,74 @@ class ChurchRepository {
       data: { churchId },
     });
   }
+
+  async removeMemberFromChurch(userId, churchId) {
+    return this.prisma.user.updateMany({
+      where: { id: userId, churchId },
+      data: { churchId: null },
+    });
+  }
+
+  async updateMember(userId, churchId, data) {
+    return this.prisma.user.updateMany({
+      where: { id: userId, churchId },
+      data: {
+        name: data.name || undefined,
+        title: data.title !== undefined ? data.title : undefined,
+        location: data.location !== undefined ? data.location : undefined,
+        age: data.age !== undefined ? data.age : undefined,
+      },
+    });
+  }
+
+  async getMemberById(userId, churchId) {
+    return this.prisma.user.findFirst({
+      where: { id: userId, churchId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        profileImage: true,
+        title: true,
+        location: true,
+        age: true,
+      },
+    });
+  }
+
+  async getMemberStats(churchId) {
+    const members = await this.prisma.user.findMany({
+      where: { churchId },
+      select: {
+        id: true,
+        name: true,
+        _count: {
+          select: {
+            posts: { where: { churchId } },
+            comments: { where: { post: { churchId } } },
+            messages: { where: { churchId } },
+          },
+        },
+      },
+    });
+
+    const withTotals = members.map(m => ({
+      userId: m.id,
+      name: m.name,
+      posts: m._count.posts,
+      comments: m._count.comments,
+      messages: m._count.messages,
+      total: m._count.posts + m._count.comments + m._count.messages,
+    }));
+
+    const grandTotal = withTotals.reduce((acc, m) => acc + m.total, 0);
+
+    return withTotals.map(m => ({
+      ...m,
+      percentage: grandTotal > 0 ? Math.round((m.total / grandTotal) * 100) : 0,
+    }));
+  }
 }
 
 module.exports = new ChurchRepository();

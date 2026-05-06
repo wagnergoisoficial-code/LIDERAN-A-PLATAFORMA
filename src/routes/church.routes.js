@@ -33,9 +33,24 @@ router.get('/:churchId/members', authMiddleware, (req, res, next) => {
   ChurchController.getChurchMembers(req, res, next);
 });
 
+// Get member engagement stats
+router.get('/:churchId/member-stats', authMiddleware, (req, res, next) => {
+  ChurchController.getMemberStats(req, res, next);
+});
+
 // Add member to church
 router.post('/:churchId/members', authMiddleware, (req, res, next) => {
   ChurchController.addMemberToChurch(req, res, next);
+});
+
+// Update member
+router.put('/:churchId/members/:memberId', authMiddleware, (req, res, next) => {
+  ChurchController.updateMember(req, res, next);
+});
+
+// Remove member from church
+router.delete('/:churchId/members/:memberId', authMiddleware, (req, res, next) => {
+  ChurchController.removeMemberFromChurch(req, res, next);
 });
 
 module.exports = router;

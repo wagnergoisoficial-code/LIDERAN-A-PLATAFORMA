@@ -122,6 +122,55 @@ class ChurchController {
       next(error);
     }
   }
+
+  async getMemberStats(req, res, next) {
+    try {
+      const { churchId } = req.params;
+      const stats = await ChurchService.getMemberStats(churchId);
+      res.status(200).json({ success: true, data: stats });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async removeMemberFromChurch(req, res, next) {
+    try {
+      const { churchId, memberId } = req.params;
+      const leaderId = req.user.id;
+
+      await ChurchService.removeMemberFromChurch(memberId, churchId, leaderId);
+
+      res.status(200).json({
+        success: true,
+        message: 'Member removed from church successfully',
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateMember(req, res, next) {
+    try {
+      const { churchId, memberId } = req.params;
+      const { name, title, location, age } = req.body;
+      const leaderId = req.user.id;
+
+      const member = await ChurchService.updateMember(
+        memberId,
+        churchId,
+        { name, title, location, age: age ? parseInt(age) : undefined },
+        leaderId
+      );
+
+      res.status(200).json({
+        success: true,
+        message: 'Member updated successfully',
+        data: member,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 module.exports = new ChurchController();

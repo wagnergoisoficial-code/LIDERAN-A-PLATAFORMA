@@ -119,6 +119,58 @@ class ChurchService {
 
     return ChurchRepository.addMemberToChurch(userId, churchId);
   }
+
+  async removeMemberFromChurch(userId, churchId, leaderId) {
+    const church = await ChurchRepository.findById(churchId);
+
+    if (!church) {
+      throw new AppError('Church not found', 404);
+    }
+
+    if (church.leaderID !== leaderId) {
+      throw new AppError('Only the church leader can remove members', 403);
+    }
+
+    if (userId === leaderId) {
+      throw new AppError('The leader cannot be removed from the church', 400);
+    }
+
+    const result = await ChurchRepository.removeMemberFromChurch(userId, churchId);
+
+    if (result.count === 0) {
+      throw new AppError('Member not found in this church', 404);
+    }
+
+    return result;
+  }
+
+  async getMemberStats(churchId) {
+    const church = await ChurchRepository.findById(churchId);
+    if (!church) {
+      throw new AppError('Church not found', 404);
+    }
+    return ChurchRepository.getMemberStats(churchId);
+  }
+
+  async updateMember(userId, churchId, data, leaderId) {
+    const church = await ChurchRepository.findById(churchId);
+
+    if (!church) {
+      throw new AppError('Church not found', 404);
+    }
+
+    if (church.leaderID !== leaderId) {
+      throw new AppError('Only the church leader can update members', 403);
+    }
+
+    const result = await ChurchRepository.updateMember(userId, churchId, data);
+
+    if (result.count === 0) {
+      throw new AppError('Member not found in this church', 404);
+    }
+
+    return ChurchRepository.getMemberById(userId, churchId);
+  }
 }
 
 module.exports = new ChurchService();
