@@ -236,6 +236,24 @@ export const api = {
       body: JSON.stringify(data)
     }).then(handleResponse),
 
+  updateChurchMember: (churchId: string, memberId: string, data: any) =>
+    fetch(`${BASE_URL}/churches/${churchId}/members/${memberId}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    }).then(handleResponse),
+
+  removeMemberFromChurch: (churchId: string, memberId: string) =>
+    fetch(`${BASE_URL}/churches/${churchId}/members/${memberId}`, {
+      method: 'DELETE',
+      headers: getHeaders()
+    }).then(handleResponse),
+
+  getChurchMemberStats: (churchId: string) =>
+    fetch(`${BASE_URL}/churches/${churchId}/member-stats`, {
+      headers: getHeaders()
+    }).then(handleResponse),
+
   // Chat
   getMessages: (limit: number = 50, lastMessageId?: string) => {
     const params = new URLSearchParams({ limit: limit.toString() });
