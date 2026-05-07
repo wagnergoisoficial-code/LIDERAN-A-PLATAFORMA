@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import UIkit from 'uikit';
+import Avatar from './Avatar';
 
 interface ChurchMembersProps {
   churchId: string;
@@ -220,7 +221,16 @@ const ChurchMembers: React.FC<ChurchMembersProps> = ({ churchId }) => {
             <tbody>
               {members.map((member: any) => (
                 <tr key={member.id} style={{ borderBottom: '1px solid #e9ecef' }}>
-                  <td style={{ padding: '12px 8px', color: '#212529', fontWeight: '500' }}>{member.name}</td>
+                  <td style={{ padding: '12px 8px', color: '#212529', fontWeight: '500' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Avatar 
+                        name={member.name} 
+                        profileImage={member.profileImage}
+                        size="small"
+                      />
+                      <span>{member.name}</span>
+                    </div>
+                  </td>
                   <td style={{ padding: '12px 8px', color: '#6c757d' }}>{member.email}</td>
                   <td style={{ padding: '12px 8px', color: '#6c757d' }}>{member.title || '-'}</td>
                   <td style={{ padding: '12px 8px', color: '#6c757d' }}>{member.location || '-'}</td>

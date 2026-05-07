@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import UIkit from 'uikit';
+import Avatar from '../components/Avatar';
 
 interface Member {
   id: string;
@@ -339,15 +340,11 @@ const Users = () => {
               {members.map((m) => (
                 <tr key={m.id}>
                   <td>
-                    {m.profileImage ? (
-                      <img
-                        src={m.profileImage}
-                        alt={m.name}
-                        style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover' }}
-                      />
-                    ) : (
-                      <span className="uk-icon-button" uk-icon="user"></span>
-                    )}
+                    <Avatar 
+                      name={m.name} 
+                      profileImage={m.profileImage}
+                      size="small"
+                    />
                   </td>
                   <td className="uk-text-bold">{m.name}</td>
                   <td>{m.email}</td>

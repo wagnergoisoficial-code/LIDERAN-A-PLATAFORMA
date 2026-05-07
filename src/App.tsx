@@ -2,7 +2,7 @@ import React from 'react';
 import { Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 
-// Pages
+// Pages small
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Feed from './pages/Feed';
@@ -96,7 +96,7 @@ export default function App() {
       {isAuthenticated && <Navbar />}
       
       <main className={isAuthenticated ? "uk-section uk-section-xsmall uk-margin-top" : ""}>
-        <div className="uk-container uk-container-small">
+        <div className="uk-container uk-container">
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />

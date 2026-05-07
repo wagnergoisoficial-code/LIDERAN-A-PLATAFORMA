@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import UIkit from 'uikit';
+import Avatar from '../components/Avatar';
 
 interface Message {
   id: string;
@@ -409,17 +410,11 @@ const Chat = () => {
               const isOwnMessage = user?.id === message.user.id;
               return (
                 <div key={message.id} className={`message-item ${isOwnMessage ? 'own' : ''}`}>
-                  {message.user.profileImage ? (
-                    <img
-                      src={message.user.profileImage}
-                      alt={message.user.name}
-                      className="message-avatar"
-                    />
-                  ) : (
-                    <div className="message-avatar-placeholder">
-                      {message.user.name.charAt(0).toUpperCase()}
-                    </div>
-                  )}
+                  <Avatar 
+                    name={message.user.name} 
+                    profileImage={message.user.profileImage}
+                    size="small"
+                  />
 
                   <div className="message-body">
                     <div className="message-header">

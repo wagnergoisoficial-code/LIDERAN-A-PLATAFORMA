@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import UIkit from 'uikit';
+import Avatar from '../components/Avatar';
 
 interface Comment {
   id: string;
   content: string;
   userName: string;
+  userProfileImage?: string;
   createdAt: string;
 }
 
@@ -14,6 +16,7 @@ interface Post {
   content: string;
   imageUrl?: string;
   userName: string;
+  userProfileImage?: string;
   createdAt: string;
   comments: Comment[];
   _count?: {
@@ -186,7 +189,11 @@ const PostCard = ({ post, onComment, onLike, isLiked }: PostCardProps) => {
       <div style={{ padding: '16px 20px', borderBottom: '1px solid #f0f0f0' }}>
         <div className="uk-flex uk-flex-middle">
           <div className="uk-width-auto uk-margin-small-right">
-            <span className="uk-icon-button" uk-icon="user"></span>
+            <Avatar 
+              name={post.userName} 
+              profileImage={post.userProfileImage}
+              size="small"
+            />
           </div>
           <div className="uk-width-expand">
             <h5 style={{ margin: 0, fontWeight: 600, fontSize: '14px' }}>{post.userName}</h5>
@@ -301,7 +308,11 @@ const PostCard = ({ post, onComment, onLike, isLiked }: PostCardProps) => {
               <li key={comment.id} style={{ marginBottom: '12px', paddingBottom: '12px', borderBottom: '1px solid #eee' }}>
                 <div style={{ display: 'flex', gap: '10px' }}>
                   <div style={{ flexShrink: 0 }}>
-                    <span className="uk-icon-button" uk-icon="icon: user; ratio: 0.8"></span>
+                    <Avatar 
+                      name={comment.userName} 
+                      profileImage={comment.userProfileImage}
+                      size="small"
+                    />
                   </div>
                   <div style={{ flex: 1 }}>
                     <span style={{ fontWeight: 600, fontSize: '13px', color: '#333' }}>{comment.userName}</span>

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import UIkit from 'uikit';
+import Avatar from '../components/Avatar';
 
 interface Devotional {
   id: string;
@@ -12,7 +13,7 @@ interface Devotional {
   isActive: boolean;
   hoursRemaining: number;
   shouldBeInactive: boolean;
-  user?: { id: string; name: string };
+  user?: { id: string; name: string; profileImage?: string };
 }
 
 const Devotionals = () => {
@@ -121,7 +122,14 @@ const Devotionals = () => {
                 </div>
 
                 <p className="uk-text-meta uk-text-small uk-margin-small">
-                  Por {dev.user?.name}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Avatar 
+                      name={dev.user?.name || 'Desconhecido'} 
+                      profileImage={dev.user?.profileImage}
+                      size="small"
+                    />
+                    <span>Por {dev.user?.name}</span>
+                  </div>
                 </p>
 
                 <blockquote className="uk-margin-medium-top" style={{ borderLeft: '3px solid #1e87f0', paddingLeft: '15px' }}>
