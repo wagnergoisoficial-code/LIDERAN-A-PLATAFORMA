@@ -21,8 +21,8 @@ class PostRepository {
     return this.prisma.post.findMany({
       where: { churchId },
       include: {
-        user: { select: { id: true, name: true } },
-        comments: { select: { id: true, content: true, user: { select: { name: true } } } },
+        user: { select: { id: true, name: true, profileImage: true } },
+        comments: { select: { id: true, content: true, user: { select: { name: true, profileImage: true } } } },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -32,8 +32,8 @@ class PostRepository {
     return this.prisma.post.findUnique({
       where: { id },
       include: {
-        user: { select: { id: true, name: true } },
-        comments: { include: { user: { select: { id: true, name: true } } } },
+        user: { select: { id: true, name: true, profileImage: true } },
+        comments: { include: { user: { select: { id: true, name: true, profileImage: true } } } },
       },
     });
   }

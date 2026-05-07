@@ -4,6 +4,24 @@ class PostController {
     this.postService = postService;
   }
 
+  formatPostForResponse(post) {
+    return {
+      id: post.id,
+      content: post.content,
+      imageUrl: post.imageUrl,
+      userName: post.user?.name,
+      userProfileImage: post.user?.profileImage,
+      createdAt: post.createdAt,
+      comments: post.comments?.map(comment => ({
+        id: comment.id,
+        content: comment.content,
+        userName: comment.user?.name,
+        userProfileImage: comment.user?.profileImage,
+        createdAt: comment.createdAt,
+      })) || [],
+    };
+  }
+
   async createPost(req, res, next) {
     try {
       const CreatePostDto = require('../dtos/CreatePostDto');
@@ -21,7 +39,7 @@ class PostController {
       res.status(201).json({
         success: true,
         message: 'Post created successfully',
-        data: post,
+        data: this.formatPostForResponse(post),
       });
     } catch (error) {
       next(error);
@@ -35,7 +53,7 @@ class PostController {
       res.status(200).json({
         success: true,
         message: 'Posts retrieved successfully',
-        data: posts,
+        data: posts.map(post => this.formatPostForResponse(post)),
       });
     } catch (error) {
       next(error);
@@ -49,7 +67,7 @@ class PostController {
       res.status(200).json({
         success: true,
         message: 'Post retrieved successfully',
-        data: post,
+        data: this.formatPostForResponse(post),
       });
     } catch (error) {
       next(error);

@@ -10,7 +10,7 @@ class DevotionalRepository {
     return this.prisma.devotional.create({
       data,
       include: {
-        user: { select: { id: true, name: true } },
+        user: { select: { id: true, name: true, profileImage: true } },
       },
     });
   }
@@ -19,7 +19,7 @@ class DevotionalRepository {
     return this.prisma.devotional.findMany({
       where: { churchId },
       include: {
-        user: { select: { id: true, name: true } },
+        user: { select: { id: true, name: true, profileImage: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -29,7 +29,7 @@ class DevotionalRepository {
     return this.prisma.devotional.findUnique({
       where: { id },
       include: {
-        user: { select: { id: true, name: true } },
+        user: { select: { id: true, name: true, profileImage: true } },
       },
     });
   }
@@ -39,7 +39,7 @@ class DevotionalRepository {
       where: { id },
       data,
       include: {
-        user: { select: { id: true, name: true } },
+        user: { select: { id: true, name: true, profileImage: true } },
       },
     });
   }
