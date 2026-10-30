@@ -40,9 +40,17 @@ const Chat = () => {
 
   useEffect(() => { loadMessages(); }, []);
   useEffect(() => { scrollToBottom(); }, [messages]);
+  // Atualiza a cada 3 segundos, só com o separador visível (poupa o servidor)
   useEffect(() => {
-    pollRef.current = setInterval(loadMessages, 1000);
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+    pollRef.current = setInterval(() => {
+      if (document.visibilityState === 'visible') loadMessages();
+    }, 3000);
+    const onVisible = () => { if (document.visibilityState === 'visible') loadMessages(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, []);
 
   const handleSend = async (e: React.FormEvent) => {

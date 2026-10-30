@@ -39,14 +39,36 @@ const Feed = () => {
   const [polls, setPolls] = useState<Poll[]>([]);
   const [ranking, setRanking] = useState<RankMember[]>([]);
   const [loadingPosts, setLoadingPosts] = useState(true);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const loadPosts = useCallback(async () => {
     try {
       const result = await api.getPosts();
-      if (result.success) setPosts(result.data);
+      if (result.success) {
+        setPosts(result.data);
+        setNextCursor(result.nextCursor || null);
+      }
     } catch { setPosts([]); }
     finally { setLoadingPosts(false); }
   }, []);
+
+  // Próxima página do feed (sem repetir publicações já mostradas)
+  const loadMore = async () => {
+    if (!nextCursor || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const result = await api.getPosts(nextCursor);
+      if (result.success) {
+        setPosts(prev => [...prev, ...result.data.filter((p: Post) => !prev.some(existing => existing.id === p.id))]);
+        setNextCursor(result.nextCursor || null);
+      }
+    } catch (err: any) {
+      UIkit.notification({ message: err.message || 'Erro ao carregar publicações', status: 'danger', pos: 'top-right' });
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   const loadPolls = useCallback(async () => {
     try {
@@ -178,12 +200,21 @@ const Feed = () => {
         ) : regularPosts.length === 0 && pinnedPosts.length === 0 ? (
           <EmptyState icon="pencil" title="Nenhum post ainda" text="Seja o primeiro a compartilhar algo inspirador" />
         ) : (
-          <div className="stagger">
-            {regularPosts.map(post => (
-              <PostCard key={post.id} post={post} currentUserId={user?.id || ''} userRole={user?.role || ''}
-                onComment={handleAddComment} onReact={handleReact} onPin={handlePin} onDelete={handleDeletePost} onDeleteComment={handleDeleteComment} />
-            ))}
-          </div>
+          <>
+            <div className="stagger">
+              {regularPosts.map(post => (
+                <PostCard key={post.id} post={post} currentUserId={user?.id || ''} userRole={user?.role || ''}
+                  onComment={handleAddComment} onReact={handleReact} onPin={handlePin} onDelete={handleDeletePost} onDeleteComment={handleDeleteComment} />
+              ))}
+            </div>
+            {nextCursor && (
+              <div style={{ textAlign: 'center', margin: '8px 0 24px' }}>
+                <button className="uk-button uk-button-default" onClick={loadMore} disabled={loadingMore}>
+                  {loadingMore ? <><span uk-spinner="ratio: 0.5"></span> Carregando...</> : 'Carregar mais'}
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
 

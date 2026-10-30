@@ -5,11 +5,12 @@ import {defineConfig, loadEnv} from 'vite';
 
 export default defineConfig(({mode}) => {
   const env = loadEnv(mode, '.', '');
+  // Em produção o endereço da API tem de vir de VITE_API_URL (ex.: https://api.exemplo.com/api)
+  if (mode === 'production' && !env.VITE_API_URL) {
+    console.warn('\n⚠️  VITE_API_URL não definida: o site vai chamar /api no próprio domínio.\n');
+  }
   return {
     plugins: [react(), tailwindcss()],
-    define: {
-      'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

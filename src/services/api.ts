@@ -2,7 +2,8 @@
  * API Service following the Youth Church Portal integration guide
  */
 
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+// Em produção vem de VITE_API_URL (definida no build); localmente aponta para o backend de desenvolvimento
+const BASE_URL = (import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:3000/api' : '/api')).replace(/\/+$/, '');
 
 export const TOKEN_KEY = 'auth_token';
 export const USER_KEY = 'auth_user';
@@ -158,8 +159,9 @@ export const api = {
     }
   },
 
-  getPosts: () => 
-    request(`/posts`),
+  // Feed paginado: a resposta traz nextCursor quando há mais publicações
+  getPosts: (cursor?: string) =>
+    request(`/posts${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`),
 
   addComment: (postId: string, data: any) => 
     request(`/posts/${postId}/comment`, {

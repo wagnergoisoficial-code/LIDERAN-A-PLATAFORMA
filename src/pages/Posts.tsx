@@ -196,7 +196,7 @@ const Posts = () => {
             <div className="card" style={{ marginTop: '16px', background: 'var(--bg-surface)', padding: '14px 20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
               <span uk-icon="icon: check; ratio: 0.9" style={{ flexShrink: 0 }}></span>
               <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-                Você tem <strong style={{ color: 'var(--text)' }}>{recentPosts.length}</strong> {recentPosts.length === 1 ? 'publicação' : 'publicações'} no feed.
+                Suas publicações recentes estão no feed.
               </span>
             </div>
           )}
