@@ -24,6 +24,7 @@ class GroupRepository {
       where: { churchId },
       include: this.include(),
       orderBy: { createdAt: 'desc' },
+      take: 200,
     });
   }
 

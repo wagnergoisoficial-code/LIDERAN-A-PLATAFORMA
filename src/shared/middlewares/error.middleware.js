@@ -19,7 +19,17 @@ const normalizeError = (err) => {
     return new AppError('Corpo da requisição inválido', 400);
   }
 
-  return new AppError(err.message || 'Erro interno do servidor', err.statusCode || 500);
+  if (err.type === 'entity.too.large') {
+    return new AppError('Conteúdo demasiado grande', 413);
+  }
+
+  // Em produção, erros inesperados não revelam detalhes internos
+  const status = err.statusCode || err.status || 500;
+  if (status >= 500 && process.env.NODE_ENV === 'production') {
+    return new AppError('Erro interno do servidor', 500);
+  }
+
+  return new AppError(err.message || 'Erro interno do servidor', status);
 };
 
 // Global error handling middleware

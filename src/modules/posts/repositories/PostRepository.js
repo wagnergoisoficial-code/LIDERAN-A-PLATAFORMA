@@ -31,12 +31,29 @@ class PostRepository {
     return this.prisma.post.create({ data, include: this.postInclude() });
   }
 
-  async findAll(churchId, hiddenUserIds = []) {
-    return this.prisma.post.findMany({
-      where: { churchId, ...(hiddenUserIds.length && { userId: { notIn: hiddenUserIds } }) },
+  async findPage(churchId, hiddenUserIds = [], { cursor, limit = 20 } = {}) {
+    const visible = { churchId, ...(hiddenUserIds.length && { userId: { notIn: hiddenUserIds } }) };
+
+    const pinned = cursor
+      ? []
+      : await this.prisma.post.findMany({
+          where: { ...visible, isPinned: true },
+          include: this.postInclude(hiddenUserIds),
+          orderBy: { createdAt: 'desc' },
+          take: 20,
+        });
+
+    const regular = await this.prisma.post.findMany({
+      where: { ...visible, isPinned: false },
       include: this.postInclude(hiddenUserIds),
-      orderBy: [{ isPinned: 'desc' }, { createdAt: 'desc' }],
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: limit + 1,
+      ...(cursor && { cursor: { id: cursor }, skip: 1 }),
     });
+
+    const hasMore = regular.length > limit;
+    const page = hasMore ? regular.slice(0, limit) : regular;
+    return { posts: [...pinned, ...page], nextCursor: hasMore ? page[page.length - 1].id : null };
   }
 
   async findById(id, hiddenUserIds = []) {

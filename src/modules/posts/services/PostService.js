@@ -6,6 +6,7 @@ const {
   assertLeader,
 } = require('../../../shared/utils/church.util');
 const { notifyChurch, notifyUser, preview } = require('../../../shared/utils/notifier');
+const { pageSize } = require('../../../shared/utils/query.util');
 
 const REACTION_TYPES = ['amen', 'praying', 'heart', 'fire', 'strong'];
 
@@ -36,10 +37,11 @@ class PostService {
     return post;
   }
 
-  async getAllPosts(user) {
-    if (!user.churchId) return [];
+  // Feed paginado: a primeira página traz também as publicações fixadas
+  async getAllPosts(user, { cursor, limit } = {}) {
+    if (!user.churchId) return { posts: [], nextCursor: null };
     const hidden = await this.postRepository.blockedIds(user.id);
-    return this.postRepository.findAll(user.churchId, hidden);
+    return this.postRepository.findPage(user.churchId, hidden, { cursor, limit: pageSize(limit) });
   }
 
   async getPostById(id, user) {

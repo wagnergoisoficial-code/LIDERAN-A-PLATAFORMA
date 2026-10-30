@@ -20,6 +20,7 @@ class PollRepository {
       where: { churchId },
       include: { options: { include: { votes: true } } },
       orderBy: { createdAt: 'desc' },
+      take: 50,
     });
   }
 

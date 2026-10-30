@@ -80,6 +80,7 @@ class ChurchRepository {
       where: { churchId },
       select: MEMBER_SELECT,
       orderBy: { createdAt: 'asc' },
+      take: 1000,
     });
   }
 

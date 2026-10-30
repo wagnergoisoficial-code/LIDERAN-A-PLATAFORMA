@@ -40,9 +40,10 @@ class PostController {
 
   async createPost(req, res, next) {
     try {
+      // A imagem só pode vir do upload (nunca de um link enviado pelo cliente)
       const dto = new CreatePostDto({
         content: req.body.content,
-        imageUrl: req.body.imageUrl,
+        imageUrl: req.uploadedImageUrl || null,
         userId: req.user.id,
       });
 
@@ -62,11 +63,15 @@ class PostController {
 
   async getAllPosts(req, res, next) {
     try {
-      const posts = await this.postService.getAllPosts(req.user);
+      const { posts, nextCursor } = await this.postService.getAllPosts(req.user, {
+        cursor: req.query.cursor,
+        limit: req.query.limit,
+      });
 
       res.status(200).json({
         success: true,
         data: posts.map((post) => this.formatPostForResponse(post, req.user.id)),
+        nextCursor,
       });
     } catch (error) {
       next(error);

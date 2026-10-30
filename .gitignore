@@ -1,0 +1,16 @@
+# Dependências e artefactos
+node_modules/
+coverage/
+*.log
+.DS_Store
+
+# Segredos: use .env.example como modelo
+.env
+.env.*
+!.env.example
+
+# Base de dados local (SQLite) e ficheiros enviados
+prisma/prisma/*.db
+prisma/prisma/*.db-journal
+uploads/*
+!uploads/.gitkeep

@@ -12,12 +12,15 @@ class EventRepository {
     });
   }
 
+  // Os 200 eventos mais recentes (inclui todos os próximos), em ordem cronológica
   async findAll(churchId) {
-    return this.prisma.event.findMany({
+    const events = await this.prisma.event.findMany({
       where: { churchId },
       include: { attendances: { include: { user: { select: { id: true, name: true, profileImage: true } } } } },
-      orderBy: { startDate: 'asc' },
+      orderBy: { startDate: 'desc' },
+      take: 200,
     });
+    return events.reverse();
   }
 
   async findById(id) {

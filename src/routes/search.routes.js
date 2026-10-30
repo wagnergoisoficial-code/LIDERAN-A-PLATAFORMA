@@ -1,6 +1,7 @@
 const express = require('express');
 const { getPrismaClient } = require('../config/database');
 const authMiddleware = require('../shared/middlewares/auth.middleware');
+const { textContains } = require('../shared/utils/query.util');
 
 const searchRoutes = express.Router();
 
@@ -17,23 +18,23 @@ searchRoutes.get('/', authMiddleware, async (req, res, next) => {
 
     const [posts, members, events, sermons] = await Promise.all([
       prisma.post.findMany({
-        where: { churchId, content: { contains: term } },
+        where: { churchId, content: textContains(term) },
         include: { user: { select: { id: true, name: true, profileImage: true } } },
         orderBy: { createdAt: 'desc' },
         take: 5,
       }),
       prisma.user.findMany({
-        where: { churchId, name: { contains: term } },
+        where: { churchId, name: textContains(term) },
         select: { id: true, name: true, profileImage: true, role: true, title: true },
         take: 5,
       }),
       prisma.event.findMany({
-        where: { churchId, title: { contains: term } },
+        where: { churchId, title: textContains(term) },
         orderBy: { startDate: 'asc' },
         take: 5,
       }),
       prisma.sermonNote.findMany({
-        where: { churchId, OR: [{ title: { contains: term } }, { speaker: { contains: term } }] },
+        where: { churchId, OR: [{ title: textContains(term) }, { speaker: textContains(term) }] },
         include: { author: { select: { id: true, name: true } } },
         orderBy: { date: 'desc' },
         take: 5,

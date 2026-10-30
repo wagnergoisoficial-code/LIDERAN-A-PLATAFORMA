@@ -1,0 +1,459 @@
+// GERADO por scripts/prisma-postgres.js a partir de prisma/schema.prisma — não editar à mão.
+// This is your Prisma schema file.
+// Learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Church/Organization
+model Church {
+  id        String   @id @default(cuid())
+  name      String
+  title     String?              // Nome da Igreja
+  description String?            // Descrição da comunidade
+  imageUrl  String?              // Logo/imagem da comunidade
+  cultosDias String?             // Dias de culto (JSON: ["segunda", "quarta", "domingo"])
+  leaderID  String?              // ID do líder que criou
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  users        User[]
+  posts        Post[]
+  devotionals  Devotional[]
+  messages     Message[]
+  events       Event[]
+  prayerRequests PrayerRequest[]
+  polls        Poll[]
+  sermonNotes  SermonNote[]
+  groups       Group[]
+
+  @@map("churches")
+}
+
+// User with role-based access
+model User {
+  id                String   @id @default(cuid())
+  email             String   @unique
+  name              String
+  password          String
+  role              String   @default("member") // member, leader, admin
+  
+  // Profile fields
+  age               Int?
+  birthDate         DateTime?
+  bio               String?
+  skills            String? // JSON string of skills
+  profileImage      String?
+  backgroundTheme   String   @default("light")
+  location          String?
+  title             String?  // Job title or church role
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Foreign keys
+  churchId  String?
+  church    Church?   @relation(fields: [churchId], references: [id], onDelete: SetNull)
+  
+  leaderId  String?   // ID do líder que registrou este membro
+
+  // Relations
+  posts              Post[]
+  comments           Comment[]
+  devotionals        Devotional[]
+  socialLinks        SocialLink[]
+  achievements       Achievement[]
+  blockedByUsers     BlockedUser[] @relation("blocker")
+  blockedUsers       BlockedUser[] @relation("blocked")
+  messages           Message[]
+  postReactions      PostReaction[]
+  eventAttendances   EventAttendance[]
+  prayers            Prayer[]
+  pollVotes          PollVote[]
+  notifications      Notification[]
+  sermonNotes        SermonNote[]
+  groupMemberships   GroupMember[]
+  ledGroups          Group[]          @relation("GroupLeader")
+  devotionalLikes    DevotionalLike[]
+
+  @@index([churchId])
+  @@map("users")
+}
+
+// Social Links
+model SocialLink {
+  id        String   @id @default(cuid())
+  platform  String   // whatsapp, linkedin, facebook, instagram
+  url       String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("social_links")
+}
+
+// Achievements/Badges
+model Achievement {
+  id        String   @id @default(cuid())
+  name      String   // "Top Commenter", "Top Fan", etc.
+  description String?
+  icon      String?
+  createdAt DateTime @default(now())
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("achievements")
+}
+
+// Blocked Users
+model BlockedUser {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  blockerId String
+  blocker   User     @relation("blocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  
+  blockedId String
+  blocked   User     @relation("blocked", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerId, blockedId])
+  @@index([blockerId])
+  @@index([blockedId])
+  @@map("blocked_users")
+}
+
+// Church Posts/Feed
+model Post {
+  id        String   @id @default(cuid())
+  content   String
+  imageUrl  String?
+  isPinned  Boolean  @default(false)
+  type      String   @default("post") // post, announcement
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Foreign keys
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  churchId  String
+  church    Church   @relation(fields: [churchId], references: [id], onDelete: Cascade)
+
+  // Relations
+  comments  Comment[]
+  reactions PostReaction[]
+
+  @@index([userId])
+  @@index([churchId])
+  @@map("posts")
+}
+
+// Post Reactions (amen, praying, heart, fire, strong)
+model PostReaction {
+  id        String   @id @default(cuid())
+  type      String   // amen, praying, heart, fire, strong
+  createdAt DateTime @default(now())
+
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId, type])
+  @@index([postId])
+  @@index([userId])
+  @@map("post_reactions")
+}
+
+// Comments on Posts
+model Comment {
+  id        String   @id @default(cuid())
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Foreign keys
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+  @@index([userId])
+  @@map("comments")
+}
+
+// Devotionals (Bible messages)
+model Devotional {
+  id        String   @id @default(cuid())
+  title     String
+  content   String
+  verse     String?
+  isActive  Boolean  @default(true)  // true = active, false = archived
+  activatedAt DateTime @default(now())  // When it was activated (or reactivated)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Foreign keys
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  churchId  String?
+  church    Church?  @relation(fields: [churchId], references: [id], onDelete: SetNull)
+
+  likes     DevotionalLike[]
+
+  @@index([userId])
+  @@index([churchId])
+  @@map("devotionals")
+}
+
+// Chat Messages
+model Message {
+  id        String   @id @default(cuid())
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Foreign keys
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  churchId  String
+  church    Church   @relation(fields: [churchId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([churchId])
+  @@index([createdAt])
+  @@map("messages")
+}
+
+// Events / Agenda
+model Event {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  location    String?
+  startDate   DateTime
+  endDate     DateTime?
+  imageUrl    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  churchId    String
+  church      Church   @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  createdBy   String
+
+  attendances EventAttendance[]
+
+  @@index([churchId])
+  @@map("events")
+}
+
+model EventAttendance {
+  id        String   @id @default(cuid())
+  status    String   @default("going") // going, maybe, not_going
+  createdAt DateTime @default(now())
+
+  eventId   String
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+  @@index([eventId])
+  @@map("event_attendances")
+}
+
+// Prayer Requests
+model PrayerRequest {
+  id        String   @id @default(cuid())
+  title     String
+  content   String
+  isAnonymous Boolean @default(false)
+  isAnswered Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId    String
+  churchId  String
+  church    Church   @relation(fields: [churchId], references: [id], onDelete: Cascade)
+
+  prayers   Prayer[]
+
+  @@index([churchId])
+  @@index([userId])
+  @@map("prayer_requests")
+}
+
+model Prayer {
+  id              String   @id @default(cuid())
+  createdAt       DateTime @default(now())
+
+  prayerRequestId String
+  prayerRequest   PrayerRequest @relation(fields: [prayerRequestId], references: [id], onDelete: Cascade)
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([prayerRequestId, userId])
+  @@index([prayerRequestId])
+  @@map("prayers")
+}
+
+// Polls
+model Poll {
+  id        String   @id @default(cuid())
+  question  String
+  expiresAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  churchId  String
+  church    Church   @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  createdBy String
+
+  options   PollOption[]
+
+  @@index([churchId])
+  @@map("polls")
+}
+
+model PollOption {
+  id     String @id @default(cuid())
+  text   String
+
+  pollId String
+  poll   Poll   @relation(fields: [pollId], references: [id], onDelete: Cascade)
+
+  votes  PollVote[]
+
+  @@index([pollId])
+  @@map("poll_options")
+}
+
+model PollVote {
+  id           String   @id @default(cuid())
+  createdAt    DateTime @default(now())
+
+  pollOptionId String
+  pollOption   PollOption @relation(fields: [pollOptionId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([pollOptionId, userId])
+  @@index([pollOptionId])
+  @@map("poll_votes")
+}
+
+// Notifications
+model Notification {
+  id        String   @id @default(cuid())
+  type      String   // new_post, new_comment, new_event, prayer_answered, poll_created, reaction
+  title     String
+  body      String
+  isRead    Boolean  @default(false)
+  linkId    String?  // ID of the related entity
+  linkType  String?  // post, event, prayer_request, poll
+  createdAt DateTime @default(now())
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isRead])
+  @@map("notifications")
+}
+
+// Sermon Notes / Pregações
+model SermonNote {
+  id           String   @id @default(cuid())
+  title        String
+  speaker      String
+  content      String
+  scriptureRef String?
+  date         DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  churchId     String
+  church       Church   @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  authorId     String
+  author       User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([churchId])
+  @@map("sermon_notes")
+}
+
+// Small Groups / Células
+model Group {
+  id          String        @id @default(cuid())
+  name        String
+  description String?
+  category    String        @default("celula")
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  churchId    String
+  church      Church        @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  leaderId    String
+  leader      User          @relation("GroupLeader", fields: [leaderId], references: [id])
+  members     GroupMember[]
+
+  @@index([churchId])
+  @@map("groups")
+}
+
+model GroupMember {
+  id       String   @id @default(cuid())
+  role     String   @default("member")
+  joinedAt DateTime @default(now())
+
+  groupId  String
+  group    Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  userId   String
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, userId])
+  @@index([groupId])
+  @@map("group_members")
+}
+
+// Devotional Likes
+model DevotionalLike {
+  id           String     @id @default(cuid())
+  createdAt    DateTime   @default(now())
+
+  devotionalId String
+  devotional   Devotional @relation(fields: [devotionalId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([devotionalId, userId])
+  @@index([devotionalId])
+  @@map("devotional_likes")
+}
+
+// Imagens enviadas (fotos de perfil e de publicações).
+// Ficam na base de dados para sobreviverem a deploys e funcionarem com várias instâncias.
+model Upload {
+  id        String   @id @default(cuid())
+  mimeType  String
+  size      Int
+  width     Int?
+  height    Int?
+  data      Bytes
+  userId    String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("uploads")
+}

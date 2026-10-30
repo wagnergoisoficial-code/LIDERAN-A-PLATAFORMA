@@ -1,0 +1,76 @@
+# Blueprint da Render: base de dados PostgreSQL + API (este repositório) + site (repositório do frontend).
+# Referência: https://render.com/docs/blueprint-spec
+#
+# Os planos "free" servem para testar. Limitações: a base de dados gratuita expira ao fim
+# de 30 dias e a API adormece após 15 minutos sem uso (o primeiro pedido demora ~1 minuto).
+# Para produção real, troque para planos pagos no painel da Render.
+
+databases:
+  - name: lidera-db
+    plan: free
+    region: frankfurt
+    databaseName: lidera
+    user: lidera
+    # Lista vazia: a base de dados só é acessível pela rede privada da Render
+    ipAllowList: []
+
+services:
+  - type: web
+    name: lidera-api
+    runtime: node
+    plan: free
+    region: frankfurt
+    branch: main
+    buildCommand: npm ci && npm run build
+    # Aplica as migrações pendentes e arranca a API
+    startCommand: npm run start:prod
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: lidera-db
+          property: connectionString
+      # Chave aleatória gerada pela Render (assina os logins)
+      - key: JWT_SECRET
+        generateValue: true
+      # Endereço do site, ex.: https://lidera-web.onrender.com (preencher depois do 1.º deploy)
+      - key: CORS_ORIGIN
+        sync: false
+      # Primeiro administrador (criado no arranque se ainda não existir)
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+
+  - type: web
+    name: lidera-web
+    runtime: static
+    repo: https://github.com/wagnergoisoficial-code/LIDERAN-A-PLATAFORMA
+    branch: main
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    pullRequestPreviewsEnabled: false
+    # Aplicação de página única: todas as rotas abrem o index.html
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    headers:
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+    envVars:
+      # Endereço da API, ex.: https://lidera-api.onrender.com/api (preencher depois do 1.º deploy)
+      - key: VITE_API_URL
+        sync: false

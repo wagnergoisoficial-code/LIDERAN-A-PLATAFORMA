@@ -22,6 +22,7 @@ class GetUserRepository {
       where: { churchId },
       select: LIST_SELECT,
       orderBy: { name: 'asc' },
+      take: 1000,
     });
   }
 

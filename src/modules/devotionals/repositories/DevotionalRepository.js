@@ -19,6 +19,7 @@ class DevotionalRepository {
       where: { churchId },
       include: INCLUDE,
       orderBy: { createdAt: 'desc' },
+      take: 100,
     });
   }
 

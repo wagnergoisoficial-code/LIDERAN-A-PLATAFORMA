@@ -1,26 +1,26 @@
-FROM node:18-alpine
+# Imagem de produção (DigitalOcean App Platform, Droplet ou qualquer servidor com Docker)
+FROM node:22-alpine
 
 WORKDIR /app
+ENV NODE_ENV=production
 
-# Copy package files
+# Dependências de produção (o Prisma faz parte delas)
 COPY package*.json ./
+RUN npm ci --omit=dev
 
-# Install dependencies
-RUN npm ci --only=production
-
-# Copy application files
+# Código e schema; gera o cliente Prisma para PostgreSQL
 COPY src ./src
 COPY prisma ./prisma
+COPY scripts ./scripts
+RUN npm run build
 
-# Generate Prisma client
-RUN npx prisma generate
+# Corre sem privilégios de root
+USER node
 
-# Expose port
 EXPOSE 3000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3000/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:'+(process.env.PORT||3000)+'/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"
 
-# Start application
-CMD ["node", "src/server.js"]
+# Aplica as migrações pendentes e arranca a API
+CMD ["npm", "run", "start:prod"]

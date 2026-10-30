@@ -1,5 +1,6 @@
 const { ValidationError } = require('../../../shared/errors/AppError');
 const ValidationUtil = require('../../../shared/utils/validation.util');
+const { isUploadUrl } = require('../../../shared/utils/url.util');
 
 class UpdateUserProfileDto {
   constructor(data) {
@@ -21,6 +22,10 @@ class UpdateUserProfileDto {
 
     if (this.socialLinks !== undefined && this.socialLinks !== null && !Array.isArray(this.socialLinks)) {
       throw new ValidationError('Redes sociais inválidas');
+    }
+
+    if (this.profileImage && !isUploadUrl(this.profileImage)) {
+      throw new ValidationError('Foto de perfil inválida: envie a imagem pelo botão de foto');
     }
 
     if (typeof this.name === 'string' && this.name.trim().length < 2) {

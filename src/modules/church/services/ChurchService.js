@@ -1,5 +1,6 @@
 const ChurchRepository = require('../repositories/ChurchRepository');
 const CreateChurchDto = require('../dtos/CreateChurchDto');
+const { isUploadUrl } = require('../../../shared/utils/url.util');
 const JwtUtil = require('../../../shared/utils/jwt.util');
 const { canManageChurch, canViewChurch, isAdmin } = require('../../../shared/utils/church.util');
 const {
@@ -82,6 +83,10 @@ class ChurchService {
     if (data.name !== undefined) {
       update.name = String(data.name || '').trim();
       if (update.name.length < 2) throw new ValidationError('O nome da comunidade deve ter pelo menos 2 caracteres');
+    }
+
+    if (data.imageUrl && !isUploadUrl(data.imageUrl)) {
+      throw new ValidationError('Imagem da comunidade inválida');
     }
 
     if (data.cultosDias !== undefined && data.cultosDias !== null) {

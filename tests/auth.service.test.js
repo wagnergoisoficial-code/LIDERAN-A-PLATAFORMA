@@ -74,15 +74,10 @@ describe('AuthService', () => {
         email: 'john@test.com',
         name: 'John Doe',
         role: 'member',
-        password: '$2b$10$abcdefgh...', // hashed password
+        password: await require('bcrypt').hash('Password123', 4),
       };
 
       mockUserRepository.findByEmail.mockResolvedValue(mockUser);
-
-      // Mock bcrypt.compare
-      jest.mock('bcrypt', () => ({
-        compare: jest.fn().mockResolvedValue(true),
-      }));
 
       const result = await authService.login(loginDto);
 

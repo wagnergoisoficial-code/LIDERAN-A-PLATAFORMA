@@ -6,6 +6,7 @@ const {
   assertLeader,
 } = require('../../../shared/utils/church.util');
 const { notifyChurch } = require('../../../shared/utils/notifier');
+const { isUploadUrl } = require('../../../shared/utils/url.util');
 
 const RSVP_STATUSES = ['going', 'maybe', 'not_going', 'none'];
 
@@ -35,7 +36,10 @@ class EventService {
     if (dto.endDate !== undefined) data.endDate = dto.endDate ? toDate(dto.endDate, 'Data de término') : null;
     if (dto.description !== undefined) data.description = text(dto.description);
     if (dto.location !== undefined) data.location = text(dto.location);
-    if (dto.imageUrl !== undefined) data.imageUrl = text(dto.imageUrl);
+    if (dto.imageUrl !== undefined) {
+      data.imageUrl = text(dto.imageUrl);
+      if (data.imageUrl && !isUploadUrl(data.imageUrl)) throw new ValidationError('Imagem do evento inválida');
+    }
 
     return data;
   }

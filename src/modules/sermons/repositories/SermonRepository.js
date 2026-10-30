@@ -18,6 +18,7 @@ class SermonRepository {
       where: { churchId },
       include: this.authorSelect(),
       orderBy: { date: 'desc' },
+      take: 200,
     });
   }
 

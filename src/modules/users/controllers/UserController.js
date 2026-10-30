@@ -67,11 +67,11 @@ class UserController {
 
   async updateProfileAvatar(req, res, next) {
     try {
-      if (!req.body.imageUrl) {
+      if (!req.uploadedImageUrl) {
         return res.status(400).json({ success: false, message: 'Nenhuma imagem enviada' });
       }
 
-      const profile = await this.userService.updateProfile(req.user.id, { profileImage: req.body.imageUrl });
+      const profile = await this.userService.updateProfile(req.user.id, { profileImage: req.uploadedImageUrl });
 
       res.status(200).json({
         success: true,

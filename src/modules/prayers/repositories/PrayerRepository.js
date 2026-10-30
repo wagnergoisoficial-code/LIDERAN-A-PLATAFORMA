@@ -33,6 +33,7 @@ class PrayerRepository {
       where: { churchId },
       include: INCLUDE,
       orderBy: { createdAt: 'desc' },
+      take: 200,
     });
     return this.withAuthors(list);
   }

@@ -440,3 +440,19 @@ model DevotionalLike {
   @@index([devotionalId])
   @@map("devotional_likes")
 }
+
+// Imagens enviadas (fotos de perfil e de publicações).
+// Ficam na base de dados para sobreviverem a deploys e funcionarem com várias instâncias.
+model Upload {
+  id        String   @id @default(cuid())
+  mimeType  String
+  size      Int
+  width     Int?
+  height    Int?
+  data      Bytes
+  userId    String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("uploads")
+}

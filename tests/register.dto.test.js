@@ -8,7 +8,7 @@ describe('RegisterDto', () => {
         name: 'John Doe',
         email: 'john@test.com',
         password: 'Password123',
-        churchId: 'church-123',
+        confirmPassword: 'Password123',
       });
 
       expect(() => dto.validate()).not.toThrow();
