@@ -10,9 +10,17 @@ const swaggerSpec = require('./config/swagger.config');
 const authRoutes = require('./routes/auth.routes');
 const userRoutes = require('./routes/user.routes');
 const postRoutes = require('./routes/post.routes');
+const postReactionRoute = require('./routes/post.reaction');
 const devotionalRoutes = require('./routes/devotional.routes');
 const churchRoutes = require('./routes/church.routes');
 const chatRoutes = require('./routes/chat.routes');
+const eventRoutes = require('./routes/event.routes');
+const prayerRoutes = require('./routes/prayer.routes');
+const pollRoutes = require('./routes/poll.routes');
+const notificationRoutes = require('./routes/notification.routes');
+const sermonRoutes = require('./routes/sermon.routes');
+const groupRoutes = require('./routes/group.routes');
+const searchRoutes = require('./routes/search.routes');
 
 class App {
   constructor() {
@@ -83,9 +91,17 @@ class App {
     this.app.use('/api/auth', authRoutes);
     this.app.use('/api/users', userRoutes);
     this.app.use('/api/posts', postRoutes);
+    this.app.use('/api/posts', postReactionRoute);
     this.app.use('/api/devotionals', devotionalRoutes);
     this.app.use('/api/churches', churchRoutes);
     this.app.use('/api/chat', chatRoutes);
+    this.app.use('/api/events', eventRoutes);
+    this.app.use('/api/prayers', prayerRoutes);
+    this.app.use('/api/polls', pollRoutes);
+    this.app.use('/api/notifications', notificationRoutes);
+    this.app.use('/api/sermons', sermonRoutes);
+    this.app.use('/api/groups', groupRoutes);
+    this.app.use('/api/search', searchRoutes);
 
     // 404 handler
     this.app.use((req, res) => {

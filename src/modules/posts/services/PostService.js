@@ -11,6 +11,8 @@ class PostService {
     return await this.postRepository.create({
       content: createPostDto.content,
       imageUrl: createPostDto.imageUrl,
+      isPinned: createPostDto.isPinned || false,
+      type: createPostDto.type || 'post',
       userId: createPostDto.userId,
       churchId: createPostDto.churchId,
     });
@@ -47,6 +49,21 @@ class PostService {
   async deletePost(id) {
     await this.getPostById(id);
     return await this.postRepository.delete(id);
+  }
+
+  async togglePin(id, isPinned) {
+    await this.getPostById(id);
+    return await this.postRepository.togglePin(id, isPinned);
+  }
+
+  async reactToPost(postId, userId, type) {
+    await this.getPostById(postId);
+    return await this.postRepository.upsertReaction(postId, userId, type);
+  }
+
+  async removeReaction(postId, userId, type) {
+    await this.getPostById(postId);
+    return await this.postRepository.deleteReaction(postId, userId, type);
   }
 }
 
