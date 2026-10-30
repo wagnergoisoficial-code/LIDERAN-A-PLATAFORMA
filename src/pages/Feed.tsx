@@ -249,8 +249,8 @@ const Feed = () => {
               <div className="card-header">
                 <span className="card-title">Enquetes</span>
               </div>
-              {polls.map(poll => (
-                <PollWidget key={poll.id} poll={poll} onVote={handleVotePoll}
+              {polls.map((poll, i) => (
+                <PollWidget key={poll.id} poll={poll} onVote={handleVotePoll} isLast={i === polls.length - 1}
                   onDelete={(isLeader || poll.createdBy === user?.id) ? handleDeletePoll : undefined} />
               ))}
             </div>
@@ -273,7 +273,7 @@ const Feed = () => {
   );
 };
 
-const PollWidget = ({ poll, onVote, onDelete }: { poll: Poll; onVote: (pollId: string, optionId: string) => void; onDelete?: (pollId: string) => void }) => {
+const PollWidget = ({ poll, onVote, onDelete, isLast }: { poll: Poll; onVote: (pollId: string, optionId: string) => void; onDelete?: (pollId: string) => void; isLast?: boolean }) => {
   // Depois de votar (ou com a enquete encerrada) mostram-se os resultados
   const showResults = poll.myVoteOptionId !== null || !!poll.isExpired;
   const canVote = !poll.isExpired;
@@ -286,7 +286,8 @@ const PollWidget = ({ poll, onVote, onDelete }: { poll: Poll; onVote: (pollId: s
   };
 
   return (
-    <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
+    // A última enquete não leva linha: a borda do cartão já fecha a lista
+    <div style={{ padding: '14px 16px', borderBottom: isLast ? undefined : '1px solid var(--border)' }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px', marginBottom: '10px' }}>
         <p style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: 'var(--text)', lineHeight: 1.4 }}>{poll.question}</p>
         {onDelete && (
@@ -367,7 +368,7 @@ const PostCard = ({ post, currentUserId, userRole, onComment, onReact, onPin, on
     <div className="card" style={{ marginBottom: '16px', borderColor: pinned ? 'var(--border-strong)' : undefined }}>
 
       {/* Author row */}
-      <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '10px' }}>
+      <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
         <Avatar name={post.userName} profileImage={post.userProfileImage} size="small" />
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>{post.userName}</div>
@@ -406,7 +407,7 @@ const PostCard = ({ post, currentUserId, userRole, onComment, onReact, onPin, on
 
       {/* Reactions summary */}
       {totalReactions > 0 && (
-        <div style={{ padding: '6px 16px', borderTop: '1px solid var(--border)', display: 'flex', gap: '10px' }}>
+        <div style={{ padding: '6px 16px', display: 'flex', gap: '10px' }}>
           {REACTION_CONFIG.filter(r => reactions[r.type as keyof PostReactions] > 0).map(r => (
             <span key={r.type} className="fade-in" style={{ fontSize: '12px', color: 'var(--text-faint)', display: 'flex', alignItems: 'center', gap: '3px' }}>
               <span uk-icon={`icon: ${r.icon}; ratio: 0.7`}></span>
@@ -449,9 +450,9 @@ const PostCard = ({ post, currentUserId, userRole, onComment, onReact, onPin, on
 
       {/* Comments list */}
       {post.comments.length > 0 && showComments && (
-        <div className="list-enter" style={{ borderTop: '1px solid var(--border)', background: 'var(--bg-surface)', maxHeight: '320px', overflowY: 'auto' }}>
+        <div className="list-enter" style={{ borderTop: '1px solid var(--border)', maxHeight: '320px', overflowY: 'auto' }}>
           {post.comments.map(comment => (
-            <div key={comment.id} style={{ display: 'flex', gap: '10px', padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
+            <div key={comment.id} style={{ display: 'flex', gap: '10px', padding: '12px 16px' }}>
               <Avatar name={comment.userName} profileImage={comment.userProfileImage} size="small" />
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '3px' }}>
@@ -473,7 +474,8 @@ const PostCard = ({ post, currentUserId, userRole, onComment, onReact, onPin, on
       )}
 
       {/* Comment input */}
-      <form onSubmit={submitComment} style={{ padding: '12px 16px', borderTop: '1px solid var(--border)', display: 'flex', gap: '8px' }}>
+      {/* Com a lista aberta, a linha marca o fim da área com scroll; fechada, o campo segue as reações */}
+      <form onSubmit={submitComment} style={{ padding: '12px 16px', borderTop: post.comments.length > 0 && showComments ? '1px solid var(--border)' : undefined, display: 'flex', gap: '8px' }}>
         <input type="text" className="uk-input" placeholder="Escreva um comentário..." value={commentText} onChange={e => setCommentText(e.target.value)}
           style={{ flex: 1 }} />
         <button type="submit" className="uk-button uk-button-primary">

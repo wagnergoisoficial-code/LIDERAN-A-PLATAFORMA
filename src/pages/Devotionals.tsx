@@ -130,14 +130,14 @@ const Devotionals = () => {
                 </div>
 
                 {/* Author */}
-                <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Avatar name={dev.user?.name || 'Desconhecido'} profileImage={dev.user?.profileImage} size="small" />
                   <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Por <strong style={{ color: 'var(--text)' }}>{dev.user?.name}</strong></span>
                 </div>
 
                 {/* Verse */}
                 {dev.verse && (
-                  <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
+                  <div style={{ padding: '14px 16px' }}>
                     <blockquote style={{ borderLeft: '2px solid var(--border-strong)', paddingLeft: '12px', margin: 0 }}>
                       <p style={{ margin: 0, fontSize: '13px', fontStyle: 'italic', color: 'var(--text-muted)', lineHeight: 1.6 }}>
                         {dev.verse}
@@ -152,7 +152,7 @@ const Devotionals = () => {
                 </div>
 
                 {/* Actions */}
-                <div style={{ padding: '10px 16px', borderTop: '1px solid var(--border)', background: 'var(--bg-surface)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                <div style={{ padding: '10px 16px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
                   <button
                     className={`uk-button uk-button-small ${dev.hasLiked ? 'uk-button-primary' : 'uk-button-default'}`}
                     onClick={e => {
@@ -188,8 +188,8 @@ const Devotionals = () => {
           </div>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <tbody className="stagger">
-              {inactiveDevotionals.map((dev) => (
-                <tr key={dev.id} style={{ borderBottom: '1px solid var(--border)' }}>
+              {inactiveDevotionals.map((dev, i) => (
+                <tr key={dev.id} style={{ borderBottom: i < inactiveDevotionals.length - 1 ? '1px solid var(--border)' : undefined }}>
                   <td style={{ padding: '10px 16px', fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>{dev.title}</td>
                   <td style={{ padding: '10px 16px', fontSize: '12px', color: 'var(--text-muted)' }}>{dev.user?.name}</td>
                   <td style={{ padding: '10px 16px', textAlign: 'right', whiteSpace: 'nowrap' }}>

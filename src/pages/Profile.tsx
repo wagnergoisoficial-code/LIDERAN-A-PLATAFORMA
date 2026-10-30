@@ -416,7 +416,7 @@ const Profile = () => {
           <div className="card-header"><span className="card-title">Distintivos</span></div>
           <div style={{ padding: '20px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '16px' }}>
             {profile.achievements.map((a: any) => (
-              <div key={a.id} style={{ textAlign: 'center', padding: '16px', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
+              <div key={a.id} style={{ textAlign: 'center', padding: '16px' }}>
                 <span uk-icon="icon: star; ratio: 1.8" style={{ display: 'block', marginBottom: '8px' }}></span>
                 <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)', marginBottom: '4px' }}>{a.name}</div>
                 {a.description && <div style={{ fontSize: '12px', color: 'var(--text-faint)' }}>{a.description}</div>}

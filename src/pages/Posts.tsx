@@ -221,7 +221,7 @@ const Posts = () => {
                 </div>
               ))}
             </div>
-            <div style={{ padding: '12px 20px', borderTop: '1px solid var(--border)', background: 'var(--bg-surface)' }}>
+            <div style={{ padding: '12px 20px', borderTop: '1px solid var(--border)' }}>
               <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-faint)', lineHeight: 1.5 }}>
                 Seus posts aparecem no Feed e podem receber comentários da comunidade.
               </p>

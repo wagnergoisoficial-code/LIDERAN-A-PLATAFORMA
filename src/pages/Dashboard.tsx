@@ -240,7 +240,7 @@ const Dashboard = () => {
                   )}
                 </div>
 
-                <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                <div style={{ marginTop: '20px', paddingTop: '16px', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
                   <button className="uk-button uk-button-default uk-button-small" onClick={() => { setEditing(true); setShowCreateForm(false); }}>
                     <span uk-icon="icon: pencil; ratio: 0.8"></span>
                     Editar

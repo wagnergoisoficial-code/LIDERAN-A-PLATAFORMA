@@ -94,7 +94,7 @@ const Reports: React.FC = () => {
           <div style={{ marginBottom: '32px' }}>
             <div className="list-label">Ranking de Engajamento</div>
             <div className="card">
-              <div style={{ display: 'grid', gridTemplateColumns: '40px 1fr 80px 80px 80px', padding: '8px 16px', background: 'var(--bg-surface)', borderBottom: '1px solid var(--border)' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '40px 1fr 80px 80px 80px', padding: '8px 16px', borderBottom: '1px solid var(--border)' }}>
                 {['#', 'Membro', 'Posts', 'Coment.', 'Score'].map(h => (
                   <span key={h} style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', textAlign: h === '#' ? 'center' : 'left' }}>{h}</span>
                 ))}

@@ -146,7 +146,7 @@ const ChurchMembers: React.FC<ChurchMembersProps> = ({ churchId }) => {
         <div className="card" style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
             <thead>
-              <tr style={{ background: 'var(--bg-surface)', borderBottom: '1px solid var(--border-strong)' }}>
+              <tr style={{ borderBottom: '1px solid var(--border-strong)' }}>
                 {['Nome', 'Email', 'Cargo', 'Localização', 'Ações'].map(h => (
                   <th key={h} style={{ padding: '10px 12px', textAlign: h === 'Ações' ? 'center' : 'left', fontSize: '11px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
                     {h}
@@ -155,8 +155,8 @@ const ChurchMembers: React.FC<ChurchMembersProps> = ({ churchId }) => {
               </tr>
             </thead>
             <tbody>
-              {members.map((member: any) => (
-                <tr key={member.id} style={{ borderBottom: '1px solid var(--border)' }}>
+              {members.map((member: any, i: number) => (
+                <tr key={member.id} style={{ borderBottom: i < members.length - 1 ? '1px solid var(--border)' : undefined }}>
                   <td style={{ padding: '10px 12px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <Avatar name={member.name} profileImage={member.profileImage} size="small" />

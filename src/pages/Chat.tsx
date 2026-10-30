@@ -122,7 +122,8 @@ const Chat = () => {
                         borderRadius: 'var(--radius-lg)',
                         background: isOwn ? 'var(--accent)' : 'var(--bg-elevated)',
                         color: isOwn ? '#fff' : 'var(--text)',
-                        border: isOwn ? '1px solid var(--accent)' : '1px solid var(--border)',
+                        // O fundo já desenha a bolha; a borda transparente mantém as medidas
+                        border: isOwn ? '1px solid var(--accent)' : '1px solid transparent',
                         fontSize: '13px',
                         lineHeight: 1.5,
                         wordBreak: 'break-word',

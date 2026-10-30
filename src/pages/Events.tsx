@@ -215,7 +215,7 @@ const EventCard: React.FC<EventCardProps> = ({ event, userId, userRole, onRsvp, 
     <div className="card" style={{ background: past ? 'var(--bg-surface)' : 'var(--bg)', opacity: past ? 0.7 : 1 }}>
       <div style={{ display: 'flex', gap: '0' }}>
         {/* Date column */}
-        <div style={{ width: '72px', flexShrink: 0, background: 'var(--bg-surface)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '16px 8px' }}>
+        <div style={{ width: '72px', flexShrink: 0, borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '16px 8px' }}>
           <span style={{ fontSize: '22px', fontWeight: 800, color: past ? 'var(--text-muted)' : 'var(--text)', lineHeight: 1 }}>
             {new Date(event.startDate).getDate()}
           </span>

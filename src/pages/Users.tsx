@@ -190,7 +190,7 @@ const Users = () => {
 
       {/* Engagement legend */}
       {isLeaderOrAdmin && !loading && members.length > 0 && (
-        <div style={{ display: 'flex', gap: '16px', marginBottom: '16px', padding: '10px 16px', border: '1px solid var(--border)', borderRadius: 'var(--radius)', background: 'var(--bg-surface)', fontSize: '11px', color: 'var(--text-muted)', flexWrap: 'wrap', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '16px', marginBottom: '16px', padding: '10px 0', fontSize: '11px', color: 'var(--text-muted)', flexWrap: 'wrap', alignItems: 'center' }}>
           <span style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Engajamento:</span>
           {[{ color: 'var(--success)', label: 'Alto ≥30%' }, { color: 'var(--accent)', label: 'Médio ≥15%' }, { color: 'var(--text-muted)', label: 'Baixo ≥5%' }, { color: 'var(--text-faint)', label: 'Inativo <5%' }].map(({ color, label }) => (
             <span key={label} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -212,7 +212,7 @@ const Users = () => {
         <div className="card" style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
-              <tr style={{ background: 'var(--bg-surface)', borderBottom: '1px solid var(--border-strong)' }}>
+              <tr style={{ borderBottom: '1px solid var(--border-strong)' }}>
                 {['', 'Nome', 'E-mail', 'Cargo', 'Função', ...(isLeaderOrAdmin ? ['Engajamento'] : []), 'Ações'].map(h => (
                   <th key={h} style={{ padding: '10px 12px', textAlign: h === 'Ações' || h === '' ? 'center' : 'left', fontSize: '11px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
                     {h}
@@ -221,10 +221,10 @@ const Users = () => {
               </tr>
             </thead>
             <tbody className="stagger">
-              {members.map((m) => {
+              {members.map((m, i) => {
                 const badge = getRoleBadge(m.role);
                 return (
-                  <tr key={m.id} style={{ borderBottom: '1px solid var(--border)' }}
+                  <tr key={m.id} style={{ borderBottom: i < members.length - 1 ? '1px solid var(--border)' : undefined }}
                     onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-surface)')}
                     onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                   >
