@@ -4,6 +4,10 @@ import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import UIkit from 'uikit';
 
+// Mesma regra do backend
+const PASSWORD_RULE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+const PASSWORD_HINT = 'A senha deve ter pelo menos 8 caracteres, com letra maiúscula, minúscula e número';
+
 const Register = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -15,13 +19,17 @@ const Register = () => {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!PASSWORD_RULE.test(password)) {
+      UIkit.notification({ message: PASSWORD_HINT, status: 'danger', pos: 'top-right' });
+      return;
+    }
     if (password !== confirmPassword) {
       UIkit.notification({ message: 'As senhas não conferem', status: 'danger', pos: 'top-right' });
       return;
     }
     setLoading(true);
     try {
-      const response = await api.register({ name, email, password, confirmPassword, role: 'leader' });
+      const response = await api.register({ name, email, password, confirmPassword });
       if (response.success) {
         login(response.data.user, response.data.token);
         UIkit.notification({ message: 'Conta criada com sucesso!', status: 'success', pos: 'top-right' });
@@ -108,11 +116,11 @@ const Register = () => {
                   <input
                     className="uk-input"
                     type="password"
-                    placeholder="Mínimo 6 char."
+                    placeholder="Mínimo 8 caracteres"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
-                    minLength={6}
+                    minLength={8}
                   />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -124,10 +132,13 @@ const Register = () => {
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     required
-                    minLength={6}
+                    minLength={8}
                   />
                 </div>
               </div>
+              <p style={{ margin: '8px 0 0', fontSize: '12px', color: 'var(--text-faint)' }}>
+                Use letra maiúscula, minúscula e número.
+              </p>
 
               <div className="uk-margin" style={{ marginTop: '24px' }}>
                 <button

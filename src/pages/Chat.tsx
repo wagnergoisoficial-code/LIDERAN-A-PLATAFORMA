@@ -52,7 +52,7 @@ const Chat = () => {
     try {
       const result = await api.sendMessage(newMessage.trim());
       if (result.success) { setNewMessage(''); await loadMessages(); }
-      else UIkit.notification({ message: result.error || 'Erro ao enviar', status: 'danger', timeout: 3000 });
+      else UIkit.notification({ message: result.message || 'Erro ao enviar', status: 'danger', timeout: 3000 });
     } catch (err: any) {
       UIkit.notification({ message: err.message || 'Erro ao enviar', status: 'danger', timeout: 3000 });
     } finally {
@@ -60,8 +60,11 @@ const Chat = () => {
     }
   };
 
+  const isLeader = user?.role === 'leader' || user?.role === 'admin';
+
   const handleDelete = async (messageId: string, messageUserId: string) => {
-    if (user?.id !== messageUserId) return;
+    if (user?.id !== messageUserId && !isLeader) return;
+    if (user?.id !== messageUserId && !confirm('Apagar esta mensagem de outro membro?')) return;
     try {
       const result = await api.deleteMessage(messageId);
       if (result.success) {
@@ -94,8 +97,8 @@ const Chat = () => {
             messages.map((msg) => {
               const isOwn = user?.id === msg.user.id;
               return (
-                <div key={msg.id}
-                  style={{ display: 'flex', gap: '10px', flexDirection: isOwn ? 'row-reverse' : 'row', alignItems: 'flex-end', animation: 'fadeInUp 0.2s ease' }}
+                <div key={msg.id} className={`msg-in${isOwn ? ' is-own' : ''}`}
+                  style={{ display: 'flex', gap: '10px', flexDirection: isOwn ? 'row-reverse' : 'row', alignItems: 'flex-end' }}
                 >
                   <div style={{ flexShrink: 0 }}>
                     <Avatar name={msg.user.name} profileImage={msg.user.profileImage} size="small" />
@@ -119,7 +122,7 @@ const Chat = () => {
                       }}>
                         {msg.content}
                       </div>
-                      {isOwn && (
+                      {(isOwn || isLeader) && (
                         <button
                           onClick={() => handleDelete(msg.id, msg.user.id)}
                           title="Deletar"
@@ -127,7 +130,7 @@ const Chat = () => {
                             background: 'none', border: 'none', cursor: 'pointer',
                             color: 'var(--text-faint)', padding: '2px',
                             display: 'flex', alignItems: 'center',
-                            opacity: 0, transition: 'opacity 160ms ease'
+                            opacity: 0, transition: 'opacity var(--t)'
                           }}
                           onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.color = 'var(--text)'; }}
                           onMouseLeave={(e) => { e.currentTarget.style.opacity = '0'; }}
@@ -178,10 +181,6 @@ const Chat = () => {
         </form>
 
         <style>{`
-          @keyframes fadeInUp {
-            from { opacity: 0; transform: translateY(6px); }
-            to   { opacity: 1; transform: translateY(0); }
-          }
           .msg-delete-btn { opacity: 0; }
           div:hover > div > .msg-delete-btn { opacity: 1; }
         `}</style>

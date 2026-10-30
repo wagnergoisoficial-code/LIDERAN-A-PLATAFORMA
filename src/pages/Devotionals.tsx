@@ -5,16 +5,20 @@ import UIkit from 'uikit';
 import Avatar from '../components/Avatar';
 import PageHeader from '../components/PageHeader';
 import EmptyState from '../components/EmptyState';
+import AnimatedNumber from '../components/AnimatedNumber';
+import { pop, burst } from '../lib/motion';
 
 interface Devotional {
   id: string;
   title: string;
   content: string;
-  verse: string;
+  verse?: string | null;
   createdAt: string;
   isActive: boolean;
   hoursRemaining: number;
   shouldBeInactive: boolean;
+  likeCount?: number;
+  hasLiked?: boolean;
   user?: { id: string; name: string; profileImage?: string };
 }
 
@@ -61,6 +65,28 @@ const Devotionals = () => {
     }
   };
 
+  const handleLike = async (id: string) => {
+    try {
+      const res = await api.likeDevotional(id);
+      if (res.success) {
+        setDevotionals(prev => prev.map(d => d.id === id ? { ...d, hasLiked: res.data.liked, likeCount: res.data.likeCount } : d));
+      }
+    } catch (err: any) {
+      UIkit.notification({ message: err.message || 'Erro ao registrar Amém', status: 'danger' });
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Excluir este devocional definitivamente?')) return;
+    try {
+      await api.deleteDevotional(id);
+      setDevotionals(prev => prev.filter(d => d.id !== id));
+      UIkit.notification({ message: 'Devocional excluído', status: 'success' });
+    } catch (err: any) {
+      UIkit.notification({ message: err.message || 'Erro ao excluir devocional', status: 'danger' });
+    }
+  };
+
   const isLeaderOrAdmin = user?.role === 'leader' || user?.role === 'admin';
   const activeDevotionals = devotionals.filter(d => d.isActive);
   const inactiveDevotionals = devotionals.filter(d => !d.isActive);
@@ -94,9 +120,9 @@ const Devotionals = () => {
         <EmptyState icon="file-text" title="Nenhum devocional ativo no momento" text="Volte mais tarde para novas reflexões espirituais" />
       ) : (
         <div className="uk-grid uk-grid-medium" uk-grid="masonry: true">
-          {activeDevotionals.map((dev) => (
+          {activeDevotionals.map((dev, i) => (
             <div key={dev.id} className="uk-width-1-2@m">
-              <div className="card">
+              <div className="card card-enter" style={{ animationDelay: `${i * 70}ms` }}>
                 {/* Card header */}
                 <div className="card-header">
                   <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 600 }}>{dev.title}</h3>
@@ -110,13 +136,15 @@ const Devotionals = () => {
                 </div>
 
                 {/* Verse */}
-                <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
-                  <blockquote style={{ borderLeft: '2px solid var(--border-strong)', paddingLeft: '12px', margin: 0 }}>
-                    <p style={{ margin: 0, fontSize: '13px', fontStyle: 'italic', color: 'var(--text-muted)', lineHeight: 1.6 }}>
-                      {dev.verse}
-                    </p>
-                  </blockquote>
-                </div>
+                {dev.verse && (
+                  <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
+                    <blockquote style={{ borderLeft: '2px solid var(--border-strong)', paddingLeft: '12px', margin: 0 }}>
+                      <p style={{ margin: 0, fontSize: '13px', fontStyle: 'italic', color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                        {dev.verse}
+                      </p>
+                    </blockquote>
+                  </div>
+                )}
 
                 {/* Content */}
                 <div style={{ padding: '14px 16px' }}>
@@ -124,17 +152,28 @@ const Devotionals = () => {
                 </div>
 
                 {/* Actions */}
-                {isLeaderOrAdmin && (
-                  <div style={{ padding: '10px 16px', borderTop: '1px solid var(--border)', background: 'var(--bg-surface)', display: 'flex', justifyContent: 'flex-end' }}>
+                <div style={{ padding: '10px 16px', borderTop: '1px solid var(--border)', background: 'var(--bg-surface)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                  <button
+                    className={`uk-button uk-button-small ${dev.hasLiked ? 'uk-button-primary' : 'uk-button-default'}`}
+                    onClick={e => {
+                      if (!dev.hasLiked) { pop(e.currentTarget); burst(e.currentTarget, { count: 8 }); }
+                      handleLike(dev.id);
+                    }}
+                    title={dev.hasLiked ? 'Remover Amém' : 'Dizer Amém'}
+                  >
+                    <span uk-icon="icon: heart; ratio: 0.8"></span>
+                    Amém{dev.likeCount ? <> · <AnimatedNumber value={dev.likeCount} /></> : ''}
+                  </button>
+                  {isLeaderOrAdmin && (
                     <button
                       className="uk-button uk-button-danger uk-button-small"
                       onClick={() => handleMarkInactive(dev.id)}
                     >
-                      <span uk-icon="icon: trash; ratio: 0.8"></span>
+                      <span uk-icon="icon: close; ratio: 0.8"></span>
                       Marcar inativa
                     </button>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             </div>
           ))}
@@ -148,18 +187,26 @@ const Devotionals = () => {
             <span className="card-title">Histórico Inativo</span>
           </div>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <tbody>
+            <tbody className="stagger">
               {inactiveDevotionals.map((dev) => (
                 <tr key={dev.id} style={{ borderBottom: '1px solid var(--border)' }}>
                   <td style={{ padding: '10px 16px', fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>{dev.title}</td>
                   <td style={{ padding: '10px 16px', fontSize: '12px', color: 'var(--text-muted)' }}>{dev.user?.name}</td>
-                  <td style={{ padding: '10px 16px', textAlign: 'right' }}>
+                  <td style={{ padding: '10px 16px', textAlign: 'right', whiteSpace: 'nowrap' }}>
                     <button
                       className="uk-button uk-button-success uk-button-small"
                       onClick={() => handleReactivate(dev.id)}
                     >
                       <span uk-icon="icon: reply; ratio: 0.8"></span>
                       Reativar
+                    </button>
+                    <button
+                      className="uk-button uk-button-danger uk-button-small"
+                      style={{ marginLeft: '8px' }}
+                      onClick={() => handleDelete(dev.id)}
+                    >
+                      <span uk-icon="icon: trash; ratio: 0.8"></span>
+                      Excluir
                     </button>
                   </td>
                 </tr>

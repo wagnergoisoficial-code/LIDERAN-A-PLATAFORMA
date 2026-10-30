@@ -71,7 +71,7 @@ const ImageUploadInput: React.FC<ImageUploadInputProps> = ({
                   textAlign: 'center',
                   cursor: 'pointer',
                   backgroundColor: 'var(--bg-surface)',
-                  transition: 'all 0.3s ease'
+                  transition: 'all 0.3s var(--ease-out)'
                 }}
                 onDragOver={(e) => {
                   e.preventDefault();

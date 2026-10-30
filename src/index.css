@@ -26,7 +26,14 @@
   --nav-border:     #0d2255;
   --nav-text:       #8fa3c7;
   --nav-active:     #ffffff;
-  --t:              160ms ease;
+  --t:              160ms cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* Movimento: curvas próprias (nada de ease genérico) */
+  --ease-out:       cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in:        cubic-bezier(0.55, 0, 1, 0.45);
+  /* Molas em CSS puro: suave (~8% de ressalto) para toques, viva (~23%) para celebrações */
+  --spring-soft:    linear(0, 0.03, 0.107, 0.213, 0.335, 0.461, 0.583, 0.695, 0.794, 0.878, 0.945, 0.997, 1.035, 1.061, 1.076, 1.083, 1.083, 1.078, 1.071, 1.061, 1.05, 1.04, 1.03, 1.021, 1.014, 1.007, 1.002, 0.999, 0.996, 0.994, 0.993, 0.993, 0.993, 0.994, 0.994, 0.995, 0.996, 0.997, 0.998, 0.999, 1);
+  --spring:         linear(0, 0.065, 0.226, 0.439, 0.662, 0.865, 1.03, 1.145, 1.211, 1.234, 1.221, 1.185, 1.136, 1.083, 1.035, 0.996, 0.968, 0.952, 0.946, 0.948, 0.956, 0.967, 0.979, 0.991, 1, 1.007, 1.011, 1.013, 1.012, 1.01, 1.008, 1.005, 1.002, 1, 0.998, 0.997, 0.997, 0.997, 0.998, 0.998, 1);
 
   /* Arredondamento discreto */
   --radius-sm:      4px;
@@ -454,7 +461,7 @@ h1, h2, h3, h4, h5, h6 {
     bottom: 0;
     left: 0;
     transform: translateX(-100%);
-    transition: transform 200ms ease;
+    transition: transform 320ms cubic-bezier(0.32, 0.72, 0, 1);
   }
 
   .app-sidebar.is-open { transform: translateX(0); }
@@ -632,14 +639,15 @@ h1, h2, h3, h4, h5, h6 {
   content: '';
   position: absolute;
   bottom: 0;
-  left: -100%;
+  left: 0;
   width: 100%;
   height: 1px;
   background: rgba(255,255,255,0.4);
-  transition: left 220ms ease;
+  transform: translateX(-101%);
+  transition: transform 260ms var(--ease-out);
 }
 
-.uk-button:hover::after { left: 0; }
+.uk-button:hover::after { transform: translateX(0); }
 
 .uk-button-small {
   height: 30px;
@@ -1073,9 +1081,9 @@ a:hover { color: var(--accent-dark); }
 }
 
 .engagement-fill {
+  width: 100%;
   height: 100%;
   border-radius: 2px;
-  transition: width 0.4s ease;
 }
 
 /* ─── BUSCA ─────────────────────────────────────────────────── */
@@ -1092,8 +1100,8 @@ a:hover { color: var(--accent-dark); }
   background: var(--bg);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius);
-  animation: scaleIn 150ms ease both;
-  transform-origin: top center;
+  animation: dropdown-in 200ms var(--ease-out) backwards;
+  transform-origin: top left;
 }
 
 .search-group-label {
@@ -1195,59 +1203,147 @@ a:hover { color: var(--accent-dark); }
   border-color: var(--border) !important;
 }
 
-/* ─── ANIMATIONS ─────────────────────────────────────────────── */
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
+/* ─── MOVIMENTO ─────────────────────────────────────────────── */
+/* Regra geral: só transform, opacity e filter. Entradas com fill-mode
+   "backwards" para não deixar transform/filter residuais (que quebrariam
+   elementos position: fixed como os modais). */
 
-@keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(10px); }
-  to   { opacity: 1; transform: translateY(0); }
+@keyframes fadeIn      { from { opacity: 0; } }
+@keyframes fadeInUp    { from { opacity: 0; transform: translateY(8px); } }
+@keyframes slideInRight { from { opacity: 0; transform: translateX(16px); } }
+@keyframes scaleIn     { from { opacity: 0; transform: scale(0.96); } }
+@keyframes enter       { from { opacity: 0; transform: translateY(8px); filter: blur(4px); } }
+@keyframes rise        { from { opacity: 0; transform: translateY(10px); } }
+@keyframes page-enter  { from { opacity: 0; transform: translateY(4px); } }
+@keyframes pop-in      { from { opacity: 0; transform: scale(0.85); } }
+@keyframes dropdown-in { from { opacity: 0; transform: translateY(-4px) scale(0.97); filter: blur(2px); } }
+@keyframes dropup-in   { from { opacity: 0; transform: translateY(4px) scale(0.97); filter: blur(2px); } }
+@keyframes modal-in    { from { opacity: 0; transform: translateY(12px) scale(0.96); filter: blur(4px); } }
+@keyframes toast-in    { from { transform: translateY(-10px) scale(0.94); filter: blur(3px); } }
+@keyframes toast-in-full { from { opacity: 0; transform: translateY(-10px) scale(0.94); filter: blur(3px); } }
+@keyframes roll-up     { from { opacity: 0; transform: translateY(70%); } }
+@keyframes roll-down   { from { opacity: 0; transform: translateY(-70%); } }
+@keyframes meter-fill  { from { transform: scaleX(0); } }
+@keyframes indicator   { from { opacity: 0; transform: scaleY(0.2); } }
+@keyframes icon-swap   { from { opacity: 0; transform: rotate(-45deg) scale(0.6); filter: blur(2px); } }
+@keyframes msg-in      { from { opacity: 0; transform: translateX(-10px) scale(0.97); } }
+@keyframes msg-in-own  { from { opacity: 0; transform: translateX(10px) scale(0.97); } }
+@keyframes ring {
+  0%   { transform: rotate(0); }
+  15%  { transform: rotate(16deg); }
+  30%  { transform: rotate(-13deg); }
+  45%  { transform: rotate(9deg); }
+  60%  { transform: rotate(-6deg); }
+  75%  { transform: rotate(3deg); }
+  100% { transform: rotate(0); }
 }
-
-@keyframes slideInRight {
-  from { opacity: 0; transform: translateX(20px); }
-  to   { opacity: 1; transform: translateX(0); }
-}
-
-@keyframes scaleIn {
-  from { opacity: 0; transform: scale(0.96); }
-  to   { opacity: 1; transform: scale(1); }
-}
-
-@keyframes bounce {
-  0%, 100% { transform: scale(1); }
-  40%       { transform: scale(1.35); }
-  60%       { transform: scale(0.9); }
-}
-
 @keyframes shimmer {
   0%   { background-position: -400px 0; }
   100% { background-position: 400px 0; }
 }
 
-@keyframes toastIn {
-  from { opacity: 0; transform: translateX(24px); }
-  to   { opacity: 1; transform: translateX(0); }
+.fade-in      { animation: fadeIn 220ms var(--ease-out) backwards; }
+.fade-in-up   { animation: rise 320ms var(--ease-out) backwards; }
+.slide-in     { animation: slideInRight 260ms var(--ease-out) backwards; }
+.card-enter   { animation: enter 380ms var(--ease-out) backwards; }
+
+/* Menus suspensos nascem do botão que os abre */
+.scale-in     { animation: dropdown-in 200ms var(--ease-out) backwards; }
+.notif-panel  { transform-origin: top right; }
+.sidebar-user-menu { transform-origin: bottom center; }
+.sidebar-user-menu.scale-in { animation-name: dropup-in; }
+
+/* Troca de página: entrada curta (navegação é frequente) */
+.app-container > * { animation: page-enter 240ms var(--ease-out) backwards; }
+
+/* Listas: itens entram em cascata (só os primeiros esperam) */
+.stagger > * { animation: rise 420ms var(--ease-out) backwards; }
+.stagger > :nth-child(2)  { animation-delay: 35ms; }
+.stagger > :nth-child(3)  { animation-delay: 70ms; }
+.stagger > :nth-child(4)  { animation-delay: 105ms; }
+.stagger > :nth-child(5)  { animation-delay: 140ms; }
+.stagger > :nth-child(6)  { animation-delay: 175ms; }
+.stagger > :nth-child(7)  { animation-delay: 210ms; }
+.stagger > :nth-child(n+8) { animation-delay: 245ms; }
+
+/* Itens acrescentados (comentários, mensagens): sem atraso */
+.list-enter > * { animation: rise 300ms var(--ease-out) backwards; }
+
+/* Toque: afunda depressa e volta com mola (sensação de botão físico) */
+.uk-button,
+.icon-btn,
+.action-btn,
+.form-btn,
+.press {
+  transition:
+    background 160ms var(--ease-out),
+    border-color 160ms var(--ease-out),
+    color 160ms var(--ease-out),
+    transform 420ms var(--spring-soft);
 }
 
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0.5; }
+.uk-button:not(:disabled):active,
+.icon-btn:active,
+.action-btn:active,
+.form-btn:not(:disabled):active,
+.press:not(:disabled):active {
+  transform: scale(0.95);
+  transition-duration: 160ms, 160ms, 160ms, 90ms;
+  transition-timing-function: var(--ease-out);
 }
 
-.fade-in      { animation: fadeIn 200ms ease both; }
-.fade-in-up   { animation: fadeInUp 240ms ease both; }
-.scale-in     { animation: scaleIn 160ms ease both; }
-.slide-in     { animation: slideInRight 200ms ease both; }
+.sidebar-link { transition: background var(--t), color var(--t), transform 380ms var(--spring-soft); }
+.sidebar-link:active { transform: scale(0.98); transition-duration: 90ms; }
+.sidebar-link.is-active::before { animation: indicator 420ms var(--spring) backwards; }
 
-.toast-item { animation: toastIn 220ms ease both; }
+/* Números que mudam rolam na direção da mudança */
+.num-roll { display: inline-block; animation: roll-up 380ms var(--spring-soft) backwards; }
+.num-roll.is-down { animation-name: roll-down; }
 
-/* Reaction bounce on active press */
-.reaction-btn:active span[uk-icon] {
-  animation: bounce 280ms ease;
-  display: inline-block;
+/* Barras de progresso: escala horizontal, enchem ao aparecer e ao mudar */
+.meter-fill {
+  transform-origin: left center;
+  transition: transform 700ms var(--spring-soft);
+  animation: meter-fill 800ms var(--ease-out) backwards 120ms;
+}
+
+/* Sino: um toque quando chegam notificações novas (nunca em loop) */
+.icon-btn.is-ringing > [uk-icon] { animation: ring 820ms var(--ease-out); transform-origin: 50% 2px; }
+.icon-btn-badge { animation: pop-in 460ms var(--spring) backwards; }
+
+/* Troca de ícone (tema claro/escuro) */
+.icon-swap { display: inline-flex; animation: icon-swap 420ms var(--spring) backwards; }
+
+/* Estados vazios */
+.empty-state-icon { animation: pop-in 560ms var(--spring) backwards 60ms; }
+.empty-state-title,
+.empty-state-text { animation: rise 420ms var(--ease-out) backwards 140ms; }
+
+/* Modais */
+.modal-overlay { animation: fadeIn 200ms var(--ease-out) backwards; }
+.modal-box { animation: modal-in 460ms var(--spring-soft) backwards; }
+
+/* Avisos */
+.uk-notification-message { animation: toast-in 480ms var(--spring) backwards; transform-origin: top right; }
+.toast-item { animation: toast-in-full 480ms var(--spring) backwards; transform-origin: top right; }
+
+/* Chat: mensagens novas entram do lado de quem fala */
+.msg-in { animation: msg-in 280ms var(--spring-soft) backwards; transform-origin: bottom left; }
+.msg-in.is-own { animation-name: msg-in-own; transform-origin: bottom right; }
+
+/* Partículas das celebrações (criadas por src/lib/motion.ts) */
+.fx-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.fx-particle {
+  position: absolute;
+  border-radius: 999px;
+  will-change: transform, opacity;
 }
 
 /* Skeleton shimmer */
@@ -1258,10 +1354,22 @@ a:hover { color: var(--accent-dark); }
   animation: shimmer 1.4s infinite linear;
 }
 
-/* Card entrance stagger — applied via inline animationDelay */
-.card-enter { animation: fadeInUp 280ms ease both; }
-
 /* Smooth theme transition */
 body, .app-topbar, main {
-  transition: background-color 200ms ease, color 200ms ease, border-color 200ms ease;
+  transition: background-color 200ms var(--ease-out), color 200ms var(--ease-out), border-color 200ms var(--ease-out);
+}
+
+/* Movimento reduzido: tudo instantâneo, estados finais preservados */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .fx-layer { display: none; }
 }

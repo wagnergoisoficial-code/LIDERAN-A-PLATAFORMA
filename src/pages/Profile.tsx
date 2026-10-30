@@ -21,7 +21,16 @@ interface UserProfile {
   createdAt: string;
   socialLinks: any[];
   achievements: any[];
+  churchName?: string | null;
+  isBlocked?: boolean;
 }
+
+const SOCIAL_PLATFORMS: Record<string, string> = {
+  whatsapp: 'WhatsApp',
+  instagram: 'Instagram',
+  facebook: 'Facebook',
+  linkedin: 'LinkedIn',
+};
 
 interface SocialLink {
   id: string;
@@ -46,9 +55,11 @@ const Profile = () => {
     location: '',
     title: '',
     backgroundTheme: 'light',
-    skills: [] as string[],
+    skillsText: '',
     profileImage: '',
+    socialLinks: [] as { platform: string; url: string }[],
   });
+  const [blocking, setBlocking] = useState(false);
 
   useEffect(() => {
     const id = userId || currentUser?.id;
@@ -70,8 +81,9 @@ const Profile = () => {
           location: result.data.location || '',
           title: result.data.title || '',
           backgroundTheme: result.data.backgroundTheme || 'light',
-          skills: result.data.skills || [],
+          skillsText: (result.data.skills || []).join(', '),
           profileImage: result.data.profileImage || '',
+          socialLinks: (result.data.socialLinks || []).map((l: SocialLink) => ({ platform: l.platform, url: l.url })),
         });
       }
     } catch {
@@ -110,21 +122,40 @@ const Profile = () => {
         location: editForm.location,
         title: editForm.title,
         backgroundTheme: editForm.backgroundTheme,
-        skills: editForm.skills.filter(s => s.trim()),
-        socialLinks: profile?.socialLinks,
+        skills: editForm.skillsText.split(',').map(s => s.trim()).filter(Boolean),
+        socialLinks: editForm.socialLinks.filter(l => l.url.trim()).map(l => ({ platform: l.platform, url: l.url.trim() })),
         profileImage: editForm.profileImage || undefined,
       });
       if (result.success) {
         setProfile(result.data);
         setIsEditing(false);
         setProfileImagePreview('');
-        updateUser({ name: result.data.name, profileImage: result.data.profileImage });
+        updateUser({ name: result.data.name, profileImage: result.data.profileImage, title: result.data.title });
         UIkit.notification({ message: 'Perfil atualizado com sucesso!', status: 'success' });
       }
     } catch (err: any) {
       UIkit.notification({ message: err.message || 'Erro ao atualizar perfil', status: 'danger' });
     }
   };
+
+  const handleToggleBlock = async () => {
+    if (!profile) return;
+    if (!profile.isBlocked && !confirm(`Bloquear ${profile.name}? As publicações, comentários e mensagens desta pessoa deixam de aparecer para você.`)) return;
+    setBlocking(true);
+    try {
+      if (profile.isBlocked) await api.unblockUser(profile.id);
+      else await api.blockUser(profile.id);
+      setProfile({ ...profile, isBlocked: !profile.isBlocked });
+      UIkit.notification({ message: profile.isBlocked ? 'Usuário desbloqueado' : 'Usuário bloqueado', status: 'success' });
+    } catch (err: any) {
+      UIkit.notification({ message: err.message || 'Erro ao atualizar bloqueio', status: 'danger' });
+    } finally {
+      setBlocking(false);
+    }
+  };
+
+  const setSocialLink = (i: number, field: 'platform' | 'url', value: string) =>
+    setEditForm(prev => ({ ...prev, socialLinks: prev.socialLinks.map((l, idx) => idx === i ? { ...l, [field]: value } : l) }));
 
   const getRoleBadge = (role: string) => {
     switch (role) {
@@ -162,13 +193,28 @@ const Profile = () => {
         icon="user"
         title={isOwnProfile ? 'Meu Perfil' : 'Perfil'}
         subtitle={isOwnProfile ? 'Suas informações na comunidade' : 'Informações do membro'}
-        actions={isOwnProfile && (
+        actions={isOwnProfile ? (
           <button className="uk-button uk-button-default" onClick={() => setIsEditing(!isEditing)}>
             <span uk-icon={`icon: ${isEditing ? 'close' : 'pencil'}; ratio: 0.8`}></span>
             {isEditing ? 'Cancelar' : 'Editar Perfil'}
           </button>
+        ) : (
+          <button
+            className={`uk-button ${profile.isBlocked ? 'uk-button-default' : 'uk-button-danger'}`}
+            onClick={handleToggleBlock}
+            disabled={blocking}
+          >
+            <span uk-icon={`icon: ${profile.isBlocked ? 'unlock' : 'ban'}; ratio: 0.8`}></span>
+            {profile.isBlocked ? 'Desbloquear' : 'Bloquear'}
+          </button>
         )}
       />
+
+      {profile.isBlocked && (
+        <div className="card" style={{ padding: '12px 16px', marginBottom: '20px', fontSize: '13px', color: 'var(--text-muted)' }}>
+          Você bloqueou este usuário. As publicações, comentários e mensagens dele ficam ocultos para você.
+        </div>
+      )}
 
       {/* ── PROFILE HEADER ──────────────────────────────────────── */}
       <div className="card" style={{ marginBottom: '20px' }}>
@@ -284,7 +330,27 @@ const Profile = () => {
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', gridColumn: '1 / -1' }}>
                   <label className="uk-form-label" style={{ marginBottom: 0 }}>Habilidades (separadas por vírgula)</label>
-                  <input className="uk-input" type="text" placeholder="Ex: Liderança, Música, Design" value={editForm.skills.join(', ')} onChange={(e) => setEditForm({ ...editForm, skills: e.target.value.split(',').map(s => s.trim()) })} />
+                  <input className="uk-input" type="text" placeholder="Ex: Liderança, Música, Design" value={editForm.skillsText} onChange={(e) => setEditForm({ ...editForm, skillsText: e.target.value })} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', gridColumn: '1 / -1' }}>
+                  <label className="uk-form-label" style={{ marginBottom: 0 }}>Redes Sociais</label>
+                  {editForm.socialLinks.map((link, i) => (
+                    <div key={i} style={{ display: 'flex', gap: '8px' }}>
+                      <select className="uk-select" value={link.platform} onChange={(e) => setSocialLink(i, 'platform', e.target.value)} style={{ width: '150px', flexShrink: 0 }}>
+                        {Object.entries(SOCIAL_PLATFORMS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                      </select>
+                      <input className="uk-input" type="url" placeholder="https://..." value={link.url} onChange={(e) => setSocialLink(i, 'url', e.target.value)} />
+                      <button type="button" className="icon-btn" title="Remover" onClick={() => setEditForm(prev => ({ ...prev, socialLinks: prev.socialLinks.filter((_, idx) => idx !== i) }))}>
+                        <span uk-icon="icon: close; ratio: 0.75"></span>
+                      </button>
+                    </div>
+                  ))}
+                  {editForm.socialLinks.length < 4 && (
+                    <button type="button" className="link-btn" style={{ alignSelf: 'flex-start' }}
+                      onClick={() => setEditForm(prev => ({ ...prev, socialLinks: [...prev.socialLinks, { platform: Object.keys(SOCIAL_PLATFORMS).find(p => !prev.socialLinks.some(l => l.platform === p)) || 'instagram', url: '' }] }))}>
+                      + Adicionar rede social
+                    </button>
+                  )}
                 </div>
               </div>
 

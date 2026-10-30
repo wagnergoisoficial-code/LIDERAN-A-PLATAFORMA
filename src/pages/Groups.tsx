@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '../services/api';
+import { burst } from '../lib/motion';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import Avatar from '../components/Avatar';
@@ -44,6 +45,7 @@ const Groups: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Group | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({ name: '', description: '', category: 'celula' });
   const [saving, setSaving] = useState(false);
   const [joining, setJoining] = useState<string | null>(null);
@@ -60,43 +62,49 @@ const Groups: React.FC = () => {
 
   useEffect(() => { load(); }, [load]);
 
-  const handleCreate = async (e: React.FormEvent) => {
+  const openCreate = () => {
+    setEditingId(null);
+    setForm({ name: '', description: '', category: 'celula' });
+    setShowForm(true);
+  };
+
+  const openEdit = (g: Group) => {
+    setEditingId(g.id);
+    setForm({ name: g.name, description: g.description || '', category: g.category });
+    setShowForm(true);
+  };
+
+  // Atualiza o grupo na lista e no detalhe com os dados devolvidos pelo servidor
+  const replaceGroup = (g: Group) => {
+    setGroups(prev => prev.map(item => item.id === g.id ? g : item));
+    setSelected(prev => prev?.id === g.id ? g : prev);
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name.trim()) return;
     setSaving(true);
     try {
-      const res = await api.createGroup(form);
+      const res = editingId ? await api.updateGroup(editingId, form) : await api.createGroup(form);
       if (res.success) {
-        setGroups(prev => [res.data, ...prev]);
+        if (editingId) replaceGroup(res.data);
+        else setGroups(prev => [res.data, ...prev]);
         setShowForm(false);
+        setEditingId(null);
         setForm({ name: '', description: '', category: 'celula' });
-        toast('Grupo criado com sucesso', 'success');
+        toast(editingId ? 'Grupo atualizado' : 'Grupo criado com sucesso', 'success');
       }
-    } catch { toast('Erro ao criar grupo', 'error'); }
+    } catch (err: any) { toast(err.message || 'Erro ao salvar grupo', 'error'); }
     finally { setSaving(false); }
   };
 
   const handleJoin = async (groupId: string, isMember: boolean) => {
     setJoining(groupId);
     try {
-      if (isMember) {
-        await api.leaveGroup(groupId);
-        setGroups(prev => prev.map(g =>
-          g.id === groupId
-            ? { ...g, isMember: false, memberCount: g.memberCount - 1, members: g.members.filter(m => m.userId !== user?.id) }
-            : g
-        ));
-        if (selected?.id === groupId) setSelected(prev => prev ? { ...prev, isMember: false, memberCount: prev.memberCount - 1 } : null);
-        toast('Você saiu do grupo', 'info');
-      } else {
-        await api.joinGroup(groupId);
-        setGroups(prev => prev.map(g =>
-          g.id === groupId ? { ...g, isMember: true, memberCount: g.memberCount + 1 } : g
-        ));
-        if (selected?.id === groupId) setSelected(prev => prev ? { ...prev, isMember: true, memberCount: prev.memberCount + 1 } : null);
-        toast('Você entrou no grupo', 'success');
-      }
-    } catch { toast('Erro ao atualizar participação', 'error'); }
+      const res = isMember ? await api.leaveGroup(groupId) : await api.joinGroup(groupId);
+      if (res.data) replaceGroup(res.data);
+      toast(isMember ? 'Você saiu do grupo' : 'Você entrou no grupo', isMember ? 'info' : 'success');
+    } catch (err: any) { toast(err.message || 'Erro ao atualizar participação', 'error'); }
     finally { setJoining(null); }
   };
 
@@ -107,8 +115,10 @@ const Groups: React.FC = () => {
       setGroups(prev => prev.filter(g => g.id !== id));
       if (selected?.id === id) setSelected(null);
       toast('Grupo excluído', 'success');
-    } catch { toast('Erro ao excluir', 'error'); }
+    } catch (err: any) { toast(err.message || 'Erro ao excluir', 'error'); }
   };
+
+  const canManage = (g: Group) => isLeader || g.leaderId === user?.id;
 
   const CategoryBadge = ({ cat }: { cat: string }) => (
     <span className="uk-label">{CATEGORIES[cat] || cat}</span>
@@ -121,7 +131,7 @@ const Groups: React.FC = () => {
           title="Células & Ministérios"
           subtitle="Grupos e ministérios da comunidade"
           actions={isLeader && (
-            <button onClick={() => setShowForm(true)} className="uk-button uk-button-primary">
+            <button onClick={openCreate} className="uk-button uk-button-primary">
               <span uk-icon="icon: plus; ratio: 0.8"></span> Novo Grupo
             </button>
           )}
@@ -149,7 +159,10 @@ const Groups: React.FC = () => {
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                   {selected.leaderId !== user?.id && (
                     <button
-                      onClick={() => handleJoin(selected.id, selected.isMember)}
+                      onClick={e => {
+                        if (!selected.isMember) burst(e.currentTarget, { count: 9, colors: ['--accent', '--success'], spread: 18 });
+                        handleJoin(selected.id, selected.isMember);
+                      }}
                       disabled={joining === selected.id}
                       className={`uk-button ${selected.isMember ? 'uk-button-default' : 'uk-button-primary'}`}
                       style={{ fontSize: '13px' }}
@@ -157,10 +170,15 @@ const Groups: React.FC = () => {
                       {joining === selected.id ? <span uk-spinner="ratio: 0.7"></span> : selected.isMember ? 'Sair do grupo' : 'Participar'}
                     </button>
                   )}
-                  {isLeader && (
-                    <button onClick={() => handleDelete(selected.id)} className="uk-button uk-button-danger uk-button-small">
-                      <span uk-icon="icon: trash; ratio: 0.75"></span> Excluir
-                    </button>
+                  {canManage(selected) && (
+                    <>
+                      <button onClick={() => openEdit(selected)} className="uk-button uk-button-default uk-button-small">
+                        <span uk-icon="icon: pencil; ratio: 0.75"></span> Editar
+                      </button>
+                      <button onClick={() => handleDelete(selected.id)} className="uk-button uk-button-danger uk-button-small">
+                        <span uk-icon="icon: trash; ratio: 0.75"></span> Excluir
+                      </button>
+                    </>
                   )}
                 </div>
               </div>
@@ -169,7 +187,7 @@ const Groups: React.FC = () => {
                 <div className="list-label">
                   {selected.memberCount} {selected.memberCount === 1 ? 'membro' : 'membros'}
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div className="stagger" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {selected.members.map(m => (
                     <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <Avatar name={m.user.name} profileImage={m.user.profileImage} size="small" />
@@ -221,14 +239,14 @@ const Groups: React.FC = () => {
         {/* Create modal */}
         {showForm && (
           <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setShowForm(false); }}>
-            <div className="modal-box fade-in" style={{ maxWidth: '460px' }}>
+            <div className="modal-box" style={{ maxWidth: '460px' }}>
               <div className="modal-header">
-                <h4>Novo Grupo</h4>
+                <h4>{editingId ? 'Editar Grupo' : 'Novo Grupo'}</h4>
                 <button className="modal-close-btn" onClick={() => setShowForm(false)}>
                   <span uk-icon="icon: close; ratio: 0.9"></span>
                 </button>
               </div>
-              <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 <div>
                   <label className="uk-form-label">Nome *</label>
                   <input className="uk-input" value={form.name} onChange={e => setForm(f => ({...f, name: e.target.value}))} placeholder="Nome do grupo" required />
@@ -246,7 +264,7 @@ const Groups: React.FC = () => {
                 <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
                   <button type="button" onClick={() => setShowForm(false)} className="uk-button uk-button-default" style={{ fontSize: '13px' }}>Cancelar</button>
                   <button type="submit" disabled={saving} className="uk-button uk-button-primary" style={{ fontSize: '13px' }}>
-                    {saving ? <span uk-spinner="ratio: 0.7"></span> : 'Criar Grupo'}
+                    {saving ? <span uk-spinner="ratio: 0.7"></span> : editingId ? 'Salvar Alterações' : 'Criar Grupo'}
                   </button>
                 </div>
               </form>

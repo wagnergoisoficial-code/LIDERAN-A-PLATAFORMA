@@ -1,16 +1,33 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { api } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import UIkit from 'uikit';
+import { celebrate } from '../lib/motion';
 
-interface ChurchCreateProps {
-  onChurchCreated?: () => void;
+interface ChurchFormValues {
+  id: string;
+  name: string;
+  title?: string | null;
+  description?: string | null;
+  cultosDias?: string[];
 }
 
-const ChurchCreate: React.FC<ChurchCreateProps> = ({ onChurchCreated }) => {
+interface ChurchCreateProps {
+  church?: ChurchFormValues; // presente = edição
+  onChurchCreated?: (church?: { id: string }) => void;
+}
+
+const ChurchCreate: React.FC<ChurchCreateProps> = ({ church, onChurchCreated }) => {
+  const { applySession } = useAuth();
+  const isEditing = !!church;
   const [formData, setFormData] = useState({
-    name: '', title: '', description: '', cultosDias: [] as string[],
+    name: church?.name || '',
+    title: church?.title || '',
+    description: church?.description || '',
+    cultosDias: church?.cultosDias || [] as string[],
   });
   const [loading, setLoading] = useState(false);
+  const submitRef = useRef<HTMLButtonElement>(null);
   const cultoDias = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -35,19 +52,25 @@ const ChurchCreate: React.FC<ChurchCreateProps> = ({ onChurchCreated }) => {
     }
     setLoading(true);
     try {
-      const response = await api.createChurch({
+      const payload = {
         name: formData.name,
         title: formData.title || null,
         description: formData.description || null,
-        cultosDias: formData.cultosDias.length > 0 ? formData.cultosDias : null,
-      });
+        cultosDias: formData.cultosDias,
+      };
+      const response = isEditing
+        ? await api.updateChurch(church!.id, payload)
+        : await api.createChurch(payload);
       if (response.success) {
-        UIkit.notification({ message: 'Comunidade criada com sucesso!', status: 'success', pos: 'top-right' });
-        setFormData({ name: '', title: '', description: '', cultosDias: [] });
-        onChurchCreated?.();
+        // Ao criar, a nova comunidade passa a ser a ativa: a sessão é atualizada
+        if (!isEditing) celebrate(submitRef.current);
+        applySession(response.session);
+        UIkit.notification({ message: isEditing ? 'Comunidade atualizada!' : 'Comunidade criada com sucesso!', status: 'success', pos: 'top-right' });
+        if (!isEditing) setFormData({ name: '', title: '', description: '', cultosDias: [] });
+        onChurchCreated?.(response.data);
       }
     } catch (err: any) {
-      UIkit.notification({ message: err.message || 'Erro ao criar comunidade', status: 'danger', pos: 'top-right' });
+      UIkit.notification({ message: err.message || 'Erro ao salvar comunidade', status: 'danger', pos: 'top-right' });
     } finally {
       setLoading(false);
     }
@@ -56,7 +79,7 @@ const ChurchCreate: React.FC<ChurchCreateProps> = ({ onChurchCreated }) => {
   return (
     <div className="card">
       <div className="card-header">
-        <span className="card-title">Nova Comunidade</span>
+        <span className="card-title">{isEditing ? 'Editar Comunidade' : 'Nova Comunidade'}</span>
       </div>
 
       <div className="card-body">
@@ -82,6 +105,7 @@ const ChurchCreate: React.FC<ChurchCreateProps> = ({ onChurchCreated }) => {
                 return (
                   <label
                     key={dia}
+                    className="press"
                     style={{
                       display: 'flex', alignItems: 'center', gap: '6px',
                       padding: '5px 12px',
@@ -91,7 +115,7 @@ const ChurchCreate: React.FC<ChurchCreateProps> = ({ onChurchCreated }) => {
                       cursor: 'pointer',
                       fontSize: '12px', fontWeight: 500,
                       color: active ? '#fff' : 'var(--text-muted)',
-                      transition: 'all 160ms ease',
+                      transition: 'background 160ms var(--ease-out), border-color 160ms var(--ease-out), color 160ms var(--ease-out), transform 420ms var(--spring-soft)',
                       textTransform: 'capitalize'
                     }}
                   >
@@ -111,10 +135,10 @@ const ChurchCreate: React.FC<ChurchCreateProps> = ({ onChurchCreated }) => {
           </div>
 
           <div style={{ marginTop: '20px' }}>
-            <button className="uk-button uk-button-primary" type="submit" disabled={loading} style={{ height: '36px' }}>
+            <button ref={submitRef} className="uk-button uk-button-primary" type="submit" disabled={loading} style={{ height: '36px' }}>
               {loading
-                ? <><span uk-spinner="ratio: 0.5"></span> Criando...</>
-                : <><span uk-icon="icon: check; ratio: 0.85"></span> Criar Comunidade</>
+                ? <><span uk-spinner="ratio: 0.5"></span> Salvando...</>
+                : <><span uk-icon="icon: check; ratio: 0.85"></span> {isEditing ? 'Salvar Alterações' : 'Criar Comunidade'}</>
               }
             </button>
           </div>

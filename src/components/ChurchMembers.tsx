@@ -219,7 +219,7 @@ const ChurchMembers: React.FC<ChurchMembersProps> = ({ churchId }) => {
                 {[
                   { label: 'Nome *', name: 'name', type: 'text', placeholder: 'Nome completo' },
                   { label: 'Email *', name: 'email', type: 'email', placeholder: 'email@exemplo.com' },
-                  { label: 'Senha *', name: 'password', type: 'password', placeholder: 'Mínimo 8 caracteres', min: 8 },
+                  { label: 'Senha *', name: 'password', type: 'password', placeholder: '8+ caracteres, Aa e número', min: 8 },
                   { label: 'Confirmar Senha *', name: 'confirmPassword', type: 'password', placeholder: 'Confirme a senha', min: 8 },
                   { label: 'Idade', name: 'age', type: 'number', placeholder: 'Ex: 25' },
                   { label: 'Título / Função', name: 'title', type: 'text', placeholder: 'Ex: Diácono' },

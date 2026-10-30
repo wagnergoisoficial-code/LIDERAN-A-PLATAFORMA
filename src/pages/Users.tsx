@@ -34,7 +34,7 @@ const EngagementBar = ({ stat }: { stat: MemberStat | undefined }) => {
     <div title={`Posts: ${stat.posts} · Comentários: ${stat.comments} · Mensagens: ${stat.messages}`} style={{ minWidth: '100px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
         <div className="engagement-track" style={{ flex: 1 }}>
-          <div className="engagement-fill" style={{ width: `${pct}%`, background: color }} />
+          <div className="engagement-fill meter-fill" style={{ transform: `scaleX(${pct / 100})`, background: color }} />
         </div>
         <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text)', minWidth: '30px', textAlign: 'right' }}>{pct}%</span>
       </div>
@@ -220,7 +220,7 @@ const Users = () => {
                 ))}
               </tr>
             </thead>
-            <tbody>
+            <tbody className="stagger">
               {members.map((m) => {
                 const badge = getRoleBadge(m.role);
                 return (
@@ -294,7 +294,7 @@ const Users = () => {
                 {[
                   { label: 'Nome *', name: 'name', type: 'text', placeholder: 'Nome completo' },
                   { label: 'Email *', name: 'email', type: 'email', placeholder: 'email@exemplo.com' },
-                  { label: 'Senha *', name: 'password', type: 'password', placeholder: 'Mínimo 8 caracteres' },
+                  { label: 'Senha *', name: 'password', type: 'password', placeholder: '8+ caracteres, Aa e número' },
                   { label: 'Confirmar Senha *', name: 'confirmPassword', type: 'password', placeholder: 'Confirme a senha' },
                   { label: 'Idade', name: 'age', type: 'number', placeholder: 'Ex: 25' },
                   { label: 'Título / Função', name: 'title', type: 'text', placeholder: 'Ex: Diácono' },

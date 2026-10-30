@@ -2,13 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import UIkit from 'uikit';
+import Avatar from '../components/Avatar';
 import PageHeader from '../components/PageHeader';
 import EmptyState from '../components/EmptyState';
+import AnimatedNumber from '../components/AnimatedNumber';
+import { pop, burst, celebrate } from '../lib/motion';
 
 interface PrayerRequest {
   id: string; title: string; content: string;
   isAnonymous: boolean; isAnswered: boolean;
   userId: string | null; prayCount: number; hasPrayed: boolean;
+  authorName?: string | null; authorProfileImage?: string | null;
+  isMine?: boolean; prayingNames?: string[];
   createdAt: string;
 }
 
@@ -47,24 +52,25 @@ const Prayers: React.FC = () => {
     } finally { setSaving(false); }
   };
 
+  const replace = (updated?: PrayerRequest) => {
+    if (updated) setRequests(prev => prev.map(r => r.id === updated.id ? updated : r));
+  };
+
   const handlePray = async (id: string, hasPrayed: boolean) => {
     try {
-      if (hasPrayed) {
-        await api.unprayForRequest(id);
-        setRequests(prev => prev.map(r => r.id === id ? { ...r, hasPrayed: false, prayCount: r.prayCount - 1 } : r));
-      } else {
-        await api.prayForRequest(id);
-        setRequests(prev => prev.map(r => r.id === id ? { ...r, hasPrayed: true, prayCount: r.prayCount + 1 } : r));
-      }
+      const res = hasPrayed ? await api.unprayForRequest(id) : await api.prayForRequest(id);
+      replace(res.data);
     } catch (err: any) {
       UIkit.notification({ message: err.message || 'Erro', status: 'danger', pos: 'top-right' });
     }
   };
 
-  const handleMarkAnswered = async (id: string) => {
+  // A posição do botão é guardada antes: ele desaparece quando o pedido fica respondido
+  const handleMarkAnswered = async (id: string, origin?: DOMRect) => {
     try {
-      await api.markPrayerAnswered(id);
-      setRequests(prev => prev.map(r => r.id === id ? { ...r, isAnswered: true } : r));
+      const res = await api.markPrayerAnswered(id);
+      celebrate(origin, ['--success', '--accent', '--success-dark']);
+      replace(res.data);
       UIkit.notification({ message: 'Marcado como respondido!', status: 'success', pos: 'top-right' });
     } catch (err: any) {
       UIkit.notification({ message: err.message || 'Erro', status: 'danger', pos: 'top-right' });
@@ -72,6 +78,7 @@ const Prayers: React.FC = () => {
   };
 
   const handleDelete = async (id: string) => {
+    if (!confirm('Excluir este pedido de oração?')) return;
     try {
       await api.deletePrayerRequest(id);
       setRequests(prev => prev.filter(r => r.id !== id));
@@ -79,6 +86,9 @@ const Prayers: React.FC = () => {
       UIkit.notification({ message: err.message || 'Erro', status: 'danger', pos: 'top-right' });
     }
   };
+
+  const isLeader = user?.role === 'leader' || user?.role === 'admin';
+  const canManage = (r: PrayerRequest) => !!r.isMine || r.userId === user?.id || isLeader;
 
   const filtered = requests.filter(r => {
     if (filter === 'active') return !r.isAnswered;
@@ -104,7 +114,7 @@ const Prayers: React.FC = () => {
           {(['active', 'answered', 'all'] as const).map(f => {
             const labels = { active: 'Ativos', answered: 'Respondidos', all: 'Todos' };
             return (
-              <button key={f} onClick={() => setFilter(f)} style={{ height: '32px', padding: '0 14px', fontSize: '12px', fontWeight: 600, fontFamily: 'inherit', border: 'none', borderRight: f !== 'all' ? '1px solid var(--border)' : 'none', background: filter === f ? 'var(--accent)' : 'transparent', color: filter === f ? 'white' : 'var(--text-muted)', cursor: 'pointer' }}>
+              <button key={f} className="press" onClick={() => setFilter(f)} style={{ height: '32px', padding: '0 14px', fontSize: '12px', fontWeight: 600, fontFamily: 'inherit', border: 'none', borderRight: f !== 'all' ? '1px solid var(--border)' : 'none', background: filter === f ? 'var(--accent)' : 'transparent', color: filter === f ? 'white' : 'var(--text-muted)', cursor: 'pointer' }}>
                 {labels[f]}
               </button>
             );
@@ -114,7 +124,7 @@ const Prayers: React.FC = () => {
         {loading ? (
           <div style={{ textAlign: 'center', padding: '60px' }}><span uk-spinner="ratio: 1.2"></span></div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div key={filter} className="stagger" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {filtered.map(r => (
               <div key={r.id} className="card" style={{ padding: '16px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
@@ -131,12 +141,12 @@ const Prayers: React.FC = () => {
                     <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.5 }}>{r.content}</p>
                   </div>
                   <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
-                    {(r.userId === user?.id || user?.role === 'leader' || user?.role === 'admin') && !r.isAnswered && (
-                      <button className="uk-button uk-button-success uk-button-small" title="Marcar como respondido" onClick={() => handleMarkAnswered(r.id)}>
+                    {canManage(r) && !r.isAnswered && (
+                      <button className="uk-button uk-button-success uk-button-small" title="Marcar como respondido" onClick={e => handleMarkAnswered(r.id, e.currentTarget.getBoundingClientRect())}>
                         <span uk-icon="icon: check; ratio: 0.75"></span> Respondido
                       </button>
                     )}
-                    {(r.userId === user?.id || user?.role === 'admin') && (
+                    {canManage(r) && (
                       <button className="uk-button uk-button-danger uk-button-small" title="Excluir pedido" onClick={() => handleDelete(r.id)}>
                         <span uk-icon="icon: trash; ratio: 0.75"></span> Excluir
                       </button>
@@ -145,14 +155,31 @@ const Prayers: React.FC = () => {
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '12px', paddingTop: '10px', borderTop: '1px solid var(--border)' }}>
-                  <span style={{ fontSize: '12px', color: 'var(--text-faint)' }}>
-                    {new Date(r.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--text-faint)', minWidth: 0 }}>
+                    {r.isAnonymous || !r.authorName ? (
+                      <span>{r.isMine ? 'Você (anônimo)' : 'Pedido anônimo'}</span>
+                    ) : (
+                      <>
+                        <Avatar name={r.authorName} profileImage={r.authorProfileImage || undefined} size="small" />
+                        <strong style={{ color: 'var(--text-muted)', fontWeight: 600 }}>{r.isMine ? 'Você' : r.authorName}</strong>
+                      </>
+                    )}
+                    <span>· {new Date(r.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                    {r.prayingNames && r.prayingNames.length > 0 && (
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        · {r.prayingNames.slice(0, 2).join(', ')}{r.prayCount > 2 ? ` e mais ${r.prayCount - 2}` : ''} {r.prayCount === 1 ? 'está orando' : 'estão orando'}
+                      </span>
+                    )}
                   </span>
                   <button
-                    onClick={() => handlePray(r.id, r.hasPrayed)}
+                    className="press"
+                    onClick={e => {
+                      if (!r.hasPrayed) { pop(e.currentTarget); burst(e.currentTarget, { count: 7 }); }
+                      handlePray(r.id, r.hasPrayed);
+                    }}
                     style={{ display: 'flex', alignItems: 'center', gap: '6px', height: '30px', padding: '0 12px', fontSize: '12px', fontWeight: 600, fontFamily: 'inherit', borderRadius: 'var(--radius-sm)', border: `1px solid ${r.hasPrayed ? 'var(--accent)' : 'var(--border-strong)'}`, background: r.hasPrayed ? 'var(--accent)' : 'transparent', color: r.hasPrayed ? '#fff' : 'var(--text-muted)', cursor: 'pointer' }}>
                     <span uk-icon={`icon: heart; ratio: 0.8`}></span>
-                    {r.prayCount > 0 ? r.prayCount : ''} {r.hasPrayed ? 'Orando' : 'Orar'}
+                    {r.prayCount > 0 && <AnimatedNumber value={r.prayCount} />} {r.hasPrayed ? 'Orando' : 'Orar'}
                   </button>
                 </div>
               </div>

@@ -4,6 +4,8 @@ import { useAuth } from '../context/AuthContext';
 import UIkit from 'uikit';
 import PageHeader from '../components/PageHeader';
 import EmptyState from '../components/EmptyState';
+import AnimatedNumber from '../components/AnimatedNumber';
+import { pop, burst } from '../lib/motion';
 
 interface Attendee { id: string; name: string; profileImage?: string; }
 interface Event {
@@ -17,13 +19,39 @@ interface Event {
 const formatDate = (d: string) => new Date(d).toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
 const formatTime = (d: string) => new Date(d).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
+// Valor para <input type="datetime-local"> no fuso do navegador
+const toLocalInput = (d?: string | null) => {
+  if (!d) return '';
+  const date = new Date(d);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
+
+const EMPTY_FORM = { title: '', description: '', location: '', startDate: '', endDate: '' };
+const byStartDate = (a: Event, b: Event) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime();
+
 const Events: React.FC = () => {
   const { user } = useAuth();
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
-  const [form, setForm] = useState({ title: '', description: '', location: '', startDate: '', endDate: '' });
+  const [editing, setEditing] = useState<Event | null>(null);
+  const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+
+  const openCreate = () => { setEditing(null); setForm(EMPTY_FORM); setShowModal(true); };
+  const openEdit = (ev: Event) => {
+    setEditing(ev);
+    setForm({
+      title: ev.title,
+      description: ev.description || '',
+      location: ev.location || '',
+      startDate: toLocalInput(ev.startDate),
+      endDate: toLocalInput(ev.endDate),
+    });
+    setShowModal(true);
+  };
+  const closeModal = () => { setShowModal(false); setEditing(null); };
 
   const load = async () => {
     try {
@@ -35,32 +63,38 @@ const Events: React.FC = () => {
 
   useEffect(() => { load(); }, []);
 
-  const handleCreate = async (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     try {
-      const res = await api.createEvent(form);
+      // Datas em ISO: o servidor recebe o instante exato, independente do fuso
+      const payload = {
+        ...form,
+        startDate: form.startDate ? new Date(form.startDate).toISOString() : '',
+        endDate: form.endDate ? new Date(form.endDate).toISOString() : null,
+      };
+      const res = editing ? await api.updateEvent(editing.id, payload) : await api.createEvent(payload);
       if (res.success) {
-        setEvents(prev => [res.data, ...prev]);
-        setShowModal(false);
-        setForm({ title: '', description: '', location: '', startDate: '', endDate: '' });
-        UIkit.notification({ message: 'Evento criado!', status: 'success', pos: 'top-right' });
+        setEvents(prev => (editing ? prev.map(ev => ev.id === editing.id ? res.data : ev) : [...prev, res.data]).sort(byStartDate));
+        closeModal();
+        UIkit.notification({ message: editing ? 'Evento atualizado!' : 'Evento criado!', status: 'success', pos: 'top-right' });
       }
     } catch (err: any) {
-      UIkit.notification({ message: err.message || 'Erro ao criar evento', status: 'danger', pos: 'top-right' });
+      UIkit.notification({ message: err.message || 'Erro ao salvar evento', status: 'danger', pos: 'top-right' });
     } finally { setSaving(false); }
   };
 
   const handleRsvp = async (eventId: string, status: string) => {
     try {
-      await api.rsvpEvent(eventId, status);
-      setEvents(prev => prev.map(e => e.id === eventId ? { ...e, myStatus: status === 'none' ? null : status } : e));
+      const res = await api.rsvpEvent(eventId, status);
+      if (res.success && res.data) setEvents(prev => prev.map(e => e.id === eventId ? res.data : e));
     } catch (err: any) {
       UIkit.notification({ message: err.message || 'Erro', status: 'danger', pos: 'top-right' });
     }
   };
 
   const handleDelete = async (eventId: string) => {
+    if (!confirm('Excluir este evento?')) return;
     try {
       await api.deleteEvent(eventId);
       setEvents(prev => prev.filter(e => e.id !== eventId));
@@ -71,7 +105,7 @@ const Events: React.FC = () => {
   };
 
   const upcoming = events.filter(e => new Date(e.startDate) >= new Date());
-  const past = events.filter(e => new Date(e.startDate) < new Date());
+  const past = events.filter(e => new Date(e.startDate) < new Date()).reverse();
 
   return (
     <div>
@@ -80,7 +114,7 @@ const Events: React.FC = () => {
           title="Agenda"
           subtitle="Eventos e atividades da comunidade"
           actions={(user?.role === 'leader' || user?.role === 'admin') && (
-            <button className="uk-button uk-button-primary" onClick={() => setShowModal(true)}>
+            <button className="uk-button uk-button-primary" onClick={openCreate}>
               <span uk-icon="icon: plus; ratio: 0.85"></span> Novo Evento
             </button>
           )}
@@ -96,8 +130,8 @@ const Events: React.FC = () => {
             {upcoming.length > 0 && (
               <div style={{ marginBottom: '32px' }}>
                 <div className="list-label">Próximos</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {upcoming.map(ev => <EventCard key={ev.id} event={ev} userId={user?.id || ''} userRole={user?.role || ''} onRsvp={handleRsvp} onDelete={handleDelete} />)}
+                <div className="stagger" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {upcoming.map(ev => <EventCard key={ev.id} event={ev} userId={user?.id || ''} userRole={user?.role || ''} onRsvp={handleRsvp} onDelete={handleDelete} onEdit={openEdit} />)}
                 </div>
               </div>
             )}
@@ -106,8 +140,8 @@ const Events: React.FC = () => {
             {past.length > 0 && (
               <div>
                 <div className="list-label">Passados</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {past.map(ev => <EventCard key={ev.id} event={ev} userId={user?.id || ''} userRole={user?.role || ''} onRsvp={handleRsvp} onDelete={handleDelete} past />)}
+                <div className="stagger" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {past.map(ev => <EventCard key={ev.id} event={ev} userId={user?.id || ''} userRole={user?.role || ''} onRsvp={handleRsvp} onDelete={handleDelete} onEdit={openEdit} past />)}
                 </div>
               </div>
             )}
@@ -120,13 +154,13 @@ const Events: React.FC = () => {
 
       {/* Create Modal */}
       {showModal && (
-        <div className="modal-overlay" onClick={() => setShowModal(false)}>
+        <div className="modal-overlay" onClick={closeModal}>
           <div className="modal-box" style={{ maxWidth: '480px' }} onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h4>Novo Evento</h4>
-              <button className="modal-close-btn" onClick={() => setShowModal(false)}><span uk-icon="icon: close; ratio: 0.9"></span></button>
+              <h4>{editing ? 'Editar Evento' : 'Novo Evento'}</h4>
+              <button className="modal-close-btn" onClick={closeModal}><span uk-icon="icon: close; ratio: 0.9"></span></button>
             </div>
-            <form onSubmit={handleCreate}>
+            <form onSubmit={handleSave}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 <div>
                   <label className="form-label">Título *</label>
@@ -152,9 +186,9 @@ const Events: React.FC = () => {
                 </div>
               </div>
               <div className="form-btn-row" style={{ marginTop: '20px' }}>
-                <button type="button" className="form-btn" onClick={() => setShowModal(false)}>Cancelar</button>
+                <button type="button" className="form-btn" onClick={closeModal}>Cancelar</button>
                 <button type="submit" className="form-btn primary" disabled={saving}>
-                  {saving ? <><span uk-spinner="ratio: 0.5"></span> Salvando...</> : 'Criar Evento'}
+                  {saving ? <><span uk-spinner="ratio: 0.5"></span> Salvando...</> : editing ? 'Salvar Alterações' : 'Criar Evento'}
                 </button>
               </div>
             </form>
@@ -168,12 +202,13 @@ const Events: React.FC = () => {
 interface EventCardProps {
   event: Event; userId: string; userRole: string;
   onRsvp: (id: string, status: string) => void;
+  onEdit: (event: Event) => void;
   onDelete: (id: string) => void;
   past?: boolean;
 }
 
-const EventCard: React.FC<EventCardProps> = ({ event, userId, userRole, onRsvp, onDelete, past }) => {
-  const canDelete = event.createdBy === userId || userRole === 'admin';
+const EventCard: React.FC<EventCardProps> = ({ event, userId, userRole, onRsvp, onDelete, onEdit, past }) => {
+  const canDelete = event.createdBy === userId || userRole === 'leader' || userRole === 'admin';
   const rsvpStatus = event.myStatus;
 
   return (
@@ -208,9 +243,14 @@ const EventCard: React.FC<EventCardProps> = ({ event, userId, userRole, onRsvp, 
               </div>
             </div>
             {canDelete && (
-              <button className="uk-button uk-button-danger uk-button-small" title="Excluir evento" onClick={() => onDelete(event.id)}>
-                <span uk-icon="icon: trash; ratio: 0.75"></span> Excluir
-              </button>
+              <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                <button className="uk-button uk-button-default uk-button-small" title="Editar evento" onClick={() => onEdit(event)}>
+                  <span uk-icon="icon: pencil; ratio: 0.75"></span> Editar
+                </button>
+                <button className="uk-button uk-button-danger uk-button-small" title="Excluir evento" onClick={() => onDelete(event.id)}>
+                  <span uk-icon="icon: trash; ratio: 0.75"></span> Excluir
+                </button>
+              </div>
             )}
           </div>
 
@@ -220,8 +260,8 @@ const EventCard: React.FC<EventCardProps> = ({ event, userId, userRole, onRsvp, 
 
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '10px' }}>
             <div style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'flex', gap: '12px' }}>
-              <span><strong style={{ color: 'var(--text)' }}>{event.goingCount}</strong> confirmados</span>
-              {event.maybeCount > 0 && <span><strong style={{ color: 'var(--text)' }}>{event.maybeCount}</strong> talvez</span>}
+              <span><strong style={{ color: 'var(--text)' }}><AnimatedNumber value={event.goingCount} /></strong> confirmados</span>
+              {event.maybeCount > 0 && <span className="fade-in"><strong style={{ color: 'var(--text)' }}><AnimatedNumber value={event.maybeCount} /></strong> talvez</span>}
             </div>
             {!past && (
               <div style={{ display: 'flex', gap: '6px' }}>
@@ -229,7 +269,12 @@ const EventCard: React.FC<EventCardProps> = ({ event, userId, userRole, onRsvp, 
                   const labels = { going: 'Vou', maybe: 'Talvez', not_going: 'Não vou' };
                   const isActive = rsvpStatus === s;
                   return (
-                    <button key={s} onClick={() => onRsvp(event.id, isActive ? 'none' : s)}
+                    <button key={s} className="press"
+                      onClick={e => {
+                        // Confirmar presença merece festa; "talvez"/"não vou" só o toque
+                        if (!isActive && s === 'going') { pop(e.currentTarget, 1.12); burst(e.currentTarget, { count: 8, colors: ['--accent', '--success'] }); }
+                        onRsvp(event.id, isActive ? 'none' : s);
+                      }}
                       style={{ height: '30px', padding: '0 12px', fontSize: '12px', fontWeight: 600, fontFamily: 'inherit', borderRadius: 'var(--radius-sm)', border: `1px solid ${isActive ? 'var(--accent)' : 'var(--border-strong)'}`, background: isActive ? 'var(--accent)' : 'transparent', color: isActive ? '#fff' : 'var(--text-muted)', cursor: 'pointer' }}>
                       {labels[s]}
                     </button>

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import UIkit from 'uikit';
 import ChurchCreate from '../components/ChurchCreate';
 import ChurchMembers from '../components/ChurchMembers';
 import PageHeader from '../components/PageHeader';
@@ -13,36 +14,75 @@ interface Church {
   description?: string;
   cultosDias?: string[];
   users?: any[];
+  memberCount?: number;
+  isActive?: boolean;
+  isOwner?: boolean;
 }
 
 const Dashboard = () => {
-  useAuth();
+  const { user, applySession } = useAuth();
   const [churches, setChurches] = useState<Church[]>([]);
   const [selectedChurch, setSelectedChurch] = useState<Church | null>(null);
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [showMembersModal, setShowMembersModal] = useState(false);
 
-  useEffect(() => { loadChurches(); }, []);
+  useEffect(() => { loadChurches(); }, [user?.churchId]);
 
-  const loadChurches = async () => {
-    setLoading(true);
+  // Mantém a comunidade selecionada; sem seleção, abre a ativa
+  const loadChurches = async (selectId?: string) => {
     try {
       const result = await api.getMyChurches();
       if (result.success) {
-        setChurches(result.data || []);
-        if (result.data?.length > 0) setSelectedChurch(result.data[0]);
+        const list: Church[] = result.data || [];
+        setChurches(list);
+        setSelectedChurch(prev =>
+          list.find(c => c.id === (selectId || prev?.id)) || list.find(c => c.isActive) || list[0] || null
+        );
       }
     } catch (err: any) {
-      console.error('Erro ao carregar comunidades:', err);
+      UIkit.notification({ message: err.message || 'Erro ao carregar comunidades', status: 'danger', pos: 'top-right' });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleChurchCreated = () => {
-    loadChurches();
+  // Após criar, abre a nova comunidade; após editar, mantém a seleção
+  const handleChurchCreated = (church?: { id: string }) => {
+    loadChurches(church?.id || selectedChurch?.id);
     setShowCreateForm(false);
+    setEditing(false);
+  };
+
+  const handleActivate = async (church: Church) => {
+    setBusy(true);
+    try {
+      const res = await api.activateChurch(church.id);
+      applySession(res.session);
+      UIkit.notification({ message: res.message || 'Comunidade ativada', status: 'success', pos: 'top-right' });
+    } catch (err: any) {
+      UIkit.notification({ message: err.message || 'Erro ao ativar comunidade', status: 'danger', pos: 'top-right' });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleDelete = async (church: Church) => {
+    if (!confirm(`Excluir a comunidade "${church.name}"? Publicações, eventos e mensagens dela também serão apagados.`)) return;
+    setBusy(true);
+    try {
+      const res = await api.deleteChurch(church.id);
+      applySession(res.session);
+      setSelectedChurch(null);
+      await loadChurches();
+      UIkit.notification({ message: 'Comunidade excluída', status: 'success', pos: 'top-right' });
+    } catch (err: any) {
+      UIkit.notification({ message: err.message || 'Erro ao excluir comunidade', status: 'danger', pos: 'top-right' });
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -54,7 +94,7 @@ const Dashboard = () => {
         actions={(
           <button
             className={`uk-button ${showCreateForm ? 'uk-button-default' : 'uk-button-primary'}`}
-            onClick={() => setShowCreateForm(!showCreateForm)}
+            onClick={() => { setShowCreateForm(!showCreateForm); setEditing(false); }}
           >
             <span uk-icon={`icon: ${showCreateForm ? 'close' : 'plus'}; ratio: 0.8`}></span>
             {showCreateForm ? 'Cancelar' : 'Nova Comunidade'}
@@ -85,7 +125,7 @@ const Dashboard = () => {
               return (
                 <button
                   key={church.id}
-                  onClick={() => { setSelectedChurch(church); setShowCreateForm(false); }}
+                  onClick={() => { setSelectedChurch(church); setShowCreateForm(false); setEditing(false); }}
                   style={{
                     width: '100%',
                     padding: '10px 16px',
@@ -98,7 +138,7 @@ const Dashboard = () => {
                     fontSize: '13px',
                     fontFamily: 'inherit',
                     fontWeight: active ? 600 : 400,
-                    transition: 'all 160ms ease'
+                    transition: 'background var(--t), color var(--t)'
                   }}
                   onMouseEnter={(e) => {
                     if (!active) {
@@ -113,13 +153,14 @@ const Dashboard = () => {
                     }
                   }}
                 >
-                  <div style={{ fontWeight: 600, marginBottom: '2px', fontSize: '13px' }}>{church.name}</div>
-                  {church.users && (
-                    <div style={{ fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px', opacity: 0.7 }}>
-                      <span uk-icon="icon: users; ratio: 0.65"></span>
-                      {church.users.length} membro{church.users.length !== 1 ? 's' : ''}
-                    </div>
-                  )}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '2px' }}>
+                    <span style={{ fontWeight: 600, fontSize: '13px', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{church.name}</span>
+                    {church.isActive && <span className="uk-label">Ativa</span>}
+                  </div>
+                  <div style={{ fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px', opacity: 0.7 }}>
+                    <span uk-icon="icon: users; ratio: 0.65"></span>
+                    {church.memberCount ?? church.users?.length ?? 0} membro{(church.memberCount ?? church.users?.length) !== 1 ? 's' : ''}
+                  </div>
                 </button>
               );
             })
@@ -129,9 +170,18 @@ const Dashboard = () => {
         {/* ── CONTEÚDO ─────────────────────────────────────────── */}
         <div style={{ minWidth: 0 }}>
 
-          {showCreateForm ? (
+          {showCreateForm || (editing && selectedChurch) ? (
             <div style={{ maxWidth: '600px' }}>
-              <ChurchCreate onChurchCreated={handleChurchCreated} />
+              <ChurchCreate
+                key={editing ? selectedChurch?.id : 'new'}
+                church={editing && selectedChurch ? selectedChurch : undefined}
+                onChurchCreated={handleChurchCreated}
+              />
+              {editing && (
+                <button className="uk-button uk-button-default" style={{ marginTop: '12px' }} onClick={() => setEditing(false)}>
+                  Cancelar
+                </button>
+              )}
             </div>
 
           ) : selectedChurch ? (
@@ -140,16 +190,33 @@ const Dashboard = () => {
               <div className="card" style={{ padding: '24px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px' }}>
                   <div style={{ minWidth: 0 }}>
-                    <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: 'var(--text)' }}>{selectedChurch.name}</h2>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: 'var(--text)' }}>{selectedChurch.name}</h2>
+                      {selectedChurch.isActive && <span className="uk-label">Ativa</span>}
+                    </div>
                     {selectedChurch.title && (
                       <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'var(--text-muted)' }}>{selectedChurch.title}</p>
                     )}
                   </div>
-                  <button className="uk-button uk-button-default uk-button-small" onClick={() => setShowMembersModal(true)}>
-                    <span uk-icon="icon: users; ratio: 0.8"></span>
-                    Ver Membros
-                  </button>
+                  <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                    {!selectedChurch.isActive && (
+                      <button className="uk-button uk-button-primary uk-button-small" disabled={busy} onClick={() => handleActivate(selectedChurch)}>
+                        <span uk-icon="icon: check; ratio: 0.8"></span>
+                        Tornar ativa
+                      </button>
+                    )}
+                    <button className="uk-button uk-button-default uk-button-small" onClick={() => setShowMembersModal(true)}>
+                      <span uk-icon="icon: users; ratio: 0.8"></span>
+                      Ver Membros
+                    </button>
+                  </div>
                 </div>
+
+                {!selectedChurch.isActive && (
+                  <p style={{ margin: '12px 0 0', fontSize: '12px', color: 'var(--text-muted)' }}>
+                    Feed, chat, eventos e demais páginas mostram a comunidade ativa. Torne esta comunidade ativa para publicar nela.
+                  </p>
+                )}
 
                 <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '20px' }}>
                   <div>
@@ -170,6 +237,19 @@ const Dashboard = () => {
                         ))}
                       </div>
                     </div>
+                  )}
+                </div>
+
+                <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                  <button className="uk-button uk-button-default uk-button-small" onClick={() => { setEditing(true); setShowCreateForm(false); }}>
+                    <span uk-icon="icon: pencil; ratio: 0.8"></span>
+                    Editar
+                  </button>
+                  {(selectedChurch.isOwner || user?.role === 'admin') && (
+                    <button className="uk-button uk-button-danger uk-button-small" disabled={busy} onClick={() => handleDelete(selectedChurch)}>
+                      <span uk-icon="icon: trash; ratio: 0.8"></span>
+                      Excluir
+                    </button>
                   )}
                 </div>
               </div>

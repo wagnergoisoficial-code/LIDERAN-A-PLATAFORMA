@@ -186,7 +186,7 @@ const Sermons: React.FC = () => {
         {/* Form Modal */}
         {showForm && (
           <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setShowForm(false); }}>
-            <div className="modal-box fade-in" style={{ maxWidth: '600px' }}>
+            <div className="modal-box" style={{ maxWidth: '600px' }}>
               <div className="modal-header">
                 <h4>{editing ? 'Editar Pregação' : 'Nova Pregação'}</h4>
                 <button className="modal-close-btn" onClick={() => setShowForm(false)}>

@@ -1,22 +1,104 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import ImageUploadInput from '../components/ImageUploadInput';
 import PageHeader from '../components/PageHeader';
+import { celebrate } from '../lib/motion';
 import UIkit from 'uikit';
 
+// Enquetes da comunidade (apenas líderes)
+const PollForm = () => {
+  const [question, setQuestion] = useState('');
+  const [options, setOptions] = useState(['', '']);
+  const [expiresAt, setExpiresAt] = useState('');
+  const [saving, setSaving] = useState(false);
+  const submitRef = useRef<HTMLButtonElement>(null);
+
+  const setOption = (i: number, value: string) => setOptions(prev => prev.map((o, idx) => idx === i ? value : o));
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const res = await api.createPoll({
+        question,
+        options: options.filter(o => o.trim()),
+        expiresAt: expiresAt ? new Date(`${expiresAt}T23:59:59`).toISOString() : null,
+      });
+      if (res.success) {
+        celebrate(submitRef.current);
+        setQuestion('');
+        setOptions(['', '']);
+        setExpiresAt('');
+        UIkit.notification({ message: 'Enquete publicada no feed!', status: 'success' });
+      }
+    } catch (err: any) {
+      UIkit.notification({ message: err.message || 'Erro ao criar enquete', status: 'danger' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="card" style={{ marginTop: '16px' }}>
+      <div className="card-header">
+        <span className="card-title">Nova Enquete</span>
+      </div>
+      <div className="card-body">
+        <form onSubmit={handleSubmit}>
+          <div className="uk-margin">
+            <label className="uk-form-label">Pergunta</label>
+            <input className="uk-input" placeholder="Ex: Qual o melhor dia para o ensaio?" value={question} onChange={e => setQuestion(e.target.value)} required />
+          </div>
+          <label className="uk-form-label">Opções</label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '6px' }}>
+            {options.map((opt, i) => (
+              <div key={i} style={{ display: 'flex', gap: '8px' }}>
+                <input className="uk-input" placeholder={`Opção ${i + 1}`} value={opt} onChange={e => setOption(i, e.target.value)} />
+                {options.length > 2 && (
+                  <button type="button" className="icon-btn" title="Remover opção" onClick={() => setOptions(prev => prev.filter((_, idx) => idx !== i))}>
+                    <span uk-icon="icon: close; ratio: 0.75"></span>
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+          {options.length < 6 && (
+            <button type="button" className="link-btn" style={{ marginTop: '10px' }} onClick={() => setOptions(prev => [...prev, ''])}>
+              + Adicionar opção
+            </button>
+          )}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: '12px', marginTop: '16px', flexWrap: 'wrap' }}>
+            <div>
+              <label className="uk-form-label">Encerra em (opcional)</label>
+              <input className="uk-input" type="date" value={expiresAt} min={new Date().toISOString().slice(0, 10)} onChange={e => setExpiresAt(e.target.value)} style={{ width: '180px' }} />
+            </div>
+            <button ref={submitRef} className="uk-button uk-button-primary" type="submit" disabled={saving || !question.trim() || options.filter(o => o.trim()).length < 2} style={{ height: '36px' }}>
+              {saving ? <><span uk-spinner="ratio: 0.5"></span> Publicando...</> : <><span uk-icon="icon: list; ratio: 0.85"></span> Publicar Enquete</>}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
 const Posts = () => {
+  const { user } = useAuth();
+  const isLeader = user?.role === 'leader' || user?.role === 'admin';
   const [newPostContent, setNewPostContent] = useState('');
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [recentPosts, setRecentPosts] = useState<any[]>([]);
+  const publishRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => { loadRecentPosts(); }, []);
 
   const loadRecentPosts = async () => {
     try {
       const result = await api.getPosts();
-      if (result.success) setRecentPosts(result.data.slice(0, 3));
+      if (result.success) setRecentPosts(result.data.filter((p: any) => p.userId === user?.id));
     } catch (err: any) {
       console.error('Erro ao carregar posts', err);
     }
@@ -43,6 +125,7 @@ const Posts = () => {
     try {
       const result = await api.createPost({ content: newPostContent }, selectedImage || undefined);
       if (result.success) {
+        celebrate(publishRef.current);
         setNewPostContent('');
         setSelectedImage(null);
         setImagePreview(null);
@@ -90,6 +173,7 @@ const Posts = () => {
                     Visível para toda a comunidade
                   </span>
                   <button
+                    ref={publishRef}
                     className="uk-button uk-button-primary"
                     type="submit"
                     disabled={loading || (!newPostContent.trim() && !selectedImage)}
@@ -105,12 +189,14 @@ const Posts = () => {
             </div>
           </div>
 
+          {isLeader && <PollForm />}
+
           {/* Recent posts notice */}
           {recentPosts.length > 0 && (
             <div className="card" style={{ marginTop: '16px', background: 'var(--bg-surface)', padding: '14px 20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
               <span uk-icon="icon: check; ratio: 0.9" style={{ flexShrink: 0 }}></span>
               <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-                Você tem <strong style={{ color: 'var(--text)' }}>{recentPosts.length}</strong> posts no feed.
+                Você tem <strong style={{ color: 'var(--text)' }}>{recentPosts.length}</strong> {recentPosts.length === 1 ? 'publicação' : 'publicações'} no feed.
               </span>
             </div>
           )}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, Component } from 'react';
-import { Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
+import { Routes, Route, Navigate, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import { useTheme } from './context/ThemeContext';
 import { api } from './services/api';
@@ -78,7 +78,18 @@ const RoleRoute: React.FC<{ children: React.ReactNode; allowedRoles: string[] }>
   return <>{children}</>;
 };
 
-interface Notification { id: string; type: string; title: string; body: string; isRead: boolean; createdAt: string; }
+interface Notification { id: string; type: string; title: string; body: string; isRead: boolean; createdAt: string; linkType?: string | null; linkId?: string | null; }
+
+// Página aberta ao clicar numa notificação
+const NOTIFICATION_ROUTES: Record<string, string> = {
+  post: '/',
+  poll: '/',
+  event: '/events',
+  prayer_request: '/prayers',
+  devotional: '/devotionals',
+  sermon: '/sermons',
+  group: '/groups',
+};
 
 interface SearchResults {
   posts: any[];
@@ -178,8 +189,21 @@ const Sidebar: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onClo
 /* ─── Barra superior ────────────────────────────────────────── */
 const Topbar: React.FC<{ onMenu: () => void }> = ({ onMenu }) => {
   const { theme, toggle: toggleTheme } = useTheme();
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [ringing, setRinging] = useState(false);
+  const lastUnread = useRef(0);
+
+  // O sino toca uma vez quando o número de não lidas aumenta
+  useEffect(() => {
+    const grew = unreadCount > lastUnread.current;
+    lastUnread.current = unreadCount;
+    if (!grew) return;
+    setRinging(true);
+    const timer = setTimeout(() => setRinging(false), 900);
+    return () => clearTimeout(timer);
+  }, [unreadCount]);
   const [showNotifs, setShowNotifs] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
 
@@ -229,6 +253,15 @@ const Topbar: React.FC<{ onMenu: () => void }> = ({ onMenu }) => {
       setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
       setUnreadCount(prev => Math.max(0, prev - 1));
     } catch { /* silent */ }
+  };
+
+  const openNotification = (n: Notification) => {
+    if (!n.isRead) handleMarkRead(n.id);
+    const to = n.linkType ? NOTIFICATION_ROUTES[n.linkType] : undefined;
+    if (to) {
+      setShowNotifs(false);
+      navigate(to);
+    }
   };
 
   const handleSearchChange = (q: string) => {
@@ -320,22 +353,24 @@ const Topbar: React.FC<{ onMenu: () => void }> = ({ onMenu }) => {
 
       <div className="topbar-actions">
         <button className="icon-btn" onClick={toggleTheme} title={theme === 'dark' ? 'Modo claro' : 'Modo escuro'}>
-          {theme === 'dark' ? (
-            <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.1" aria-hidden="true">
-              <circle cx="10" cy="10" r="3.5" />
-              <path d="M10 1.5v2.5M10 16v2.5M1.5 10H4M16 10h2.5M4 4l1.8 1.8M14.2 14.2 16 16M4 16l1.8-1.8M14.2 5.8 16 4" />
-            </svg>
-          ) : (
-            <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.1" aria-hidden="true">
-              <path d="M16.5 12.6A7 7 0 1 1 7.4 3.5a5.6 5.6 0 0 0 9.1 9.1Z" />
-            </svg>
-          )}
+          <span key={theme} className="icon-swap">
+            {theme === 'dark' ? (
+              <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.1" aria-hidden="true">
+                <circle cx="10" cy="10" r="3.5" />
+                <path d="M10 1.5v2.5M10 16v2.5M1.5 10H4M16 10h2.5M4 4l1.8 1.8M14.2 14.2 16 16M4 16l1.8-1.8M14.2 5.8 16 4" />
+              </svg>
+            ) : (
+              <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.1" aria-hidden="true">
+                <path d="M16.5 12.6A7 7 0 1 1 7.4 3.5a5.6 5.6 0 0 0 9.1 9.1Z" />
+              </svg>
+            )}
+          </span>
         </button>
 
         <div ref={notifRef} style={{ position: 'relative' }}>
-          <button className={`icon-btn${showNotifs ? ' is-active' : ''}`} onClick={() => setShowNotifs(v => !v)} title="Notificações">
+          <button className={`icon-btn${showNotifs ? ' is-active' : ''}${ringing ? ' is-ringing' : ''}`} onClick={() => { if (!showNotifs) loadNotifications(); setShowNotifs(v => !v); }} title="Notificações">
             <span uk-icon="icon: bell; ratio: 0.85"></span>
-            {unreadCount > 0 && <span className="icon-btn-badge">{unreadCount > 9 ? '9+' : unreadCount}</span>}
+            {unreadCount > 0 && <span key={unreadCount} className="icon-btn-badge">{unreadCount > 9 ? '9+' : unreadCount}</span>}
           </button>
 
           {showNotifs && (
@@ -351,7 +386,7 @@ const Topbar: React.FC<{ onMenu: () => void }> = ({ onMenu }) => {
                   <div className="notif-empty">Nenhuma notificação</div>
                 ) : (
                   notifications.map(n => (
-                    <div key={n.id} onClick={() => !n.isRead && handleMarkRead(n.id)}
+                    <div key={n.id} onClick={() => openNotification(n)}
                       className={`notif-item${n.isRead ? '' : ' is-unread'}`}>
                       <div className="notif-title">{n.title}</div>
                       <div className="notif-body">{n.body}</div>

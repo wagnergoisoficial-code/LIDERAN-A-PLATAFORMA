@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '../services/api';
+import { useCountUp } from '../lib/motion';
 import { useAuth } from '../context/AuthContext';
 import Avatar from '../components/Avatar';
 import PageHeader from '../components/PageHeader';
@@ -14,13 +15,18 @@ interface ChurchInfo {
   users?: any[]; posts?: any[]; devotionals?: any[];
 }
 
+// Os números dos cartões contam até ao valor ao abrir a página
+const CountUp = ({ value }: { value: number }) => <>{useCountUp(value)}</>;
+
 const StatCard = ({ icon, label, value, sub }: { icon: string; label: string; value: string | number; sub?: string }) => (
   <div className="card" style={{ padding: '20px 24px', flex: 1, minWidth: '160px' }}>
     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
       <span uk-icon={`icon: ${icon}; ratio: 0.85`}></span>
       <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-muted)' }}>{label}</span>
     </div>
-    <div style={{ fontSize: '28px', fontWeight: 800, color: 'var(--text)', letterSpacing: '-0.02em', lineHeight: 1 }}>{value}</div>
+    <div style={{ fontSize: '28px', fontWeight: 800, color: 'var(--text)', letterSpacing: '-0.02em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
+      {typeof value === 'number' ? <CountUp value={value} /> : value}
+    </div>
     {sub && <div style={{ marginTop: '6px', fontSize: '12px', color: 'var(--text-faint)' }}>{sub}</div>}
   </div>
 );
@@ -74,7 +80,7 @@ const Reports: React.FC = () => {
         <PageHeader icon="table" title="Relatórios" subtitle={`Visão geral da comunidade${church ? ` — ${church.name}` : ''}`} />
 
         {/* Summary cards */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginBottom: '32px' }}>
+        <div className="stagger" style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginBottom: '32px' }}>
           <StatCard icon="users" label="Membros" value={totalMembers} sub={`${activeMembers} ativos`} />
           <StatCard icon="pencil" label="Posts" value={totalPosts} sub="total publicados" />
           <StatCard icon="comment" label="Comentários" value={totalComments} sub="total escritos" />
@@ -93,18 +99,20 @@ const Reports: React.FC = () => {
                   <span key={h} style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', textAlign: h === '#' ? 'center' : 'left' }}>{h}</span>
                 ))}
               </div>
-              {stats.map((m, i) => (
-                <div key={m.userId} style={{ display: 'grid', gridTemplateColumns: '40px 1fr 80px 80px 80px', padding: '10px 16px', borderBottom: i < stats.length - 1 ? '1px solid var(--border)' : 'none', alignItems: 'center' }}>
-                  <span style={{ fontSize: '13px', fontWeight: 700, color: i === 0 ? 'var(--text)' : i === 1 ? 'var(--text-muted)' : 'var(--text-faint)', textAlign: 'center' }}>{i + 1}</span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <Avatar name={m.name || '?'} size="small" />
-                    <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>{m.name}</span>
+              <div className="stagger">
+                {stats.map((m, i) => (
+                  <div key={m.userId} style={{ display: 'grid', gridTemplateColumns: '40px 1fr 80px 80px 80px', padding: '10px 16px', borderBottom: i < stats.length - 1 ? '1px solid var(--border)' : 'none', alignItems: 'center' }}>
+                    <span style={{ fontSize: '13px', fontWeight: 700, color: i === 0 ? 'var(--text)' : i === 1 ? 'var(--text-muted)' : 'var(--text-faint)', textAlign: 'center' }}>{i + 1}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <Avatar name={m.name || '?'} size="small" />
+                      <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>{m.name}</span>
+                    </div>
+                    <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{m.posts}</span>
+                    <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{m.comments}</span>
+                    <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text)' }}>{m.total}</span>
                   </div>
-                  <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{m.posts}</span>
-                  <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{m.comments}</span>
-                  <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text)' }}>{m.total}</span>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
         )}
@@ -128,7 +136,7 @@ const Reports: React.FC = () => {
                           <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-faint)' }}>{opt.votes} votos ({opt.percentage}%)</span>
                         </div>
                         <div style={{ height: '6px', background: 'var(--bg-elevated)', borderRadius: '3px', overflow: 'hidden' }}>
-                          <div style={{ height: '100%', width: `${opt.percentage}%`, background: 'var(--accent)', transition: 'width 400ms ease' }} />
+                          <div className="meter-fill" style={{ height: '100%', transform: `scaleX(${opt.percentage / 100})`, background: 'var(--accent)' }} />
                         </div>
                       </div>
                     ))}

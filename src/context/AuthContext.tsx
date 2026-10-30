@@ -1,13 +1,19 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { TOKEN_KEY, USER_KEY } from '../services/api';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { api, TOKEN_KEY, USER_KEY } from '../services/api';
 
 interface User {
   id: string;
   name: string;
   email: string;
   role: 'member' | 'leader' | 'admin';
-  churchId: string;
-  profileImage?: string;
+  churchId: string | null;
+  profileImage?: string | null;
+  title?: string | null;
+}
+
+export interface Session {
+  user: User;
+  token: string;
 }
 
 interface AuthContextType {
@@ -16,6 +22,8 @@ interface AuthContextType {
   login: (userData: User, token: string) => void;
   logout: () => void;
   updateUser: (userData: Partial<User>) => void;
+  refreshUser: () => Promise<void>;
+  applySession: (session?: Session | null) => void;
   isAuthenticated: boolean;
   isLoading: boolean;
 }
@@ -27,6 +35,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  const login = useCallback((userData: User, authToken: string) => {
+    localStorage.setItem(TOKEN_KEY, authToken);
+    localStorage.setItem(USER_KEY, JSON.stringify(userData));
+    setUser(userData);
+    setToken(authToken);
+  }, []);
+
+  // Sessão devolvida pelo backend (ex.: ao criar ou ativar uma comunidade)
+  const applySession = useCallback((session?: Session | null) => {
+    if (session?.user && session?.token) login(session.user, session.token);
+  }, [login]);
+
+  // Recarrega os dados do utilizador (comunidade, cargo, foto) a partir do backend
+  const refreshUser = useCallback(async () => {
+    if (!localStorage.getItem(TOKEN_KEY)) return;
+    try {
+      const res = await api.me();
+      if (res.success) applySession(res.data);
+    } catch {
+      /* 401 já encerra a sessão em api.ts; falhas de rede mantêm os dados locais */
+    }
+  }, [applySession]);
+
   useEffect(() => {
     const storedToken = localStorage.getItem(TOKEN_KEY);
     const storedUser = localStorage.getItem(USER_KEY);
@@ -35,20 +66,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         setToken(storedToken);
         setUser(JSON.parse(storedUser));
+        refreshUser();
       } catch (e) {
         localStorage.removeItem(TOKEN_KEY);
         localStorage.removeItem(USER_KEY);
       }
     }
     setIsLoading(false);
-  }, []);
-
-  const login = (userData: User, authToken: string) => {
-    localStorage.setItem(TOKEN_KEY, authToken);
-    localStorage.setItem(USER_KEY, JSON.stringify(userData));
-    setUser(userData);
-    setToken(authToken);
-  };
+  }, [refreshUser]);
 
   const logout = () => {
     localStorage.removeItem(TOKEN_KEY);
@@ -74,6 +99,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       login,
       logout,
       updateUser,
+      refreshUser,
+      applySession,
       isAuthenticated: !!token,
       isLoading
     }}>
