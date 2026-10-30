@@ -1,29 +1,21 @@
 const { ValidationError } = require('../../../shared/errors/AppError');
-const ValidationUtil = require('../../../shared/utils/validation.util');
 
-// Create Comment DTO
+const MAX_LENGTH = 1000;
+
 class CreateCommentDto {
-  constructor(data) {
-    this.content = data.content;
+  constructor(data = {}) {
+    this.content = typeof data.content === 'string' ? data.content.trim() : '';
     this.postId = data.postId;
     this.userId = data.userId;
   }
 
   validate() {
-    if (ValidationUtil.isEmpty(this.content)) {
-      throw new ValidationError('Comment content is required');
+    if (!this.content) {
+      throw new ValidationError('Escreva um comentário');
     }
 
-    if (this.content.trim().length < 1) {
-      throw new ValidationError('Comment cannot be empty');
-    }
-
-    if (ValidationUtil.isEmpty(this.postId)) {
-      throw new ValidationError('Post ID is required');
-    }
-
-    if (ValidationUtil.isEmpty(this.userId)) {
-      throw new ValidationError('User ID is required');
+    if (this.content.length > MAX_LENGTH) {
+      throw new ValidationError(`O comentário pode ter no máximo ${MAX_LENGTH} caracteres`);
     }
 
     return true;

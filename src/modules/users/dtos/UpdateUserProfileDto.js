@@ -15,7 +15,15 @@ class UpdateUserProfileDto {
   }
 
   validate() {
-    if (this.name && this.name.trim().length < 2) {
+    if (this.skills !== undefined && this.skills !== null && !Array.isArray(this.skills)) {
+      throw new ValidationError('Habilidades inválidas');
+    }
+
+    if (this.socialLinks !== undefined && this.socialLinks !== null && !Array.isArray(this.socialLinks)) {
+      throw new ValidationError('Redes sociais inválidas');
+    }
+
+    if (typeof this.name === 'string' && this.name.trim().length < 2) {
       throw new ValidationError('Nome deve ter pelo menos 2 caracteres');
     }
 
@@ -23,7 +31,7 @@ class UpdateUserProfileDto {
       throw new ValidationError('Idade deve ser entre 1 e 150');
     }
 
-    if (this.bio && this.bio.trim().length > 500) {
+    if (typeof this.bio === 'string' && this.bio.trim().length > 500) {
       throw new ValidationError('Bio não pode ter mais de 500 caracteres');
     }
 

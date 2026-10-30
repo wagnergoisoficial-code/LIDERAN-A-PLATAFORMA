@@ -4,13 +4,15 @@ const { AuthorizationError } = require('../errors/AppError');
 const roleMiddleware = (...allowedRoles) => {
   return (req, res, next) => {
     if (!req.user) {
-      return next(new AuthorizationError('User not authenticated'));
+      return next(new AuthorizationError('Usuário não autenticado'));
     }
 
     if (!allowedRoles.includes(req.user.role)) {
       return next(
         new AuthorizationError(
-          `This action requires one of these roles: ${allowedRoles.join(', ')}`
+          allowedRoles.includes('leader')
+            ? 'Apenas líderes podem realizar esta ação'
+            : 'Você não tem permissão para esta ação'
         )
       );
     }

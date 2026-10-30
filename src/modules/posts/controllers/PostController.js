@@ -1,4 +1,5 @@
-// Post Controller
+const CreatePostDto = require('../dtos/CreatePostDto');
+
 class PostController {
   constructor(postService) {
     this.postService = postService;
@@ -7,7 +8,9 @@ class PostController {
   formatPostForResponse(post, userId) {
     const reactionTypes = ['amen', 'praying', 'heart', 'fire', 'strong'];
     const reactionCounts = {};
-    reactionTypes.forEach(t => { reactionCounts[t] = post.reactions?.filter(r => r.type === t).length || 0; });
+    reactionTypes.forEach((t) => {
+      reactionCounts[t] = post.reactions?.filter((r) => r.type === t).length || 0;
+    });
     return {
       id: post.id,
       content: post.content,
@@ -19,35 +22,37 @@ class PostController {
       userProfileImage: post.user?.profileImage,
       createdAt: post.createdAt,
       reactions: reactionCounts,
-      myReactions: post.reactions?.filter(r => r.userId === userId).map(r => r.type) || [],
-      comments: post.comments?.map(comment => ({
-        id: comment.id,
-        content: comment.content,
-        userId: comment.user?.id,
-        userName: comment.user?.name,
-        userProfileImage: comment.user?.profileImage,
-        createdAt: comment.createdAt,
-      })) || [],
+      myReactions: post.reactions?.filter((r) => r.userId === userId).map((r) => r.type) || [],
+      comments: post.comments?.map((comment) => this.formatComment(comment)) || [],
+    };
+  }
+
+  formatComment(comment) {
+    return {
+      id: comment.id,
+      content: comment.content,
+      userId: comment.user?.id,
+      userName: comment.user?.name,
+      userProfileImage: comment.user?.profileImage,
+      createdAt: comment.createdAt,
     };
   }
 
   async createPost(req, res, next) {
     try {
-      const CreatePostDto = require('../dtos/CreatePostDto');
       const dto = new CreatePostDto({
         content: req.body.content,
         imageUrl: req.body.imageUrl,
         userId: req.user.id,
-        churchId: req.user.churchId,
       });
 
       dto.validate();
 
-      const post = await this.postService.createPost(dto);
+      const post = await this.postService.createPost(dto, req.user);
 
       res.status(201).json({
         success: true,
-        message: 'Post created successfully',
+        message: 'Publicação criada',
         data: this.formatPostForResponse(post, req.user.id),
       });
     } catch (error) {
@@ -57,12 +62,11 @@ class PostController {
 
   async getAllPosts(req, res, next) {
     try {
-      const posts = await this.postService.getAllPosts(req.user.churchId);
+      const posts = await this.postService.getAllPosts(req.user);
 
       res.status(200).json({
         success: true,
-        message: 'Posts retrieved successfully',
-        data: posts.map(post => this.formatPostForResponse(post, req.user.id)),
+        data: posts.map((post) => this.formatPostForResponse(post, req.user.id)),
       });
     } catch (error) {
       next(error);
@@ -71,8 +75,17 @@ class PostController {
 
   async getPostById(req, res, next) {
     try {
-      const post = await this.postService.getPostById(req.params.id);
-      res.status(200).json({ success: true, message: 'Post retrieved successfully', data: this.formatPostForResponse(post, req.user.id) });
+      const post = await this.postService.getPostById(req.params.id, req.user);
+      res.status(200).json({ success: true, data: this.formatPostForResponse(post, req.user.id) });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async deletePost(req, res, next) {
+    try {
+      await this.postService.deletePost(req.params.id, req.user);
+      res.json({ success: true, message: 'Publicação excluída' });
     } catch (error) {
       next(error);
     }
@@ -80,9 +93,9 @@ class PostController {
 
   async togglePin(req, res, next) {
     try {
-      const { isPinned } = req.body;
-      await this.postService.togglePin(req.params.id, !!isPinned);
-      res.json({ success: true, message: isPinned ? 'Post pinned' : 'Post unpinned' });
+      const isPinned = !!req.body.isPinned;
+      await this.postService.togglePin(req.params.id, isPinned, req.user);
+      res.json({ success: true, message: isPinned ? 'Publicação fixada' : 'Publicação desafixada' });
     } catch (error) {
       next(error);
     }
@@ -90,9 +103,8 @@ class PostController {
 
   async react(req, res, next) {
     try {
-      const { type } = req.body;
-      await this.postService.reactToPost(req.params.id, req.user.id, type);
-      res.json({ success: true, message: 'Reaction added' });
+      await this.postService.reactToPost(req.params.id, req.user, req.body.type);
+      res.json({ success: true, message: 'Reação adicionada' });
     } catch (error) {
       next(error);
     }
@@ -100,9 +112,8 @@ class PostController {
 
   async unreact(req, res, next) {
     try {
-      const { type } = req.body;
-      await this.postService.removeReaction(req.params.id, req.user.id, type);
-      res.json({ success: true, message: 'Reaction removed' });
+      await this.postService.removeReaction(req.params.id, req.user, req.body.type);
+      res.json({ success: true, message: 'Reação removida' });
     } catch (error) {
       next(error);
     }

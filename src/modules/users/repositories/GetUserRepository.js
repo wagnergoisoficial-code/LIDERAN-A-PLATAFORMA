@@ -1,6 +1,17 @@
 const { getPrismaClient } = require('../../../config/database');
 
-// User Repository for database operations
+const LIST_SELECT = {
+  id: true,
+  name: true,
+  email: true,
+  role: true,
+  profileImage: true,
+  title: true,
+  location: true,
+  age: true,
+  createdAt: true,
+};
+
 class GetUserRepository {
   constructor() {
     this.prisma = getPrismaClient();
@@ -9,27 +20,13 @@ class GetUserRepository {
   async findAll(churchId) {
     return this.prisma.user.findMany({
       where: { churchId },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        createdAt: true,
-      },
+      select: LIST_SELECT,
+      orderBy: { name: 'asc' },
     });
   }
 
   async findById(id) {
-    return this.prisma.user.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        createdAt: true,
-      },
-    });
+    return this.prisma.user.findUnique({ where: { id }, select: LIST_SELECT });
   }
 }
 

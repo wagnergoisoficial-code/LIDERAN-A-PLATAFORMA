@@ -20,34 +20,35 @@ class PollController {
         hasVoted: o.votes.some(v => v.userId === userId),
       })),
       myVoteOptionId: poll.options.find(o => o.votes.some(v => v.userId === userId))?.id || null,
+      isExpired: !!poll.expiresAt && new Date(poll.expiresAt) < new Date(),
     };
   }
 
   async create(req, res, next) {
     try {
-      const poll = await this.pollService.create({ ...req.body, userId: req.user.id, churchId: req.user.churchId });
-      res.status(201).json({ success: true, data: this.format(poll, req.user.id) });
+      const poll = await this.pollService.create(req.body, req.user);
+      res.status(201).json({ success: true, message: 'Enquete criada', data: this.format(poll, req.user.id) });
     } catch (e) { next(e); }
   }
 
   async getAll(req, res, next) {
     try {
-      const polls = await this.pollService.getAll(req.user.churchId);
+      const polls = await this.pollService.getAll(req.user);
       res.json({ success: true, data: polls.map(p => this.format(p, req.user.id)) });
     } catch (e) { next(e); }
   }
 
   async remove(req, res, next) {
     try {
-      await this.pollService.delete(req.params.id, req.user.id, req.user.role);
-      res.json({ success: true, message: 'Poll deleted' });
+      await this.pollService.delete(req.params.id, req.user);
+      res.json({ success: true, message: 'Enquete excluída' });
     } catch (e) { next(e); }
   }
 
   async vote(req, res, next) {
     try {
-      await this.pollService.vote(req.params.id, req.body.optionId, req.user.id);
-      res.json({ success: true, message: 'Vote recorded' });
+      const poll = await this.pollService.vote(req.params.id, req.body.optionId, req.user);
+      res.json({ success: true, message: 'Voto registrado', data: this.format(poll, req.user.id) });
     } catch (e) { next(e); }
   }
 }

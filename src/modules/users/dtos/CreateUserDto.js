@@ -8,7 +8,6 @@ class CreateUserDto {
     this.email = data.email;
     this.password = data.password;
     this.role = data.role || 'member'; // Default role
-    this.churchId = data.churchId;
   }
 
   validate() {
@@ -34,16 +33,12 @@ class CreateUserDto {
 
     if (!ValidationUtil.validatePassword(this.password)) {
       throw new ValidationError(
-        'Senha deve ter pelo menos 8 caracteres com letras maiúsculas, minúsculas e números'
+        'A senha deve ter pelo menos 8 caracteres, com letra maiúscula, minúscula e número'
       );
     }
 
     if (!['member', 'leader', 'admin'].includes(this.role)) {
       throw new ValidationError('Cargo inválido');
-    }
-
-    if (ValidationUtil.isEmpty(this.churchId)) {
-      throw new ValidationError('Church ID é obrigatório');
     }
 
     return true;

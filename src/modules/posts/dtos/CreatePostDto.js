@@ -1,30 +1,28 @@
 const { ValidationError } = require('../../../shared/errors/AppError');
 const ValidationUtil = require('../../../shared/utils/validation.util');
 
-// Create Post DTO
+const MAX_LENGTH = 5000;
+
+// Uma publicação precisa de texto, imagem ou ambos
 class CreatePostDto {
-  constructor(data) {
-    this.content = data.content;
-    this.imageUrl = data.imageUrl;
+  constructor(data = {}) {
+    this.content = typeof data.content === 'string' ? data.content.trim() : '';
+    this.imageUrl = data.imageUrl || null;
     this.userId = data.userId;
     this.churchId = data.churchId;
   }
 
   validate() {
-    if (ValidationUtil.isEmpty(this.content)) {
-      throw new ValidationError('Content is required');
+    if (!this.content && !this.imageUrl) {
+      throw new ValidationError('Escreva algo ou selecione uma imagem');
     }
 
-    if (this.content.trim().length < 3) {
-      throw new ValidationError('Content must be at least 3 characters');
+    if (this.content.length > MAX_LENGTH) {
+      throw new ValidationError(`A publicação pode ter no máximo ${MAX_LENGTH} caracteres`);
     }
 
     if (ValidationUtil.isEmpty(this.userId)) {
-      throw new ValidationError('User ID is required');
-    }
-
-    if (ValidationUtil.isEmpty(this.churchId)) {
-      throw new ValidationError('Church ID is required');
+      throw new ValidationError('Usuário não identificado');
     }
 
     return true;

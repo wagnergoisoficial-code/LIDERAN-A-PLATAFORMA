@@ -1,29 +1,19 @@
 const express = require('express');
-const { getPrismaClient } = require('../config/database');
+const DevotionalController = require('../modules/devotionals/controllers/DevotionalController');
+const DevotionalService = require('../modules/devotionals/services/DevotionalService');
+const DevotionalRepository = require('../modules/devotionals/repositories/DevotionalRepository');
 const authMiddleware = require('../shared/middlewares/auth.middleware');
+const roleMiddleware = require('../shared/middlewares/role.middleware');
 
 const devotionalLikeRoute = express.Router();
+const devotionalController = new DevotionalController(new DevotionalService(new DevotionalRepository()));
 
-devotionalLikeRoute.post('/:id/like', authMiddleware, async (req, res, next) => {
-  try {
-    const prisma = getPrismaClient();
-    const { id: userId } = req.user;
-    const devotionalId = req.params.id;
+// Curtir / descurtir (alterna)
+devotionalLikeRoute.post('/:id/like', authMiddleware, (req, res, next) => devotionalController.toggleLike(req, res, next));
 
-    const existing = await prisma.devotionalLike.findUnique({
-      where: { devotionalId_userId: { devotionalId, userId } },
-    });
-
-    if (existing) {
-      await prisma.devotionalLike.delete({ where: { id: existing.id } });
-      const count = await prisma.devotionalLike.count({ where: { devotionalId } });
-      return res.json({ success: true, liked: false, likeCount: count });
-    }
-
-    await prisma.devotionalLike.create({ data: { devotionalId, userId } });
-    const count = await prisma.devotionalLike.count({ where: { devotionalId } });
-    res.json({ success: true, liked: true, likeCount: count });
-  } catch (e) { next(e); }
-});
+// Excluir devocional
+devotionalLikeRoute.delete('/:id', authMiddleware, roleMiddleware('leader', 'admin'), (req, res, next) =>
+  devotionalController.deleteDevotional(req, res, next)
+);
 
 module.exports = devotionalLikeRoute;

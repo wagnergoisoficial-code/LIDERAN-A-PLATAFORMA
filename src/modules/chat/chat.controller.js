@@ -1,55 +1,24 @@
 const chatService = require('./chat.service');
 
 class ChatController {
-  async sendMessage(req, res) {
+  async sendMessage(req, res, next) {
     try {
-      const { content } = req.body;
-      const userId = req.user.id;
-      const churchId = req.user.churchId;
-
-      if (!churchId) {
-        return res.status(400).json({
-          success: false,
-          error: 'User must belong to a church to send messages',
-        });
-      }
-
-      if (!content || content.trim() === '') {
-        return res.status(400).json({
-          success: false,
-          error: 'Message content cannot be empty',
-        });
-      }
-
-      const message = await chatService.sendMessage(userId, churchId, content.trim());
+      const message = await chatService.sendMessage(req.user, req.body.content);
 
       res.status(201).json({
         success: true,
         data: message,
-        message: 'Message sent successfully',
+        message: 'Mensagem enviada',
       });
     } catch (err) {
-      res.status(500).json({
-        success: false,
-        error: err.message,
-      });
+      next(err);
     }
   }
 
-  async getMessages(req, res) {
+  async getMessages(req, res, next) {
     try {
-      const userId = req.user.id;
-      const churchId = req.user.churchId;
       const { limit = 50, lastMessageId = null } = req.query;
-
-      if (!churchId) {
-        return res.status(400).json({
-          success: false,
-          error: 'User must belong to a church to view messages',
-        });
-      }
-
-      const messages = await chatService.getMessages(churchId, parseInt(limit), lastMessageId);
+      const messages = await chatService.getMessages(req.user, limit, lastMessageId);
 
       res.status(200).json({
         success: true,
@@ -57,29 +26,21 @@ class ChatController {
         count: messages.length,
       });
     } catch (err) {
-      res.status(500).json({
-        success: false,
-        error: err.message,
-      });
+      next(err);
     }
   }
 
-  async deleteMessage(req, res) {
+  async deleteMessage(req, res, next) {
     try {
-      const { messageId } = req.params;
-      const userId = req.user.id;
-
-      const result = await chatService.deleteMessage(messageId, userId);
+      const result = await chatService.deleteMessage(req.params.messageId, req.user);
 
       res.status(200).json({
         success: true,
+        message: 'Mensagem apagada',
         data: result,
       });
     } catch (err) {
-      res.status(500).json({
-        success: false,
-        error: err.message,
-      });
+      next(err);
     }
   }
 }

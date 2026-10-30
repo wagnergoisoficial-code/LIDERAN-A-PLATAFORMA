@@ -17,7 +17,7 @@ class AuthController {
 
       res.status(201).json({
         success: true,
-        message: 'User registered successfully',
+        message: 'Conta criada com sucesso',
         data: result,
       });
     } catch (error) {
@@ -29,13 +29,24 @@ class AuthController {
     try {
       const dto = new RegisterMemberDto(req.body);
       dto.validate();
-      const leaderId = req.user.id;
-
-      const result = await this.authService.registerMember(dto, leaderId);
+      const member = await this.authService.registerMember(dto, req.user);
 
       res.status(201).json({
         success: true,
-        message: 'Member registered successfully',
+        message: 'Membro cadastrado com sucesso',
+        data: { user: member },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async me(req, res, next) {
+    try {
+      const result = await this.authService.me(req.user.id);
+
+      res.status(200).json({
+        success: true,
         data: result,
       });
     } catch (error) {
@@ -52,7 +63,7 @@ class AuthController {
 
       res.status(200).json({
         success: true,
-        message: 'Login successful',
+        message: 'Login realizado com sucesso',
         data: result,
       });
     } catch (error) {

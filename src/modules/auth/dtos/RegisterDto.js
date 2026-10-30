@@ -1,50 +1,52 @@
 const { ValidationError } = require('../../../shared/errors/AppError');
 const ValidationUtil = require('../../../shared/utils/validation.util');
 
-// Register DTO with validation - LEADERS SIGN UP WITHOUT A CHURCH
+const PASSWORD_RULE_MESSAGE = 'A senha deve ter pelo menos 8 caracteres, com letra maiúscula, minúscula e número';
+
+// Register DTO with validation
+// O registo público cria sempre uma conta de líder: o cargo enviado pelo cliente é ignorado.
 class RegisterDto {
-  constructor(data) {
-    this.name = data.name;
-    this.email = data.email;
+  constructor(data = {}) {
+    this.name = typeof data.name === 'string' ? data.name.trim() : data.name;
+    this.email = typeof data.email === 'string' ? data.email.trim() : data.email;
     this.password = data.password;
     this.confirmPassword = data.confirmPassword;
-    this.role = data.role || 'leader';
-    // Leaders don't need a churchId - they'll create one after signing up
+    this.role = 'leader';
   }
 
   validate() {
     if (ValidationUtil.isEmpty(this.name)) {
-      throw new ValidationError('Name is required');
+      throw new ValidationError('Informe o nome');
     }
 
-    if (this.name.trim().length < 2) {
-      throw new ValidationError('Name must be at least 2 characters');
+    if (this.name.length < 2) {
+      throw new ValidationError('O nome deve ter pelo menos 2 caracteres');
     }
 
     if (ValidationUtil.isEmpty(this.email)) {
-      throw new ValidationError('Email is required');
+      throw new ValidationError('Informe o e-mail');
     }
 
     if (!ValidationUtil.validateEmail(this.email)) {
-      throw new ValidationError('Invalid email format');
+      throw new ValidationError('E-mail inválido');
     }
 
     if (ValidationUtil.isEmpty(this.password)) {
-      throw new ValidationError('Password is required');
+      throw new ValidationError('Informe a senha');
     }
 
     if (!ValidationUtil.validatePassword(this.password)) {
-      throw new ValidationError(
-        'Password must be at least 8 characters with uppercase, lowercase, and digit'
-      );
+      throw new ValidationError(PASSWORD_RULE_MESSAGE);
     }
 
     if (this.password !== this.confirmPassword) {
-      throw new ValidationError('Password and Confirm Password must match');
+      throw new ValidationError('As senhas não conferem');
     }
 
     return true;
   }
 }
+
+RegisterDto.PASSWORD_RULE_MESSAGE = PASSWORD_RULE_MESSAGE;
 
 module.exports = RegisterDto;

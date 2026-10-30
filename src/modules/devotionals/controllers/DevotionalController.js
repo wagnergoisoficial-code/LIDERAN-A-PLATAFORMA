@@ -1,4 +1,5 @@
-// Devotional Controller
+const CreateDevotionalDto = require('../dtos/CreateDevotionalDto');
+
 class DevotionalController {
   constructor(devotionalService) {
     this.devotionalService = devotionalService;
@@ -6,22 +7,14 @@ class DevotionalController {
 
   async createDevotional(req, res, next) {
     try {
-      const CreateDevotionalDto = require('../dtos/CreateDevotionalDto');
-      const dto = new CreateDevotionalDto({
-        title: req.body.title,
-        content: req.body.content,
-        verse: req.body.verse,
-        userId: req.user.id,
-        churchId: req.user.churchId,
-      });
-
+      const dto = new CreateDevotionalDto(req.body);
       dto.validate();
 
-      const devotional = await this.devotionalService.createDevotional(dto);
+      const devotional = await this.devotionalService.createDevotional(dto, req.user);
 
       res.status(201).json({
         success: true,
-        message: 'Devotional created successfully',
+        message: 'Devocional publicado',
         data: devotional,
       });
     } catch (error) {
@@ -31,15 +24,8 @@ class DevotionalController {
 
   async getAllDevotionals(req, res, next) {
     try {
-      const devotionals = await this.devotionalService.getAllDevotionals(
-        req.user.churchId
-      );
-
-      res.status(200).json({
-        success: true,
-        message: 'Devotionals retrieved successfully',
-        data: devotionals,
-      });
+      const devotionals = await this.devotionalService.getAllDevotionals(req.user);
+      res.status(200).json({ success: true, data: devotionals });
     } catch (error) {
       next(error);
     }
@@ -47,9 +33,7 @@ class DevotionalController {
 
   async markAsInactive(req, res, next) {
     try {
-      const { id } = req.params;
-
-      const devotional = await this.devotionalService.markAsInactive(id);
+      const devotional = await this.devotionalService.markAsInactive(req.params.id, req.user);
 
       res.status(200).json({
         success: true,
@@ -63,15 +47,31 @@ class DevotionalController {
 
   async reactivateDevotional(req, res, next) {
     try {
-      const { id } = req.params;
-
-      const devotional = await this.devotionalService.reactivateDevotional(id);
+      const devotional = await this.devotionalService.reactivateDevotional(req.params.id, req.user);
 
       res.status(200).json({
         success: true,
         message: 'Devocional reativado com sucesso',
         data: devotional,
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async deleteDevotional(req, res, next) {
+    try {
+      await this.devotionalService.deleteDevotional(req.params.id, req.user);
+      res.status(200).json({ success: true, message: 'Devocional excluído' });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async toggleLike(req, res, next) {
+    try {
+      const result = await this.devotionalService.toggleLike(req.params.id, req.user);
+      res.status(200).json({ success: true, data: result });
     } catch (error) {
       next(error);
     }

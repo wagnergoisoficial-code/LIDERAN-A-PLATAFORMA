@@ -1,5 +1,16 @@
-const { NotFoundError, ConflictError } = require('../../../shared/errors/AppError');
+const { NotFoundError, ConflictError, ForbiddenError, ValidationError } = require('../../../shared/errors/AppError');
+const { requireChurch, isAdmin } = require('../../../shared/utils/church.util');
 const bcrypt = require('bcrypt');
+
+const parseSkills = (value) => {
+  if (!value) return [];
+  try {
+    const skills = JSON.parse(value);
+    return Array.isArray(skills) ? skills : [];
+  } catch {
+    return [];
+  }
+};
 
 // User Service - business logic
 class UserService {
@@ -7,63 +18,71 @@ class UserService {
     this.userRepository = userRepository;
   }
 
-  async getAllUsers(churchId) {
-    return await this.userRepository.findAll(churchId);
+  async getAllUsers(user) {
+    if (!user.churchId) return [];
+    return await this.userRepository.findAll(user.churchId);
   }
 
   async getUserById(id) {
     const user = await this.userRepository.findById(id);
 
     if (!user) {
-      throw new NotFoundError('User not found');
+      throw new NotFoundError('Usuário não encontrado');
     }
 
     return user;
   }
 
-  async getProfileById(id) {
+  // Perfis são visíveis para o próprio, membros da mesma comunidade, o líder dela e admins
+  async getProfileById(id, requester) {
     const user = await this.userRepository.findByIdWithProfile(id);
 
     if (!user) {
       throw new NotFoundError('Usuário não encontrado');
     }
 
-    return {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      age: user.age,
-      bio: user.bio,
-      skills: user.skills ? JSON.parse(user.skills) : [],
-      profileImage: user.profileImage,
-      backgroundTheme: user.backgroundTheme,
-      location: user.location,
-      title: user.title,
-      createdAt: user.createdAt,
-      socialLinks: user.socialLinks,
-      achievements: user.achievements,
-    };
+    if (requester && !this.canViewProfile(requester, user)) {
+      throw new NotFoundError('Usuário não encontrado');
+    }
+
+    const profile = this.formatProfile(user);
+
+    if (requester && requester.id !== user.id) {
+      profile.isBlocked = await this.userRepository.isUserBlocked(requester.id, user.id);
+    }
+
+    return profile;
   }
 
-  async createUser(createUserDto) {
-    // Check if user already exists
+  canViewProfile(requester, user) {
+    if (requester.id === user.id || isAdmin(requester)) return true;
+    if (user.churchId && user.churchId === requester.churchId) return true;
+    return !!user.church && user.church.leaderID === requester.id;
+  }
+
+  // Líderes cadastram membros/líderes na sua comunidade; só admins criam admins
+  async createUser(createUserDto, requester) {
+    const churchId = requireChurch(requester);
+
+    if (createUserDto.role === 'admin' && !isAdmin(requester)) {
+      throw new ForbiddenError('Apenas administradores podem criar outros administradores');
+    }
+
     const existingUser = await this.userRepository.findByEmail(createUserDto.email);
 
     if (existingUser) {
-      throw new ConflictError('Email já cadastrado');
+      throw new ConflictError('Este e-mail já está cadastrado');
     }
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
 
-    // Create user
     const user = await this.userRepository.create({
       name: createUserDto.name,
       email: createUserDto.email,
       password: hashedPassword,
-      churchId: createUserDto.churchId,
+      churchId,
       role: createUserDto.role,
+      leaderId: requester.id,
     });
 
     return {
@@ -71,33 +90,48 @@ class UserService {
       name: user.name,
       email: user.email,
       role: user.role,
+      churchId: user.churchId,
       createdAt: user.createdAt,
     };
   }
 
-  async updateProfile(userId, updateUserProfileDto) {
+  // Campos ausentes ficam como estão; texto vazio limpa o campo
+  async updateProfile(userId, dto) {
     const user = await this.userRepository.findById(userId);
 
     if (!user) {
       throw new NotFoundError('Usuário não encontrado');
     }
 
+    const clean = (value) => (typeof value === 'string' ? value.trim() || null : value ?? null);
     const updateData = {};
-    
-    if (updateUserProfileDto.name) updateData.name = updateUserProfileDto.name;
-    if (updateUserProfileDto.age) updateData.age = updateUserProfileDto.age;
-    if (updateUserProfileDto.bio) updateData.bio = updateUserProfileDto.bio;
-    if (updateUserProfileDto.location) updateData.location = updateUserProfileDto.location;
-    if (updateUserProfileDto.title) updateData.title = updateUserProfileDto.title;
-    if (updateUserProfileDto.profileImage) updateData.profileImage = updateUserProfileDto.profileImage;
-    if (updateUserProfileDto.backgroundTheme) updateData.backgroundTheme = updateUserProfileDto.backgroundTheme;
-    if (updateUserProfileDto.skills) updateData.skills = JSON.stringify(updateUserProfileDto.skills);
 
-    updateData.socialLinks = updateUserProfileDto.socialLinks;
+    if (dto.name !== undefined) {
+      const name = String(dto.name || '').trim();
+      if (name.length < 2) throw new ValidationError('O nome deve ter pelo menos 2 caracteres');
+      updateData.name = name;
+    }
+    if (dto.age !== undefined) {
+      updateData.age = dto.age === null || dto.age === '' ? null : parseInt(dto.age, 10);
+      if (updateData.age !== null && Number.isNaN(updateData.age)) throw new ValidationError('Idade inválida');
+    }
+    if (dto.bio !== undefined) updateData.bio = clean(dto.bio);
+    if (dto.location !== undefined) updateData.location = clean(dto.location);
+    if (dto.title !== undefined) updateData.title = clean(dto.title);
+    if (dto.profileImage !== undefined) updateData.profileImage = clean(dto.profileImage);
+    if (dto.backgroundTheme) updateData.backgroundTheme = dto.backgroundTheme;
+    if (dto.skills !== undefined) {
+      const skills = (Array.isArray(dto.skills) ? dto.skills : [])
+        .map((skill) => String(skill).trim())
+        .filter(Boolean);
+      updateData.skills = JSON.stringify([...new Set(skills)].slice(0, 20));
+    }
+    if (dto.socialLinks !== undefined) updateData.socialLinks = dto.socialLinks;
 
     const updated = await this.userRepository.updateProfile(userId, updateData);
+    const fresh = await this.userRepository.findByIdWithProfile(updated.id);
 
-    return this.formatProfile(updated);
+    return this.formatProfile(fresh);
   }
 
   async getSocialLinks(userId) {
@@ -134,11 +168,15 @@ class UserService {
 
   async blockUser(blockerId, blockedId) {
     if (blockerId === blockedId) {
-      throw new ConflictError('Você não pode se bloquear');
+      throw new ConflictError('Você não pode bloquear a si mesmo');
     }
 
     await this.getUserById(blockerId);
     await this.getUserById(blockedId);
+
+    if (await this.userRepository.isUserBlocked(blockerId, blockedId)) {
+      throw new ConflictError('Este usuário já está bloqueado');
+    }
 
     return await this.userRepository.blockUser(blockerId, blockedId);
   }
@@ -163,14 +201,16 @@ class UserService {
       role: user.role,
       age: user.age,
       bio: user.bio,
-      skills: user.skills ? JSON.parse(user.skills) : [],
+      skills: parseSkills(user.skills),
       profileImage: user.profileImage,
       backgroundTheme: user.backgroundTheme,
       location: user.location,
       title: user.title,
+      churchId: user.churchId,
+      churchName: user.church?.name || null,
       createdAt: user.createdAt,
-      socialLinks: user.socialLinks,
-      achievements: user.achievements,
+      socialLinks: user.socialLinks || [],
+      achievements: user.achievements || [],
     };
   }
 }

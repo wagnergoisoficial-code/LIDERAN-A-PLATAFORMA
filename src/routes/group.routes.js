@@ -9,6 +9,7 @@ const controller = new GroupController(new GroupService(new GroupRepository()));
 
 groupRoutes.get('/', authMiddleware, (req, res, next) => controller.getAll(req, res, next));
 groupRoutes.post('/', authMiddleware, (req, res, next) => controller.create(req, res, next));
+groupRoutes.get('/:id', authMiddleware, (req, res, next) => controller.getById(req, res, next));
 groupRoutes.put('/:id', authMiddleware, (req, res, next) => controller.update(req, res, next));
 groupRoutes.delete('/:id', authMiddleware, (req, res, next) => controller.remove(req, res, next));
 groupRoutes.post('/:id/join', authMiddleware, (req, res, next) => controller.join(req, res, next));

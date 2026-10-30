@@ -1,39 +1,20 @@
 const { ValidationError } = require('../../../shared/errors/AppError');
-const ValidationUtil = require('../../../shared/utils/validation.util');
 
-// Create Devotional DTO
 class CreateDevotionalDto {
-  constructor(data) {
-    this.title = data.title;
-    this.content = data.content;
-    this.verse = data.verse;
-    this.userId = data.userId;
-    this.churchId = data.churchId;
+  constructor(data = {}) {
+    this.title = typeof data.title === 'string' ? data.title.trim() : '';
+    this.content = typeof data.content === 'string' ? data.content.trim() : '';
+    this.verse = typeof data.verse === 'string' && data.verse.trim() ? data.verse.trim() : null;
   }
 
   validate() {
-    if (ValidationUtil.isEmpty(this.title)) {
-      throw new ValidationError('Title is required');
+    if (this.title.length < 3) {
+      throw new ValidationError('O título deve ter pelo menos 3 caracteres');
     }
 
-    if (this.title.trim().length < 3) {
-      throw new ValidationError('Title must be at least 3 characters');
+    if (this.content.length < 10) {
+      throw new ValidationError('A reflexão deve ter pelo menos 10 caracteres');
     }
-
-    if (ValidationUtil.isEmpty(this.content)) {
-      throw new ValidationError('Content is required');
-    }
-
-    if (this.content.trim().length < 10) {
-      throw new ValidationError('Content must be at least 10 characters');
-    }
-
-    if (ValidationUtil.isEmpty(this.userId)) {
-      throw new ValidationError('User ID is required');
-    }
-
-    // churchId is optional - allows admins without a church to create devotionals
-    // If no churchId, the devotional becomes a global/system devotional
 
     return true;
   }

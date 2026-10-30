@@ -28,6 +28,11 @@ router.delete('/:churchId', authMiddleware, (req, res, next) => {
   ChurchController.deleteChurch(req, res, next);
 });
 
+// Set as the leader's active church
+router.post('/:churchId/activate', authMiddleware, roleMiddleware('leader', 'admin'), (req, res, next) => {
+  ChurchController.activateChurch(req, res, next);
+});
+
 // Get church members
 router.get('/:churchId/members', authMiddleware, (req, res, next) => {
   ChurchController.getChurchMembers(req, res, next);

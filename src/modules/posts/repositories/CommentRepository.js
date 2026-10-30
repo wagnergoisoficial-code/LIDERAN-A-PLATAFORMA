@@ -1,6 +1,5 @@
 const { getPrismaClient } = require('../../../config/database');
 
-// Comment Repository
 class CommentRepository {
   constructor() {
     this.prisma = getPrismaClient();
@@ -10,9 +9,15 @@ class CommentRepository {
     return this.prisma.comment.create({
       data,
       include: {
-        user: { select: { id: true, name: true } },
-        post: { select: { id: true } },
+        user: { select: { id: true, name: true, profileImage: true } },
       },
+    });
+  }
+
+  async findById(id) {
+    return this.prisma.comment.findUnique({
+      where: { id },
+      include: { post: { select: { id: true, churchId: true } } },
     });
   }
 
@@ -20,7 +25,7 @@ class CommentRepository {
     return this.prisma.comment.findMany({
       where: { postId },
       include: {
-        user: { select: { id: true, name: true } },
+        user: { select: { id: true, name: true, profileImage: true } },
       },
     });
   }

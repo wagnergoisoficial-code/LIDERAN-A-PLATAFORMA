@@ -30,6 +30,13 @@ class AuthorizationError extends AppError {
   }
 }
 
+class ForbiddenError extends AuthorizationError {
+  constructor(message = 'Você não tem permissão para esta ação') {
+    super(message);
+    this.name = 'ForbiddenError';
+  }
+}
+
 class NotFoundError extends AppError {
   constructor(message = 'Resource not found') {
     super(message, 404);
@@ -49,6 +56,7 @@ module.exports = {
   ValidationError,
   AuthenticationError,
   AuthorizationError,
+  ForbiddenError,
   NotFoundError,
   ConflictError,
 };

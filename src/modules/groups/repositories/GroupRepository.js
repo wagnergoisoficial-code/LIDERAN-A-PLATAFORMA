@@ -39,8 +39,8 @@ class GroupRepository {
     return this.prisma.group.delete({ where: { id } });
   }
 
-  async join(groupId, userId) {
-    return this.prisma.groupMember.create({ data: { groupId, userId } });
+  async join(groupId, userId, role = 'member') {
+    return this.prisma.groupMember.create({ data: { groupId, userId, role } });
   }
 
   async leave(groupId, userId) {

@@ -12,67 +12,50 @@ class GroupController {
 
   async getAll(req, res, next) {
     try {
-      const { churchId, id: userId } = req.user;
-      if (!churchId) return res.json({ success: true, data: [] });
-      const groups = await this.service.getGroups(churchId);
-      res.json({ success: true, data: groups.map(g => this.format(g, userId)) });
+      const groups = await this.service.getGroups(req.user);
+      res.json({ success: true, data: groups.map(g => this.format(g, req.user.id)) });
+    } catch (e) { next(e); }
+  }
+
+  async getById(req, res, next) {
+    try {
+      const group = await this.service.getGroupById(req.params.id, req.user);
+      res.json({ success: true, data: this.format(group, req.user.id) });
     } catch (e) { next(e); }
   }
 
   async create(req, res, next) {
     try {
-      const { churchId, id: leaderId, role } = req.user;
-      if (!['leader', 'admin'].includes(role))
-        return res.status(403).json({ success: false, message: 'Acesso negado' });
-      const { name, description, category } = req.body;
-      const group = await this.service.createGroup({
-        name, description: description || null,
-        category: category || 'celula', churchId, leaderId,
-      });
-      await this.service.joinGroup(group.id, leaderId).catch(() => {});
-      const fresh = await this.service.getGroupById(group.id);
-      res.status(201).json({ success: true, data: this.format(fresh, leaderId) });
+      const group = await this.service.createGroup(req.body, req.user);
+      res.status(201).json({ success: true, message: 'Grupo criado', data: this.format(group, req.user.id) });
     } catch (e) { next(e); }
   }
 
   async update(req, res, next) {
     try {
-      const { id: userId, role } = req.user;
-      if (!['leader', 'admin'].includes(role))
-        return res.status(403).json({ success: false, message: 'Acesso negado' });
-      const { name, description, category } = req.body;
-      const group = await this.service.updateGroup(req.params.id, {
-        ...(name && { name }),
-        ...(description !== undefined && { description }),
-        ...(category && { category }),
-      });
-      res.json({ success: true, data: this.format(group, userId) });
+      const group = await this.service.updateGroup(req.params.id, req.body, req.user);
+      res.json({ success: true, message: 'Grupo atualizado', data: this.format(group, req.user.id) });
     } catch (e) { next(e); }
   }
 
   async remove(req, res, next) {
     try {
-      const { role } = req.user;
-      if (!['leader', 'admin'].includes(role))
-        return res.status(403).json({ success: false, message: 'Acesso negado' });
-      await this.service.deleteGroup(req.params.id);
-      res.json({ success: true });
+      await this.service.deleteGroup(req.params.id, req.user);
+      res.json({ success: true, message: 'Grupo excluído' });
     } catch (e) { next(e); }
   }
 
   async join(req, res, next) {
     try {
-      const { id: userId } = req.user;
-      await this.service.joinGroup(req.params.id, userId);
-      res.json({ success: true });
+      const group = await this.service.joinGroup(req.params.id, req.user);
+      res.json({ success: true, message: 'Você entrou no grupo', data: this.format(group, req.user.id) });
     } catch (e) { next(e); }
   }
 
   async leave(req, res, next) {
     try {
-      const { id: userId } = req.user;
-      await this.service.leaveGroup(req.params.id, userId);
-      res.json({ success: true });
+      const group = await this.service.leaveGroup(req.params.id, req.user);
+      res.json({ success: true, message: 'Você saiu do grupo', data: this.format(group, req.user.id) });
     } catch (e) { next(e); }
   }
 }

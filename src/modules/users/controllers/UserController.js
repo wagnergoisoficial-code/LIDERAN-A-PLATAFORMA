@@ -6,13 +6,10 @@ class UserController {
 
   async getAllUsers(req, res, next) {
     try {
-      const churchId = req.user.churchId;
-
-      const users = await this.userService.getAllUsers(churchId);
+      const users = await this.userService.getAllUsers(req.user);
 
       res.status(200).json({
         success: true,
-        message: 'Users retrieved successfully',
         data: users,
       });
     } catch (error) {
@@ -28,8 +25,7 @@ class UserController {
 
       res.status(200).json({
         success: true,
-        message: 'User retrieved successfully',
-        data: user,
+                data: user,
       });
     } catch (error) {
       next(error);
@@ -40,11 +36,10 @@ class UserController {
     try {
       const { id } = req.params;
 
-      const profile = await this.userService.getProfileById(id);
+      const profile = await this.userService.getProfileById(id, req.user);
 
       res.status(200).json({
         success: true,
-        message: 'Profile retrieved successfully',
         data: profile,
       });
     } catch (error) {
@@ -62,7 +57,7 @@ class UserController {
 
       res.status(200).json({
         success: true,
-        message: 'Profile updated successfully',
+        message: 'Perfil atualizado',
         data: profile,
       });
     } catch (error) {
@@ -98,7 +93,7 @@ class UserController {
 
       res.status(201).json({
         success: true,
-        message: 'Social link added successfully',
+        message: 'Rede social adicionada',
         data: link,
       });
     } catch (error) {
@@ -114,8 +109,7 @@ class UserController {
 
       res.status(200).json({
         success: true,
-        message: 'Social links retrieved successfully',
-        data: links,
+                data: links,
       });
     } catch (error) {
       next(error);
@@ -130,7 +124,7 @@ class UserController {
 
       res.status(200).json({
         success: true,
-        message: 'Social link removed successfully',
+        message: 'Rede social removida',
       });
     } catch (error) {
       next(error);
@@ -145,8 +139,7 @@ class UserController {
 
       res.status(200).json({
         success: true,
-        message: 'Achievements retrieved successfully',
-        data: achievements,
+                data: achievements,
       });
     } catch (error) {
       next(error);
@@ -156,17 +149,14 @@ class UserController {
   async createUser(req, res, next) {
     try {
       const CreateUserDto = require('../dtos/CreateUserDto');
-      const dto = new CreateUserDto({
-        ...req.body,
-        churchId: req.user.churchId,
-      });
+      const dto = new CreateUserDto(req.body);
       dto.validate();
 
-      const user = await this.userService.createUser(dto);
+      const user = await this.userService.createUser(dto, req.user);
 
       res.status(201).json({
         success: true,
-        message: 'User created successfully',
+        message: 'Usuário criado com sucesso',
         data: user,
       });
     } catch (error) {
@@ -182,7 +172,7 @@ class UserController {
 
       res.status(200).json({
         success: true,
-        message: 'User blocked successfully',
+        message: 'Usuário bloqueado',
       });
     } catch (error) {
       next(error);
@@ -197,7 +187,7 @@ class UserController {
 
       res.status(200).json({
         success: true,
-        message: 'User unblocked successfully',
+        message: 'Usuário desbloqueado',
       });
     } catch (error) {
       next(error);
@@ -210,8 +200,7 @@ class UserController {
 
       res.status(200).json({
         success: true,
-        message: 'Blocked users retrieved successfully',
-        data: blockedUsers,
+                data: blockedUsers,
       });
     } catch (error) {
       next(error);

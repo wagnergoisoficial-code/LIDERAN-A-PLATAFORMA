@@ -1,8 +1,20 @@
-const { PrismaClient } = require('@prisma/client');
+const { getPrismaClient } = require('../../../config/database');
+
+const MEMBER_SELECT = {
+  id: true,
+  name: true,
+  email: true,
+  role: true,
+  profileImage: true,
+  title: true,
+  location: true,
+  age: true,
+  createdAt: true,
+};
 
 class ChurchRepository {
   constructor() {
-    this.prisma = new PrismaClient();
+    this.prisma = getPrismaClient();
   }
 
   async create(data) {
@@ -15,7 +27,6 @@ class ChurchRepository {
         cultosDias: data.cultosDias ? JSON.stringify(data.cultosDias) : null,
         leaderID: data.leaderID || null,
       },
-      include: { users: true },
     });
   }
 
@@ -23,87 +34,60 @@ class ChurchRepository {
     return this.prisma.church.findUnique({
       where: { id },
       include: {
-        users: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            role: true,
-            profileImage: true,
-            title: true,
-          },
-        },
-        posts: true,
-        devotionals: true,
-        _count: {
-          select: {
-            users: true,
-            posts: true,
-          },
-        },
+        users: { select: MEMBER_SELECT },
+        _count: { select: { users: true, posts: true, events: true, devotionals: true } },
       },
     });
+  }
+
+  async findBasic(id) {
+    return this.prisma.church.findUnique({ where: { id } });
   }
 
   async findByLeaderId(leaderID) {
     return this.prisma.church.findMany({
-      where: { leaderID },
+      where: leaderID ? { leaderID } : {},
       include: {
-        users: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            role: true,
-          },
-        },
-        _count: {
-          select: {
-            users: true,
-          },
-        },
+        users: { select: { id: true, name: true, email: true, role: true } },
+        _count: { select: { users: true } },
       },
+      orderBy: { createdAt: 'asc' },
     });
   }
 
+  // Campos ausentes ficam como estão; null ou texto vazio limpam o valor
   async update(id, data) {
+    const clean = (value) => (value === undefined ? undefined : value || null);
+
     return this.prisma.church.update({
       where: { id },
       data: {
         name: data.name || undefined,
-        title: data.title || undefined,
-        description: data.description || undefined,
-        imageUrl: data.imageUrl || undefined,
-        cultosDias: data.cultosDias ? JSON.stringify(data.cultosDias) : undefined,
+        title: clean(data.title),
+        description: clean(data.description),
+        imageUrl: clean(data.imageUrl),
+        cultosDias: data.cultosDias === undefined ? undefined : JSON.stringify(data.cultosDias || []),
       },
-      include: { users: true },
     });
   }
 
   async delete(id) {
-    return this.prisma.church.delete({
-      where: { id },
-    });
+    return this.prisma.church.delete({ where: { id } });
   }
 
   async getMembers(churchId) {
     return this.prisma.user.findMany({
       where: { churchId },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        profileImage: true,
-        title: true,
-        location: true,
-        age: true,
-        createdAt: true,
-      },
+      select: MEMBER_SELECT,
+      orderBy: { createdAt: 'asc' },
     });
   }
 
-  async addMemberToChurch(userId, churchId) {
+  async findUser(userId) {
+    return this.prisma.user.findUnique({ where: { id: userId } });
+  }
+
+  async setUserChurch(userId, churchId) {
     return this.prisma.user.update({
       where: { id: userId },
       data: { churchId },
@@ -120,28 +104,14 @@ class ChurchRepository {
   async updateMember(userId, churchId, data) {
     return this.prisma.user.updateMany({
       where: { id: userId, churchId },
-      data: {
-        name: data.name || undefined,
-        title: data.title !== undefined ? data.title : undefined,
-        location: data.location !== undefined ? data.location : undefined,
-        age: data.age !== undefined ? data.age : undefined,
-      },
+      data,
     });
   }
 
   async getMemberById(userId, churchId) {
     return this.prisma.user.findFirst({
       where: { id: userId, churchId },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        profileImage: true,
-        title: true,
-        location: true,
-        age: true,
-      },
+      select: MEMBER_SELECT,
     });
   }
 
@@ -151,6 +121,7 @@ class ChurchRepository {
       select: {
         id: true,
         name: true,
+        profileImage: true,
         _count: {
           select: {
             posts: { where: { churchId } },
@@ -161,9 +132,10 @@ class ChurchRepository {
       },
     });
 
-    const withTotals = members.map(m => ({
+    const withTotals = members.map((m) => ({
       userId: m.id,
       name: m.name,
+      profileImage: m.profileImage,
       posts: m._count.posts,
       comments: m._count.comments,
       messages: m._count.messages,
@@ -172,10 +144,12 @@ class ChurchRepository {
 
     const grandTotal = withTotals.reduce((acc, m) => acc + m.total, 0);
 
-    return withTotals.map(m => ({
-      ...m,
-      percentage: grandTotal > 0 ? Math.round((m.total / grandTotal) * 100) : 0,
-    }));
+    return withTotals
+      .map((m) => ({
+        ...m,
+        percentage: grandTotal > 0 ? Math.round((m.total / grandTotal) * 100) : 0,
+      }))
+      .sort((a, b) => b.total - a.total);
   }
 }
 

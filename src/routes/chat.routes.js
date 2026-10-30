@@ -43,7 +43,7 @@ const router = express.Router();
  *       500:
  *         description: Server error
  */
-router.get('/messages', authMiddleware, (req, res) => chatController.getMessages(req, res));
+router.get('/messages', authMiddleware, (req, res, next) => chatController.getMessages(req, res, next));
 
 /**
  * @swagger
@@ -84,7 +84,7 @@ router.get('/messages', authMiddleware, (req, res) => chatController.getMessages
  *       500:
  *         description: Server error
  */
-router.post('/messages', authMiddleware, (req, res) => chatController.sendMessage(req, res));
+router.post('/messages', authMiddleware, (req, res, next) => chatController.sendMessage(req, res, next));
 
 /**
  * @swagger
@@ -111,6 +111,6 @@ router.post('/messages', authMiddleware, (req, res) => chatController.sendMessag
  *       500:
  *         description: Server error
  */
-router.delete('/messages/:messageId', authMiddleware, (req, res) => chatController.deleteMessage(req, res));
+router.delete('/messages/:messageId', authMiddleware, (req, res, next) => chatController.deleteMessage(req, res, next));
 
 module.exports = router;

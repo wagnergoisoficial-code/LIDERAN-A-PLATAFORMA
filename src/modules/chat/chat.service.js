@@ -1,93 +1,67 @@
-const { PrismaClient } = require('@prisma/client');
+const { getPrismaClient } = require('../../config/database');
+const { NotFoundError, ValidationError } = require('../../shared/errors/AppError');
+const { requireChurch, assertSameChurch, assertOwnerOrLeader } = require('../../shared/utils/church.util');
 
-const prisma = new PrismaClient();
+const MAX_LENGTH = 500;
+const USER_SELECT = { id: true, name: true, profileImage: true };
 
 class ChatService {
-  async sendMessage(userId, churchId, content) {
-    try {
-      const message = await prisma.message.create({
-        data: {
-          userId,
-          churchId,
-          content,
-        },
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              profileImage: true,
-            },
-          },
-        },
-      });
-
-      return message;
-    } catch (err) {
-      throw new Error(`Error creating message: ${err.message}`);
-    }
+  get prisma() {
+    return getPrismaClient();
   }
 
-  async getMessages(churchId, limit = 50, lastMessageId = null) {
-    try {
-      let query = {
-        where: { churchId },
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              profileImage: true,
-            },
-          },
-        },
-        orderBy: { createdAt: 'desc' },
-        take: limit,
-      };
+  async sendMessage(user, content) {
+    const churchId = requireChurch(user);
+    const text = typeof content === 'string' ? content.trim() : '';
 
-      // If lastMessageId is provided, get messages after that one for pagination
-      if (lastMessageId) {
-        const lastMessage = await prisma.message.findUnique({
-          where: { id: lastMessageId },
-        });
+    if (!text) throw new ValidationError('Escreva uma mensagem');
+    if (text.length > MAX_LENGTH) throw new ValidationError(`A mensagem pode ter no máximo ${MAX_LENGTH} caracteres`);
 
-        if (lastMessage) {
-          query.where.createdAt = {
-            gt: lastMessage.createdAt,
-          };
-        }
-      }
-
-      const messages = await prisma.message.findMany(query);
-
-      return messages.reverse(); // Return in ascending order (oldest first)
-    } catch (err) {
-      throw new Error(`Error fetching messages: ${err.message}`);
-    }
+    return this.prisma.message.create({
+      data: { userId: user.id, churchId, content: text },
+      include: { user: { select: USER_SELECT } },
+    });
   }
 
-  async deleteMessage(messageId, userId) {
-    try {
-      const message = await prisma.message.findUnique({
-        where: { id: messageId },
-      });
+  // Últimas mensagens da comunidade (ou apenas as posteriores a lastMessageId)
+  async getMessages(user, limit = 50, lastMessageId = null) {
+    if (!user.churchId) return [];
 
-      if (!message) {
-        throw new Error('Message not found');
-      }
+    const take = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 100);
+    const blocked = await this.prisma.blockedUser.findMany({
+      where: { blockerId: user.id },
+      select: { blockedId: true },
+    });
 
-      if (message.userId !== userId) {
-        throw new Error('Unauthorized to delete this message');
-      }
+    const where = { churchId: user.churchId };
+    if (blocked.length) where.userId = { notIn: blocked.map((b) => b.blockedId) };
 
-      await prisma.message.delete({
-        where: { id: messageId },
-      });
-
-      return { success: true, message: 'Message deleted successfully' };
-    } catch (err) {
-      throw new Error(`Error deleting message: ${err.message}`);
+    if (lastMessageId) {
+      const lastMessage = await this.prisma.message.findUnique({ where: { id: lastMessageId } });
+      if (lastMessage && lastMessage.churchId === user.churchId) where.createdAt = { gt: lastMessage.createdAt };
     }
+
+    const messages = await this.prisma.message.findMany({
+      where,
+      include: { user: { select: USER_SELECT } },
+      orderBy: { createdAt: 'desc' },
+      take,
+    });
+
+    return messages.reverse(); // mais antigas primeiro
+  }
+
+  // O autor ou um líder da comunidade pode apagar
+  async deleteMessage(messageId, user) {
+    const message = await this.prisma.message.findUnique({ where: { id: messageId } });
+
+    if (!message) throw new NotFoundError('Mensagem não encontrada');
+
+    assertSameChurch(user, message.churchId, 'Mensagem não encontrada');
+    assertOwnerOrLeader(user, message.userId, 'Você só pode apagar as suas mensagens');
+
+    await this.prisma.message.delete({ where: { id: messageId } });
+    return { id: messageId };
   }
 }
 

@@ -1,93 +1,103 @@
 const { NotFoundError } = require('../../../shared/errors/AppError');
+const { requireChurch, assertSameChurch, assertLeader } = require('../../../shared/utils/church.util');
+const { notifyChurch, preview } = require('../../../shared/utils/notifier');
 
-// Devotional Service
+const ACTIVE_HOURS = 24;
+
 class DevotionalService {
   constructor(devotionalRepository) {
     this.devotionalRepository = devotionalRepository;
   }
 
-  async createDevotional(createDevotionalDto) {
-    return await this.devotionalRepository.create({
-      title: createDevotionalDto.title,
-      content: createDevotionalDto.content,
-      verse: createDevotionalDto.verse,
-      userId: createDevotionalDto.userId,
-      churchId: createDevotionalDto.churchId,
+  async createDevotional(dto, user) {
+    assertLeader(user, 'Apenas líderes podem publicar devocionais');
+    const churchId = requireChurch(user);
+
+    const devotional = await this.devotionalRepository.create({
+      title: dto.title,
+      content: dto.content,
+      verse: dto.verse,
+      userId: user.id,
+      churchId,
       isActive: true,
       activatedAt: new Date(),
     });
+
+    await notifyChurch(churchId, user.id, {
+      type: 'new_devotional',
+      title: `Novo devocional: ${devotional.title}`,
+      body: devotional.verse || preview(devotional.content),
+      linkId: devotional.id,
+      linkType: 'devotional',
+    });
+
+    return this.format(devotional, user.id);
   }
 
-  async getAllDevotionals(churchId) {
-    const devotionals = await this.devotionalRepository.findAll(churchId);
-    return devotionals.map(dev => this.formatDevotionalWithTimeRemaining(dev));
+  async getAllDevotionals(user) {
+    if (!user.churchId) return [];
+    const devotionals = await this.devotionalRepository.findAll(user.churchId);
+    return devotionals.map((dev) => this.format(dev, user.id));
   }
 
-  async getDevotionalById(id) {
-    const devotional = await this.devotionalRepository.findById(id);
-
-    if (!devotional) {
-      throw new NotFoundError('Devotional not found');
-    }
-
-    return this.formatDevotionalWithTimeRemaining(devotional);
-  }
-
-  async deleteDevotional(id) {
-    await this.getDevotionalById(id);
-    return await this.devotionalRepository.delete(id);
-  }
-
-  async markAsInactive(id) {
+  async findInChurch(id, user) {
     const devotional = await this.devotionalRepository.findById(id);
 
     if (!devotional) {
       throw new NotFoundError('Devocional não encontrado');
     }
 
-    return await this.devotionalRepository.update(id, { isActive: false });
+    assertSameChurch(user, devotional.churchId, 'Devocional não encontrado');
+    return devotional;
   }
 
-  async reactivateDevotional(id) {
-    const devotional = await this.devotionalRepository.findById(id);
+  async deleteDevotional(id, user) {
+    assertLeader(user, 'Apenas líderes podem excluir devocionais');
+    await this.findInChurch(id, user);
+    return this.devotionalRepository.delete(id);
+  }
 
-    if (!devotional) {
-      throw new NotFoundError('Devocional não encontrado');
-    }
+  async markAsInactive(id, user) {
+    assertLeader(user);
+    await this.findInChurch(id, user);
+    const updated = await this.devotionalRepository.update(id, { isActive: false });
+    return this.format(updated, user.id);
+  }
 
-    return await this.devotionalRepository.update(id, { 
+  async reactivateDevotional(id, user) {
+    assertLeader(user);
+    await this.findInChurch(id, user);
+    const updated = await this.devotionalRepository.update(id, {
       isActive: true,
       activatedAt: new Date(),
     });
+    return this.format(updated, user.id);
   }
 
-  // Calculate hours remaining until inactive (24 hours after activation)
+  async toggleLike(id, user) {
+    await this.findInChurch(id, user);
+    return this.devotionalRepository.toggleLike(id, user.id);
+  }
+
   calculateHoursRemaining(activatedAt) {
-    const now = new Date();
-    const activationTime = new Date(activatedAt);
-    const twentyFourHoursInMs = 24 * 60 * 60 * 1000;
-    const expiryTime = new Date(activationTime.getTime() + twentyFourHoursInMs);
-    
-    const hoursRemaining = (expiryTime.getTime() - now.getTime()) / (1000 * 60 * 60);
-    
+    const expiry = new Date(activatedAt).getTime() + ACTIVE_HOURS * 60 * 60 * 1000;
+    const hoursRemaining = (expiry - Date.now()) / (1000 * 60 * 60);
     return Math.max(0, Math.ceil(hoursRemaining));
   }
 
-  // Check if devotional should be automatically deactivated
-  shouldBeInactive(activatedAt) {
-    const hoursRemaining = this.calculateHoursRemaining(activatedAt);
-    return hoursRemaining <= 0;
-  }
-
-  formatDevotionalWithTimeRemaining(devotional) {
+  // Um devocional fica ativo durante 24h após ser publicado ou reativado
+  format(devotional, userId) {
     const hoursRemaining = this.calculateHoursRemaining(devotional.activatedAt);
-    const shouldBeInactive = this.shouldBeInactive(devotional.activatedAt);
+    const shouldBeInactive = hoursRemaining <= 0;
+    const { likes, ...rest } = devotional;
 
     return {
-      ...devotional,
+      ...rest,
       hoursRemaining,
       shouldBeInactive,
       isActive: devotional.isActive && !shouldBeInactive,
+      likeCount: likes?.length || 0,
+      hasLiked: likes?.some((l) => l.userId === userId) || false,
     };
   }
 }

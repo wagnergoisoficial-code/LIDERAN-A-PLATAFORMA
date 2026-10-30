@@ -24,6 +24,7 @@ class UserRepository {
       include: {
         socialLinks: true,
         achievements: true,
+        church: { select: { id: true, name: true, leaderID: true } },
       },
     });
   }

@@ -34,14 +34,13 @@ class PollRepository {
     return this.prisma.poll.delete({ where: { id } });
   }
 
-  async vote(pollOptionId, userId) {
-    // Remove existing votes from this user for this poll
-    const option = await this.prisma.pollOption.findUnique({ where: { id: pollOptionId } });
-    const otherOptions = await this.prisma.pollOption.findMany({ where: { pollId: option.pollId } });
-    await this.prisma.pollVote.deleteMany({
-      where: { pollOptionId: { in: otherOptions.map(o => o.id) }, userId },
-    });
-    return this.prisma.pollVote.create({ data: { pollOptionId, userId } });
+  // Cada pessoa tem um único voto por enquete (trocar de opção substitui o voto anterior)
+  async vote(pollId, pollOptionId, userId) {
+    const options = await this.prisma.pollOption.findMany({ where: { pollId }, select: { id: true } });
+    return this.prisma.$transaction([
+      this.prisma.pollVote.deleteMany({ where: { pollOptionId: { in: options.map(o => o.id) }, userId } }),
+      this.prisma.pollVote.create({ data: { pollOptionId, userId } }),
+    ]);
   }
 }
 
