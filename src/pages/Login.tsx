@@ -3,10 +3,12 @@ import { useNavigate, Link } from 'react-router-dom';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import UIkit from 'uikit';
+import AuthLayout, { PasswordInput } from '../components/AuthLayout';
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { login } = useAuth();
@@ -29,112 +31,45 @@ const Login = () => {
   };
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: 'var(--bg)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '24px'
-    }}>
-      <div style={{ width: '100%', maxWidth: '400px' }}>
-
-        {/* Logo / Brand */}
-        <div style={{ marginBottom: '40px', textAlign: 'center' }}>
-          <div style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '10px',
-            marginBottom: '8px'
-          }}>
-            <div style={{
-              width: '32px', height: '32px',
-              background: 'var(--nav-bg)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              border: '1px solid var(--nav-border)',
-              borderRadius: 'var(--radius-sm)'
-            }}>
-              <span uk-icon="icon: heart; ratio: 0.9" style={{ color: '#fff' }}></span>
-            </div>
-            <span style={{ fontSize: '18px', fontWeight: 700, letterSpacing: '-0.04em', color: 'var(--text)' }}>
-              ICHURCH
-            </span>
-          </div>
-          <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>
-            Entre na sua conta para continuar
-          </p>
+    <AuthLayout
+      title="Entrar"
+      subtitle="Entre na sua conta para continuar."
+      footer={<>Não tem uma conta? <Link to="/register">Criar conta</Link></>}
+    >
+      <form onSubmit={handleLogin}>
+        <div className="auth-field">
+          <label className="auth-label" htmlFor="login-email">E-mail</label>
+          <input
+            id="login-email"
+            name="email"
+            className="uk-input"
+            type="email"
+            placeholder="seu@email.com"
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
         </div>
 
-        {/* Form Card */}
-        <div className="card" style={{ borderColor: 'var(--border-strong)', borderRadius: 'var(--radius-lg)' }}>
-
-          <div style={{ padding: '28px' }}>
-            <form className="uk-form-stacked" onSubmit={handleLogin}>
-
-              <div className="uk-margin">
-                <label className="uk-form-label">E-mail</label>
-                <div className="uk-inline uk-width-1-1">
-                  <span className="uk-form-icon" uk-icon="icon: mail"></span>
-                  <input
-                    className="uk-input"
-                    type="email"
-                    placeholder="seu@email.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="uk-margin">
-                <label className="uk-form-label">Senha</label>
-                <div className="uk-inline uk-width-1-1">
-                  <span className="uk-form-icon" uk-icon="icon: lock"></span>
-                  <input
-                    className="uk-input"
-                    type="password"
-                    placeholder="Sua senha"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="uk-margin" style={{ marginTop: '24px' }}>
-                <button
-                  className="uk-button uk-button-primary uk-width-1-1"
-                  type="submit"
-                  disabled={loading}
-                  style={{ height: '40px', fontSize: '14px', fontWeight: 600, justifyContent: 'center' }}
-                >
-                  {loading
-                    ? <><span uk-spinner="ratio: 0.5"></span> Entrando...</>
-                    : <><span uk-icon="icon: sign-in; ratio: 0.85"></span> Entrar</>
-                  }
-                </button>
-              </div>
-
-            </form>
-          </div>
-
-          {/* Footer */}
-          <div style={{
-            padding: '16px 28px',
-            borderTop: '1px solid var(--border)',
-            background: 'var(--bg-surface)',
-            textAlign: 'center'
-          }}>
-            <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-              Não tem uma conta?{' '}
-              <Link to="/register" style={{ color: 'var(--accent)', fontWeight: 600 }}>
-                Registre-se
-              </Link>
-            </span>
-          </div>
+        <div className="auth-field">
+          <label className="auth-label" htmlFor="login-password">Senha</label>
+          <PasswordInput
+            id="login-password"
+            name="password"
+            autoComplete="current-password"
+            value={password}
+            onChange={setPassword}
+            visible={showPassword}
+            onToggle={() => setShowPassword((visible) => !visible)}
+          />
         </div>
-      </div>
-    </div>
+
+        <button className="uk-button uk-button-primary auth-submit" type="submit" disabled={loading}>
+          {loading ? <><span uk-spinner="ratio: 0.5"></span> Entrando...</> : 'Entrar'}
+        </button>
+      </form>
+    </AuthLayout>
   );
 };
 
