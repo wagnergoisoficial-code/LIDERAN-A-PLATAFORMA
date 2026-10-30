@@ -28,6 +28,10 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      # Na Render há 3 proxies à frente da API (testado em 30/10/2026). Com menos, a API lê o IP
+      # de um proxy e os limites de pedidos e de login ficam partilhados entre utilizadores.
+      - key: TRUST_PROXY
+        value: "3"
       - key: DATABASE_URL
         fromDatabase:
           name: lidera-db

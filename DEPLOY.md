@@ -40,6 +40,7 @@ A `JWT_SECRET` é gerada pela Render. A API **recusa arrancar** sem ela, sem `DA
 | `CORS_ORIGIN` | recomendada | Sites autorizados, separados por vírgula. O `https://` é opcional |
 | `PUBLIC_URL` | não | Endereço público da API, usado nos links das imagens. Na Render vem de `RENDER_EXTERNAL_URL` |
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | não | Cria o primeiro administrador, se ainda não existir |
+| `TRUST_PROXY` | na Render | Número de proxies à frente da API, para os limites usarem o IP real de quem faz o pedido. Padrão em produção: 1. **Na Render tem de ser 3** (testado em 30/10/2026) |
 | `RATE_LIMIT_PER_MINUTE` | não | Pedidos por minuto e por IP. Padrão: 600 |
 | `LOGIN_ATTEMPTS` | não | Tentativas de login falhadas por conta, em 15 minutos. Padrão: 10 |
 
