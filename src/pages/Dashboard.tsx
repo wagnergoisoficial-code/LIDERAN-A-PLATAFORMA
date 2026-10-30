@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import UIkit from 'uikit';
 import ChurchCreate from '../components/ChurchCreate';
 import ChurchMembers from '../components/ChurchMembers';
 
@@ -15,16 +14,14 @@ interface Church {
 }
 
 const Dashboard = () => {
-  const { user } = useAuth();
+  useAuth();
   const [churches, setChurches] = useState<Church[]>([]);
   const [selectedChurch, setSelectedChurch] = useState<Church | null>(null);
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showMembersModal, setShowMembersModal] = useState(false);
 
-  useEffect(() => {
-    loadChurches();
-  }, []);
+  useEffect(() => { loadChurches(); }, []);
 
   const loadChurches = async () => {
     setLoading(true);
@@ -32,9 +29,7 @@ const Dashboard = () => {
       const result = await api.getMyChurches();
       if (result.success) {
         setChurches(result.data || []);
-        if (result.data && result.data.length > 0) {
-          setSelectedChurch(result.data[0]);
-        }
+        if (result.data?.length > 0) setSelectedChurch(result.data[0]);
       }
     } catch (err: any) {
       console.error('Erro ao carregar comunidades:', err);
@@ -49,135 +44,149 @@ const Dashboard = () => {
   };
 
   return (
-    <div style={{ display: 'flex', minHeight: 'calc(100vh - 80px)' }}>
-      {/* SIDEBAR ESQUERDA */}
-      <div style={{
-        width: '240px',
-        backgroundColor: '#f8f9fa',
-        borderRight: '1px solid #e9ecef',
+    <div style={{ display: 'flex', minHeight: 'calc(100vh - 80px)', background: 'var(--bg)' }}>
+
+      {/* ── SIDEBAR ─────────────────────────────────────────────── */}
+      <aside style={{
+        width: '220px',
+        background: 'var(--bg-surface)',
+        borderRight: '1px solid var(--border)',
         display: 'flex',
         flexDirection: 'column',
-        padding: '24px 0',
-        overflowY: 'auto'
+        flexShrink: 0
       }}>
-        {/* Header do Sidebar */}
-        <div style={{ padding: '0 20px', marginBottom: '24px' }}>
-          <h3 style={{ margin: '0 0 8px 0', fontSize: '16px', fontWeight: '600', color: '#212529' }}>
+        {/* Sidebar header */}
+        <div style={{ padding: '16px 16px 12px', borderBottom: '1px solid var(--border)' }}>
+          <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--text-faint)', marginBottom: '2px' }}>
             Painel do Líder
-          </h3>
-          <p style={{ margin: '0', fontSize: '13px', color: '#6c757d' }}>
-            Gerencie suas comunidades
-          </p>
+          </div>
+          <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Gerencie suas comunidades</div>
         </div>
 
-        {/* Botão Criar Comunidade */}
-        <div style={{ padding: '0 12px', marginBottom: '20px' }}>
+        {/* Create button */}
+        <div style={{ padding: '12px 12px 8px' }}>
           <button
             onClick={() => setShowCreateForm(!showCreateForm)}
             style={{
               width: '100%',
-              padding: '10px 16px',
-              backgroundColor: showCreateForm ? '#0d6efd' : '#6c757d',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
+              padding: '0 12px',
+              height: '32px',
+              background: showCreateForm ? 'var(--accent)' : 'transparent',
+              color: showCreateForm ? '#fff' : 'var(--text-muted)',
+              border: `1px solid ${showCreateForm ? 'var(--accent)' : 'var(--border-strong)'}`,
+              fontSize: '12px',
+              fontFamily: 'inherit',
+              fontWeight: 500,
               cursor: 'pointer',
-              fontSize: '14px',
-              fontWeight: '500',
-              transition: 'all 0.2s'
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'all 160ms ease'
             }}
             onMouseEnter={(e) => {
               if (!showCreateForm) {
-                e.currentTarget.style.backgroundColor = '#5a6268';
+                e.currentTarget.style.background = 'var(--bg-elevated)';
+                e.currentTarget.style.color = 'var(--text)';
               }
             }}
             onMouseLeave={(e) => {
               if (!showCreateForm) {
-                e.currentTarget.style.backgroundColor = '#6c757d';
+                e.currentTarget.style.background = 'transparent';
+                e.currentTarget.style.color = 'var(--text-muted)';
               }
             }}
           >
-            {showCreateForm ? '✕ Cancelar' : '+ Nova Comunidade'}
+            <span uk-icon={`icon: ${showCreateForm ? 'close' : 'plus'}; ratio: 0.8`}></span>
+            {showCreateForm ? 'Cancelar' : 'Nova Comunidade'}
           </button>
         </div>
 
-        {/* Divisor */}
-        <div style={{ height: '1px', backgroundColor: '#e9ecef', margin: '12px 0' }}></div>
+        <div style={{ height: '1px', background: 'var(--border)', margin: '4px 12px' }}></div>
 
-        {/* Lista de Comunidades */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '0' }}>
+        {/* Church list */}
+        <div style={{ flex: 1, overflowY: 'auto' }}>
           {loading ? (
-            <div style={{ padding: '20px', textAlign: 'center', color: '#6c757d' }}>
-              <div uk-spinner="ratio: 0.8"></div>
+            <div style={{ padding: '20px', textAlign: 'center' }}>
+              <span uk-spinner="ratio: 0.7"></span>
             </div>
           ) : churches.length === 0 ? (
-            <div style={{ padding: '20px', color: '#6c757d', fontSize: '13px', textAlign: 'center' }}>
+            <div style={{ padding: '20px 16px', fontSize: '12px', color: 'var(--text-faint)', textAlign: 'center' }}>
               Nenhuma comunidade criada
             </div>
           ) : (
-            churches.map((church: Church) => (
-              <button
-                key={church.id}
-                onClick={() => setSelectedChurch(church)}
-                style={{
-                  width: '100%',
-                  padding: '12px 16px',
-                  backgroundColor: selectedChurch?.id === church.id ? '#0d6efd' : 'transparent',
-                  color: selectedChurch?.id === church.id ? 'white' : '#212529',
-                  border: 'none',
-                  borderLeft: selectedChurch?.id === church.id ? '4px solid #0d6efd' : '4px solid transparent',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                  transition: 'all 0.2s',
-                  fontSize: '14px'
-                }}
-                onMouseEnter={(e) => {
-                  if (selectedChurch?.id !== church.id) {
-                    e.currentTarget.style.backgroundColor = '#e9ecef';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (selectedChurch?.id !== church.id) {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                  }
-                }}
-              >
-                <div style={{ fontWeight: '600', marginBottom: '4px' }}>
-                  {church.name}
-                </div>
-                {church.users && (
-                  <div style={{ fontSize: '12px', opacity: 0.8 }}>
-                    👥 {church.users.length} membro{church.users.length !== 1 ? 's' : ''}
-                  </div>
-                )}
-              </button>
-            ))
+            churches.map((church) => {
+              const active = selectedChurch?.id === church.id;
+              return (
+                <button
+                  key={church.id}
+                  onClick={() => { setSelectedChurch(church); setShowCreateForm(false); }}
+                  style={{
+                    width: '100%',
+                    padding: '10px 16px',
+                    background: active ? 'var(--accent-light)' : 'transparent',
+                    color: active ? 'var(--accent-dark)' : 'var(--text-muted)',
+                    border: 'none',
+                    borderLeft: `2px solid ${active ? 'var(--accent)' : 'transparent'}`,
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    fontSize: '13px',
+                    fontFamily: 'inherit',
+                    fontWeight: active ? 600 : 400,
+                    transition: 'all 160ms ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!active) {
+                      e.currentTarget.style.background = 'var(--bg-elevated)';
+                      e.currentTarget.style.color = 'var(--text)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!active) {
+                      e.currentTarget.style.background = 'transparent';
+                      e.currentTarget.style.color = 'var(--text-muted)';
+                    }
+                  }}
+                >
+                  <div style={{ fontWeight: 600, marginBottom: '2px', fontSize: '13px' }}>{church.name}</div>
+                  {church.users && (
+                    <div style={{ fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px', opacity: 0.7 }}>
+                      <span uk-icon="icon: users; ratio: 0.65"></span>
+                      {church.users.length} membro{church.users.length !== 1 ? 's' : ''}
+                    </div>
+                  )}
+                </button>
+              );
+            })
           )}
         </div>
-      </div>
+      </aside>
 
-      {/* CONTEÚDO PRINCIPAL DIREITA */}
-      <div style={{ flex: 1, padding: '24px', overflowY: 'auto', backgroundColor: 'white' }}>
+      {/* ── MAIN CONTENT ────────────────────────────────────────── */}
+      <main style={{ flex: 1, padding: '28px', overflowY: 'auto', background: 'var(--bg)' }}>
+
         {showCreateForm ? (
           <div>
-            <h2 style={{ marginTop: '0', marginBottom: '24px', fontSize: '24px', fontWeight: '600' }}>
-              Criar Nova Comunidade
-            </h2>
+            <div style={{ marginBottom: '24px', paddingBottom: '16px', borderBottom: '1px solid var(--border)' }}>
+              <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 700, letterSpacing: '-0.02em' }}>
+                Nova Comunidade
+              </h2>
+            </div>
             <div style={{ maxWidth: '600px' }}>
               <ChurchCreate onChurchCreated={handleChurchCreated} />
             </div>
           </div>
+
         ) : selectedChurch ? (
           <div>
-            {/* HEADER COM INFO DA COMUNIDADE */}
-            <div style={{ marginBottom: '32px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            {/* Church header */}
+            <div style={{ marginBottom: '28px', paddingBottom: '20px', borderBottom: '1px solid var(--border)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div>
-                  <h2 style={{ margin: '0 0 8px 0', fontSize: '28px', fontWeight: '700', color: '#212529' }}>
+                  <h2 style={{ margin: '0 0 4px', fontSize: '22px', fontWeight: 700, letterSpacing: '-0.02em' }}>
                     {selectedChurch.name}
                   </h2>
                   {selectedChurch.title && (
-                    <p style={{ margin: '0 0 12px 0', fontSize: '15px', color: '#6c757d' }}>
+                    <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>
                       {selectedChurch.title}
                     </p>
                   )}
@@ -185,150 +194,103 @@ const Dashboard = () => {
                 <button
                   onClick={() => setShowMembersModal(true)}
                   style={{
-                    padding: '10px 20px',
-                    backgroundColor: '#28a745',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '6px',
+                    padding: '0 16px',
+                    height: '34px',
+                    background: 'var(--bg)',
+                    color: 'var(--text)',
+                    border: '1px solid var(--border-strong)',
+                    fontSize: '13px',
+                    fontFamily: 'inherit',
+                    fontWeight: 500,
                     cursor: 'pointer',
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    transition: 'background-color 0.2s',
+                    display: 'flex', alignItems: 'center', gap: '6px',
+                    transition: 'all 160ms ease',
                     whiteSpace: 'nowrap'
                   }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#218838';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = '#28a745';
-                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.color = 'var(--accent)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-strong)'; e.currentTarget.style.color = 'var(--text)'; }}
                 >
-                  👥 Ver Membros
+                  <span uk-icon="icon: users; ratio: 0.85"></span>
+                  Ver Membros
                 </button>
               </div>
             </div>
 
-            {/* GRID COM INFO E MEMBROS */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              {/* COLUNA ESQUERDA - INFO */}
-              <div>
-                <div style={{
-                  backgroundColor: '#f8f9fa',
-                  border: '1px solid #e9ecef',
-                  borderRadius: '8px',
-                  padding: '20px'
-                }}>
-                  <h4 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: '600', color: '#212529' }}>
-                    Informações da Comunidade
-                  </h4>
-
-                  {selectedChurch.description && (
-                    <div style={{ marginBottom: '16px' }}>
-                      <p style={{ margin: '0 0 8px 0', fontSize: '13px', fontWeight: '600', color: '#6c757d' }}>
-                        Descrição
-                      </p>
-                      <p style={{ margin: '0', fontSize: '14px', color: '#212529', lineHeight: '1.5' }}>
-                        {selectedChurch.description}
-                      </p>
-                    </div>
-                  )}
-
-                  {selectedChurch.cultosDias && selectedChurch.cultosDias.length > 0 && (
-                    <div>
-                      <p style={{ margin: '0 0 8px 0', fontSize: '13px', fontWeight: '600', color: '#6c757d' }}>
-                        Dias de Culto
-                      </p>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                        {selectedChurch.cultosDias.map((dia: string) => (
-                          <span
-                            key={dia}
-                            style={{
-                              display: 'inline-block',
-                              backgroundColor: '#0d6efd',
-                              color: 'white',
-                              padding: '6px 12px',
-                              borderRadius: '4px',
-                              fontSize: '12px',
-                              fontWeight: '500',
-                              textTransform: 'capitalize'
-                            }}
-                          >
-                            {dia}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
+            {/* Info section */}
+            <div style={{ border: '1px solid var(--border)', background: 'var(--bg)' }}>
+              <div style={{ padding: '12px 16px', background: 'var(--bg-surface)', borderBottom: '1px solid var(--border)' }}>
+                <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
+                  Informações
+                </span>
               </div>
+              <div style={{ padding: '20px' }}>
+                {selectedChurch.description ? (
+                  <div style={{ marginBottom: selectedChurch.cultosDias?.length ? '20px' : 0 }}>
+                    <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--text-faint)', marginBottom: '6px' }}>
+                      Descrição
+                    </div>
+                    <p style={{ margin: 0, fontSize: '13px', color: 'var(--text)', lineHeight: 1.6 }}>
+                      {selectedChurch.description}
+                    </p>
+                  </div>
+                ) : (
+                  <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-faint)' }}>Sem descrição cadastrada.</p>
+                )}
 
-              {/* COLUNA DIREITA - MEMBROS */}
-              <div>
-                <ChurchMembers
-                  churchId={selectedChurch.id}
-                  churchName={selectedChurch.name}
-                />
+                {selectedChurch.cultosDias && selectedChurch.cultosDias.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--text-faint)', marginBottom: '8px' }}>
+                      Dias de Culto
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                      {selectedChurch.cultosDias.map((dia) => (
+                        <span key={dia} style={{
+                          display: 'inline-block',
+                          padding: '3px 10px',
+                          background: 'var(--accent-light)',
+                          border: '1px solid var(--accent)',
+                          color: 'var(--accent-dark)',
+                          fontSize: '11px',
+                          fontWeight: 600,
+                          textTransform: 'capitalize',
+                          letterSpacing: '0.03em'
+                        }}>
+                          {dia}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
+
+            {/* Members section */}
+            <div style={{ marginTop: '24px' }}>
+              <ChurchMembers churchId={selectedChurch.id} churchName={selectedChurch.name} />
+            </div>
           </div>
+
         ) : (
-          <div style={{ textAlign: 'center', padding: '60px 20px', color: '#6c757d' }}>
-            <div style={{ fontSize: '48px', marginBottom: '16px' }}>📋</div>
-            <p style={{ fontSize: '16px', margin: '0' }}>
+          <div style={{ textAlign: 'center', padding: '80px 20px', color: 'var(--text-faint)' }}>
+            <span uk-icon="icon: list; ratio: 2.5" style={{ display: 'block', marginBottom: '16px', color: 'var(--border-strong)' }}></span>
+            <p style={{ fontSize: '14px', margin: 0, color: 'var(--text-muted)' }}>
               Selecione uma comunidade ou crie uma nova
             </p>
           </div>
         )}
-      </div>
+      </main>
 
-      {/* MODAL DE MEMBROS */}
+      {/* ── MEMBERS MODAL ───────────────────────────────────────── */}
       {showMembersModal && selectedChurch && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000
-        }}>
-          <div style={{
-            backgroundColor: 'white',
-            borderRadius: '8px',
-            padding: '30px',
-            width: '90%',
-            maxWidth: '1000px',
-            maxHeight: '85vh',
-            overflowY: 'auto',
-            boxShadow: '0 10px 40px rgba(0, 0, 0, 0.2)'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-              <h3 style={{ margin: '0', fontSize: '24px', fontWeight: '700', color: '#212529' }}>
-                Membros de {selectedChurch.name}
-              </h3>
-              <button
-                onClick={() => setShowMembersModal(false)}
-                style={{
-                  backgroundColor: '#dc3545',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  padding: '8px 16px',
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                  fontWeight: '600'
-                }}
-              >
-                ✕ Fechar
+        <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowMembersModal(false); }}>
+          <div className="modal-box" style={{ maxWidth: '1000px' }}>
+            <div className="modal-header">
+              <h3>Membros — {selectedChurch.name}</h3>
+              <button className="modal-close-btn" onClick={() => setShowMembersModal(false)}>
+                <span uk-icon="icon: close; ratio: 0.9"></span>
               </button>
             </div>
-            <ChurchMembers
-              churchId={selectedChurch.id}
-              churchName={selectedChurch.name}
-            />
+            <ChurchMembers churchId={selectedChurch.id} churchName={selectedChurch.name} />
           </div>
         </div>
       )}
@@ -337,4 +299,3 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
-

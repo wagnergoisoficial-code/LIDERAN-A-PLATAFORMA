@@ -7,13 +7,17 @@ import Avatar from '../components/Avatar';
 interface Message {
   id: string;
   content: string;
-  user: {
-    id: string;
-    name: string;
-    profileImage?: string;
-  };
+  user: { id: string; name: string; profileImage?: string };
   createdAt: string;
 }
+
+const formatDate = (dateString: string) => {
+  const date = new Date(dateString);
+  const isToday = date.toDateString() === new Date().toDateString();
+  return isToday
+    ? date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+    : date.toLocaleDateString('pt-BR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+};
 
 const Chat = () => {
   const { user } = useAuth();
@@ -22,456 +26,196 @@ const Chat = () => {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const pollRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Scroll to bottom when new messages arrive
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+  const scrollToBottom = () => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
 
-  // Format date
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    const today = new Date();
-    const isToday = date.toDateString() === today.toDateString();
-
-    if (isToday) {
-      return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-    } else {
-      return date.toLocaleDateString('pt-BR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-    }
-  };
-
-  // Load messages from server
   const loadMessages = async () => {
     try {
       const result = await api.getMessages(50);
-      if (result.success) {
-        setMessages(result.data);
-        setLoading(false);
-      }
-    } catch (err: any) {
-      console.error('Erro ao carregar mensagens:', err);
-      setLoading(false);
-    }
+      if (result.success) { setMessages(result.data); setLoading(false); }
+    } catch { setLoading(false); }
   };
 
-  // Initial load
+  useEffect(() => { loadMessages(); }, []);
+  useEffect(() => { scrollToBottom(); }, [messages]);
   useEffect(() => {
-    loadMessages();
+    pollRef.current = setInterval(loadMessages, 1000);
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, []);
 
-  // Scroll to bottom when messages change
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
-  // Set up polling every 1 second
-  useEffect(() => {
-    const startPolling = () => {
-      pollIntervalRef.current = setInterval(() => {
-        loadMessages();
-      }, 1000);
-    };
-
-    startPolling();
-
-    return () => {
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current);
-      }
-    };
-  }, []);
-
-  // Send message
-  const handleSendMessage = async (e: React.FormEvent) => {
+  const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!newMessage.trim()) return;
-
     setSending(true);
     try {
       const result = await api.sendMessage(newMessage.trim());
-
-      if (result.success) {
-        setNewMessage('');
-        await loadMessages();
-      } else {
-        UIkit.notification({
-          message: result.error || 'Erro ao enviar mensagem',
-          status: 'danger',
-          timeout: 3000,
-        });
-      }
+      if (result.success) { setNewMessage(''); await loadMessages(); }
+      else UIkit.notification({ message: result.error || 'Erro ao enviar', status: 'danger', timeout: 3000 });
     } catch (err: any) {
-      console.error('Erro ao enviar mensagem:', err);
-      UIkit.notification({
-        message: err.message || 'Erro ao enviar mensagem',
-        status: 'danger',
-        timeout: 3000,
-      });
+      UIkit.notification({ message: err.message || 'Erro ao enviar', status: 'danger', timeout: 3000 });
     } finally {
       setSending(false);
     }
   };
 
-  // Delete message (only own messages)
-  const handleDeleteMessage = async (messageId: string, messageUserId: string) => {
+  const handleDelete = async (messageId: string, messageUserId: string) => {
     if (user?.id !== messageUserId) return;
-
     try {
       const result = await api.deleteMessage(messageId);
       if (result.success) {
-        setMessages(messages.filter((msg) => msg.id !== messageId));
-        UIkit.notification({
-          message: 'Mensagem deletada',
-          status: 'success',
-          timeout: 2000,
-        });
+        setMessages(messages.filter(m => m.id !== messageId));
+        UIkit.notification({ message: 'Mensagem removida', status: 'success', timeout: 2000 });
       }
     } catch (err: any) {
-      console.error('Erro ao deletar mensagem:', err);
-      UIkit.notification({
-        message: err.message || 'Erro ao deletar mensagem',
-        status: 'danger',
-        timeout: 3000,
-      });
+      UIkit.notification({ message: err.message || 'Erro ao deletar', status: 'danger', timeout: 3000 });
     }
   };
 
   return (
-    <div style={{ backgroundColor: '#ffffff', minHeight: '100vh', display: 'flex', flexDirection: 'column', padding: 0 }}>
-      <style>{`
-        .chat-page {
-          background: #ffffff;
-          display: flex;
-          flex-direction: column;
-          height: 100vh;
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-        }
+    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 90px)', background: 'var(--bg)', border: '1px solid var(--border)' }}>
 
-        .messages-area {
-          flex: 1;
-          overflow-y: auto;
-          padding: 24px;
-          display: flex;
-          flex-direction: column;
-          gap: 16px;
-          scroll-behavior: smooth;
-        }
+      {/* Chat header */}
+      <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border)', background: 'var(--bg-surface)', display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+        <span uk-icon="icon: commenting; ratio: 0.9" style={{ color: 'var(--accent)' }}></span>
+        <div>
+          <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>Chat da Comunidade</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-faint)' }}>Mensagens visíveis para todos os membros</div>
+        </div>
+      </div>
 
-        .messages-area::-webkit-scrollbar {
-          width: 8px;
-        }
-
-        .messages-area::-webkit-scrollbar-track {
-          background: transparent;
-        }
-
-        .messages-area::-webkit-scrollbar-thumb {
-          background: #e0e0e0;
-          border-radius: 4px;
-        }
-
-        .messages-area::-webkit-scrollbar-thumb:hover {
-          background: #999;
-        }
-
-        .message-item {
-          display: flex;
-          gap: 12px;
-          animation: fadeIn 0.3s ease-out;
-          align-items: flex-end;
-        }
-
-        .message-item.own {
-          flex-direction: row-reverse;
-        }
-
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-            transform: translateY(8px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-
-        .message-avatar {
-          width: 36px;
-          height: 36px;
-          border-radius: 50%;
-          object-fit: cover;
-          flex-shrink: 0;
-        }
-
-        .message-avatar-placeholder {
-          width: 36px;
-          height: 36px;
-          border-radius: 50%;
-          background: #e0e0e0;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: #666;
-          font-weight: 600;
-          font-size: 14px;
-          flex-shrink: 0;
-        }
-
-        .message-body {
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-          gap: 4px;
-        }
-
-        .message-item.own .message-body {
-          align-items: flex-end;
-        }
-
-        .message-header {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          font-size: 14px;
-          padding: 0 12px;
-        }
-
-        .message-item.own .message-header {
-          justify-content: flex-end;
-        }
-
-        .message-name {
-          font-weight: 600;
-          color: #333;
-        }
-
-        .message-time {
-          color: #999;
-          font-size: 12px;
-        }
-
-        .message-bubble {
-          max-width: 60%;
-          padding: 10px 14px;
-          border-radius: 16px;
-          word-wrap: break-word;
-          word-break: break-word;
-          line-height: 1.4;
-          font-size: 14px;
-        }
-
-        .message-bubble.other {
-          background: #f0f0f0;
-          color: #333;
-          border-bottom-left-radius: 4px;
-        }
-
-        .message-bubble.own {
-          background: #1e87f0;
-          color: white;
-          border-bottom-right-radius: 4px;
-        }
-
-        .message-actions {
-          display: none;
-          gap: 8px;
-          margin-top: 4px;
-          padding: 0 12px;
-        }
-
-        .message-item.own:hover .message-actions {
-          display: flex;
-          justify-content: flex-end;
-        }
-
-        .message-item:not(.own):hover .message-actions {
-          display: flex;
-        }
-
-        .delete-btn {
-          background: none;
-          border: none;
-          color: #999;
-          cursor: pointer;
-          font-size: 12px;
-          padding: 0;
-          transition: color 0.2s;
-        }
-
-        .delete-btn:hover {
-          color: #e74c3c;
-        }
-
-        .empty-state {
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          color: #999;
-          padding: 40px 20px;
-        }
-
-        .empty-icon {
-          font-size: 48px;
-          margin-bottom: 12px;
-        }
-
-        .empty-text {
-          font-size: 14px;
-        }
-
-        .loading {
-          flex: 1;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-
-        .input-area {
-          padding: 16px 24px 24px;
-          background: #ffffff;
-          border-top: 1px solid #f0f0f0;
-          display: flex;
-          gap: 12px;
-          align-items: flex-end;
-        }
-
-        .input-wrapper {
-          flex: 1;
-          display: flex;
-          align-items: center;
-          background: #f5f5f5;
-          border-radius: 8px;
-          padding: 0 14px;
-        }
-
-        .message-input {
-          flex: 1;
-          border: none;
-          background: transparent;
-          outline: none;
-          padding: 12px 0;
-          font-size: 14px;
-          font-family: inherit;
-          color: #333;
-          resize: none;
-          max-height: 100px;
-        }
-
-        .message-input::placeholder {
-          color: #999;
-        }
-
-        .send-btn {
-          background: #1e87f0;
-          color: white;
-          border: none;
-          padding: 10px 20px;
-          border-radius: 6px;
-          font-size: 14px;
-          font-weight: 500;
-          cursor: pointer;
-          transition: background 0.2s;
-          min-height: 40px;
-          display: flex;
-          align-items: center;
-          gap: 8px;
-        }
-
-        .send-btn:hover:not(:disabled) {
-          background: #0e5ec6;
-        }
-
-        .send-btn:disabled {
-          opacity: 0.6;
-          cursor: not-allowed;
-        }
-      `}</style>
-
-      <div className="chat-page">
-        {/* Messages Area */}
-        <div className="messages-area">
-          {loading ? (
-            <div className="loading">
-              <div uk-spinner="ratio: 2"></div>
-            </div>
-          ) : messages.length === 0 ? (
-            <div className="empty-state">
-              <div className="empty-icon">💬</div>
-              <p className="empty-text">Nenhuma mensagem ainda. Seja o primeiro a conversar!</p>
-            </div>
-          ) : (
-            messages.map((message) => {
-              const isOwnMessage = user?.id === message.user.id;
-              return (
-                <div key={message.id} className={`message-item ${isOwnMessage ? 'own' : ''}`}>
-                  <Avatar 
-                    name={message.user.name} 
-                    profileImage={message.user.profileImage}
-                    size="small"
-                  />
-
-                  <div className="message-body">
-                    <div className="message-header">
-                      <span className="message-name">{message.user.name}</span>
-                      <span className="message-time">{formatDate(message.createdAt)}</span>
+      {/* Messages area */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        {loading ? (
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span uk-spinner="ratio: 1.5"></span>
+          </div>
+        ) : messages.length === 0 ? (
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-faint)', gap: '10px' }}>
+            <span uk-icon="icon: commenting; ratio: 2.5" style={{ color: 'var(--border-strong)' }}></span>
+            <p style={{ margin: 0, fontSize: '13px' }}>Nenhuma mensagem ainda. Seja o primeiro a conversar!</p>
+          </div>
+        ) : (
+          messages.map((msg) => {
+            const isOwn = user?.id === msg.user.id;
+            return (
+              <div key={msg.id}
+                style={{ display: 'flex', gap: '10px', flexDirection: isOwn ? 'row-reverse' : 'row', alignItems: 'flex-end', animation: 'fadeInUp 0.2s ease' }}
+              >
+                <div style={{ flexShrink: 0 }}>
+                  <Avatar name={msg.user.name} profileImage={msg.user.profileImage} size="small" />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', alignItems: isOwn ? 'flex-end' : 'flex-start', maxWidth: '65%' }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', flexDirection: isOwn ? 'row-reverse' : 'row' }}>
+                    <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text)' }}>{msg.user.name}</span>
+                    <span style={{ fontSize: '11px', color: 'var(--text-faint)' }}>{formatDate(msg.createdAt)}</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px', flexDirection: isOwn ? 'row-reverse' : 'row' }}>
+                    <div style={{
+                      padding: '9px 13px',
+                      background: isOwn ? 'var(--accent)' : 'var(--bg-elevated)',
+                      color: isOwn ? '#fff' : 'var(--text)',
+                      border: isOwn ? '1px solid var(--accent)' : '1px solid var(--border)',
+                      fontSize: '13px',
+                      lineHeight: 1.5,
+                      wordBreak: 'break-word',
+                      maxWidth: '100%'
+                    }}>
+                      {msg.content}
                     </div>
-                    <div className="message-bubble" style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
-                      <div className={`message-bubble ${isOwnMessage ? 'own' : 'other'}`}>
-                        {message.content}
-                      </div>
-                      {isOwnMessage && (
-                        <button
-                          className="delete-btn"
-                          onClick={() => handleDeleteMessage(message.id, message.user.id)}
-                          title="Deletar mensagem"
-                        >
-                          ✕
-                        </button>
-                      )}
-                    </div>
+                    {isOwn && (
+                      <button
+                        onClick={() => handleDelete(msg.id, msg.user.id)}
+                        title="Deletar"
+                        style={{
+                          background: 'none', border: 'none', cursor: 'pointer',
+                          color: 'var(--text-faint)', padding: '2px',
+                          display: 'flex', alignItems: 'center',
+                          opacity: 0, transition: 'opacity 160ms ease'
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.color = 'var(--danger)'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.opacity = '0'; }}
+                        className="msg-delete-btn"
+                      >
+                        <span uk-icon="icon: trash; ratio: 0.75"></span>
+                      </button>
+                    )}
                   </div>
                 </div>
-              );
-            })
-          )}
-          <div ref={messagesEndRef} />
-        </div>
-
-        {/* Input Area */}
-        <form onSubmit={handleSendMessage} className="input-area">
-          <div className="input-wrapper">
-            <input
-              type="text"
-              className="message-input"
-              placeholder="Digite sua mensagem..."
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              disabled={sending}
-              maxLength={500}
-            />
-          </div>
-          <button
-            type="submit"
-            className="send-btn"
-            disabled={sending || !newMessage.trim()}
-          >
-            {sending ? (
-              <div uk-spinner="ratio: 0.4"></div>
-            ) : (
-              <>
-                <span uk-icon="send"></span>
-                Enviar
-              </>
-            )}
-          </button>
-        </form>
+              </div>
+            );
+          })
+        )}
+        <div ref={messagesEndRef} />
       </div>
+
+      {/* Input area */}
+      <form onSubmit={handleSend} style={{
+        padding: '12px 16px',
+        borderTop: '1px solid var(--border)',
+        background: 'var(--bg)',
+        display: 'flex',
+        gap: '10px',
+        alignItems: 'center',
+        flexShrink: 0
+      }}>
+        <input
+          type="text"
+          placeholder="Digite sua mensagem..."
+          value={newMessage}
+          onChange={(e) => setNewMessage(e.target.value)}
+          disabled={sending}
+          maxLength={500}
+          style={{
+            flex: 1,
+            height: '38px',
+            padding: '0 14px',
+            border: '1px solid var(--border-strong)',
+            background: 'var(--bg-surface)',
+            color: 'var(--text)',
+            fontSize: '13px',
+            fontFamily: 'inherit',
+            outline: 'none',
+            transition: 'border-color 160ms ease'
+          }}
+          onFocus={(e) => (e.target.style.borderColor = 'var(--accent)')}
+          onBlur={(e) => (e.target.style.borderColor = 'var(--border-strong)')}
+        />
+        <button
+          type="submit"
+          disabled={sending || !newMessage.trim()}
+          style={{
+            height: '38px',
+            padding: '0 18px',
+            background: 'var(--accent)',
+            color: '#fff',
+            border: '1px solid var(--accent)',
+            fontSize: '13px',
+            fontFamily: 'inherit',
+            fontWeight: 500,
+            cursor: 'pointer',
+            display: 'flex', alignItems: 'center', gap: '6px',
+            transition: 'background 160ms ease, transform 160ms ease',
+            opacity: sending || !newMessage.trim() ? 0.5 : 1
+          }}
+          onMouseEnter={(e) => { if (!sending && newMessage.trim()) { e.currentTarget.style.background = 'var(--accent-dark)'; e.currentTarget.style.transform = 'translateY(-1px)'; } }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--accent)'; e.currentTarget.style.transform = 'translateY(0)'; }}
+        >
+          {sending
+            ? <span uk-spinner="ratio: 0.5"></span>
+            : <><span uk-icon="icon: arrow-right; ratio: 0.85"></span> Enviar</>
+          }
+        </button>
+      </form>
+
+      <style>{`
+        @keyframes fadeInUp {
+          from { opacity: 0; transform: translateY(6px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        .msg-delete-btn { opacity: 0; }
+        div:hover > div > .msg-delete-btn { opacity: 1; }
+      `}</style>
     </div>
   );
 };

@@ -31,11 +31,8 @@ const Devotionals = () => {
   const loadDevotionals = async () => {
     try {
       const result = await api.getDevotionals();
-      if (result.success) {
-        setDevotionals(result.data);
-      }
-    } catch (err) {
-      console.error('Erro ao carregar devocionais:', err);
+      if (result.success) setDevotionals(result.data);
+    } catch {
       setDevotionals([]);
     } finally {
       setLoading(false);
@@ -56,7 +53,7 @@ const Devotionals = () => {
     try {
       await api.reactivateDevotional(id);
       loadDevotionals();
-      UIkit.notification({ message: 'Devocional reativado com sucesso', status: 'success' });
+      UIkit.notification({ message: 'Devocional reativado', status: 'success' });
     } catch (err: any) {
       UIkit.notification({ message: err.message || 'Erro ao reativar devocional', status: 'danger' });
     }
@@ -64,100 +61,97 @@ const Devotionals = () => {
 
   const isLeaderOrAdmin = user?.role === 'leader' || user?.role === 'admin';
   const activeDevotionals = devotionals.filter(d => d.isActive);
+  const inactiveDevotionals = devotionals.filter(d => !d.isActive);
 
-  const getStatusBadge = (dev: Devotional) => {
-    if (!dev.isActive) {
-      return <span className="uk-label uk-label-danger uk-border-rounded">Inativa</span>;
-    }
-    if (dev.hoursRemaining <= 6) {
-      return <span className="uk-label uk-label-warning uk-border-rounded">{dev.hoursRemaining}h restantes</span>;
-    }
-    return <span className="uk-label uk-label-success uk-border-rounded">Ativa</span>;
+  const StatusBadge = ({ dev }: { dev: Devotional }) => {
+    if (!dev.isActive) return <span className="uk-label uk-label-danger">Inativa</span>;
+    if (dev.hoursRemaining <= 6) return <span className="uk-label uk-label-warning">{dev.hoursRemaining}h restantes</span>;
+    return <span className="uk-label uk-label-success">Ativa</span>;
   };
 
   return (
     <div>
-      <div className="uk-grid-medium uk-flex-middle uk-margin-bottom" uk-grid="">
-        <div className="uk-width-expand">
-          <h2 className="uk-text-bold">Devocionais Diários</h2>
-          <p className="uk-text-muted">Fortaleça sua fé com reflexões preparadas pelos líderes. (Disponível por 24h)</p>
+      {/* Page header */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '24px', paddingBottom: '16px', borderBottom: '1px solid var(--border)' }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+            <span uk-icon="icon: book; ratio: 1.1" style={{ color: 'var(--accent)' }}></span>
+            <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 700, letterSpacing: '-0.02em' }}>Devocionais Diários</h2>
+          </div>
+          <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>
+            Reflexões preparadas pelos líderes — disponíveis por 24h
+          </p>
         </div>
         {isLeaderOrAdmin && (
-          <div className="uk-width-auto">
-            <button
-              className="uk-button uk-button-primary uk-border-rounded"
-              onClick={() => setShowModal(true)}
-            >
-              <span uk-icon="plus" className="uk-margin-small-right"></span>
-              Novo Devocional
-            </button>
-          </div>
+          <button
+            className="uk-button uk-button-primary"
+            onClick={() => setShowModal(true)}
+            style={{ height: '36px', whiteSpace: 'nowrap' }}
+          >
+            <span uk-icon="icon: plus; ratio: 0.85"></span>
+            Novo Devocional
+          </button>
         )}
       </div>
 
       {loading ? (
-        <div className="uk-text-center uk-margin-large-top">
+        <div style={{ textAlign: 'center', padding: '60px 0' }}>
           <span uk-spinner="ratio: 2"></span>
         </div>
       ) : activeDevotionals.length === 0 ? (
-        <div style={{
-          background: 'white',
-          padding: '48px 24px',
-          borderRadius: '12px',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
-          textAlign: 'center'
-        }}>
-          <div style={{ fontSize: '48px', marginBottom: '16px' }}>🙏</div>
-          <p style={{ fontSize: '16px', color: '#6c757d', margin: '0' }}>Nenhum devocional ativo no momento</p>
-          <p style={{ fontSize: '14px', color: '#adb5bd', margin: '8px 0 0 0' }}>Volte mais tarde para novas reflexões espirituais</p>
+        <div style={{ border: '1px solid var(--border)', padding: '60px 24px', textAlign: 'center', background: 'var(--bg-surface)' }}>
+          <span uk-icon="icon: heart; ratio: 2.5" style={{ color: 'var(--text-faint)', display: 'block', marginBottom: '16px' }}></span>
+          <p style={{ fontSize: '15px', color: 'var(--text-muted)', margin: '0 0 6px', fontWeight: 500 }}>
+            Nenhum devocional ativo no momento
+          </p>
+          <p style={{ fontSize: '13px', color: 'var(--text-faint)', margin: 0 }}>
+            Volte mais tarde para novas reflexões espirituais
+          </p>
         </div>
       ) : (
         <div className="uk-grid uk-grid-medium" uk-grid="masonry: true">
           {activeDevotionals.map((dev) => (
             <div key={dev.id} className="uk-width-1-2@m">
-              <div className="uk-card uk-card-default uk-card-body uk-border-rounded">
-                <div className="uk-flex uk-flex-between uk-flex-middle uk-margin-bottom">
-                  <h3 className="uk-card-title uk-text-bold uk-margin-remove">{dev.title}</h3>
-                  {getStatusBadge(dev)}
+              <div style={{ border: '1px solid var(--border)', background: 'var(--bg)', transition: 'border-color 160ms ease' }}
+                onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'var(--border-strong)')}
+                onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'var(--border)')}
+              >
+                {/* Card header */}
+                <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-surface)' }}>
+                  <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 600 }}>{dev.title}</h3>
+                  <StatusBadge dev={dev} />
                 </div>
 
-                <p className="uk-text-meta uk-text-small uk-margin-small">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Avatar 
-                      name={dev.user?.name || 'Desconhecido'} 
-                      profileImage={dev.user?.profileImage}
-                      size="small"
-                    />
-                    <span>Por {dev.user?.name}</span>
-                  </div>
-                </p>
+                {/* Author */}
+                <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Avatar name={dev.user?.name || 'Desconhecido'} profileImage={dev.user?.profileImage} size="small" />
+                  <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Por <strong style={{ color: 'var(--text)' }}>{dev.user?.name}</strong></span>
+                </div>
 
-                <blockquote className="uk-margin-medium-top" style={{ borderLeft: '3px solid #1e87f0', paddingLeft: '15px' }}>
-                  <p className="uk-text-italic uk-text-small">{dev.verse}</p>
-                </blockquote>
+                {/* Verse */}
+                <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
+                  <blockquote style={{ borderLeft: '2px solid var(--accent)', paddingLeft: '12px', margin: 0 }}>
+                    <p style={{ margin: 0, fontSize: '13px', fontStyle: 'italic', color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                      {dev.verse}
+                    </p>
+                  </blockquote>
+                </div>
 
-                <p className="uk-margin-medium-top uk-text-justify">{dev.content}</p>
+                {/* Content */}
+                <div style={{ padding: '14px 16px' }}>
+                  <p style={{ margin: 0, fontSize: '13px', color: 'var(--text)', lineHeight: 1.7 }}>{dev.content}</p>
+                </div>
 
-                {isLeaderOrAdmin && dev.isActive && (
-                  <div className="uk-margin-top uk-flex uk-flex-right">
+                {/* Actions */}
+                {isLeaderOrAdmin && (
+                  <div style={{ padding: '10px 16px', borderTop: '1px solid var(--border)', background: 'var(--bg-surface)', display: 'flex', justifyContent: 'flex-end' }}>
                     <button
-                      className="uk-button uk-button-text uk-text-danger uk-button-small"
+                      className="uk-button uk-button-text uk-text-danger"
                       onClick={() => handleMarkInactive(dev.id)}
+                      style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}
                     >
-                      <span uk-icon="icon: trash; ratio: 0.8" className="uk-margin-small-right"></span>
+                      <span uk-icon="icon: trash; ratio: 0.8"></span>
                       Marcar inativa
-                    </button>
-                  </div>
-                )}
-
-                {isLeaderOrAdmin && !dev.isActive && (
-                  <div className="uk-margin-top">
-                    <button
-                      className="uk-button uk-button-text uk-text-primary uk-button-small"
-                      onClick={() => handleReactivate(dev.id)}
-                    >
-                      <span uk-icon="icon: reply; ratio: 0.8" className="uk-margin-small-right"></span>
-                      Reativar
                     </button>
                   </div>
                 )}
@@ -167,29 +161,34 @@ const Devotionals = () => {
         </div>
       )}
 
-      {isLeaderOrAdmin && devotionals.filter(d => !d.isActive).length > 0 && (
-        <div className="uk-margin-large-top uk-padding uk-card uk-card-default uk-border-rounded">
-          <h4 className="uk-text-bold">Histórico de Devocionais Inativos</h4>
-          <div className="uk-overflow-auto">
-            <table className="uk-table uk-table-small">
-              <tbody>
-                {devotionals.filter(d => !d.isActive).map((dev) => (
-                  <tr key={dev.id}>
-                    <td className="uk-text-bold">{dev.title}</td>
-                    <td className="uk-text-small uk-text-muted">{dev.user?.name}</td>
-                    <td className="uk-text-right">
-                      <button
-                        className="uk-button uk-button-link uk-button-small"
-                        onClick={() => handleReactivate(dev.id)}
-                      >
-                        Reativar
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      {/* Inactive history */}
+      {isLeaderOrAdmin && inactiveDevotionals.length > 0 && (
+        <div style={{ marginTop: '32px', border: '1px solid var(--border)', background: 'var(--bg)' }}>
+          <div style={{ padding: '12px 16px', background: 'var(--bg-surface)', borderBottom: '1px solid var(--border)' }}>
+            <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
+              Histórico Inativo
+            </span>
           </div>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <tbody>
+              {inactiveDevotionals.map((dev) => (
+                <tr key={dev.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                  <td style={{ padding: '10px 16px', fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>{dev.title}</td>
+                  <td style={{ padding: '10px 16px', fontSize: '12px', color: 'var(--text-muted)' }}>{dev.user?.name}</td>
+                  <td style={{ padding: '10px 16px', textAlign: 'right' }}>
+                    <button
+                      className="uk-button uk-button-text uk-text-primary"
+                      onClick={() => handleReactivate(dev.id)}
+                      style={{ fontSize: '12px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                    >
+                      <span uk-icon="icon: reply; ratio: 0.8"></span>
+                      Reativar
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
@@ -203,13 +202,7 @@ const Devotionals = () => {
   );
 };
 
-const CreateDevotionalModal = ({
-  onCreated,
-  onClose,
-}: {
-  onCreated: () => void;
-  onClose: () => void;
-}) => {
+const CreateDevotionalModal = ({ onCreated, onClose }: { onCreated: () => void; onClose: () => void }) => {
   const [title, setTitle] = useState('');
   const [verse, setVerse] = useState('');
   const [content, setContent] = useState('');
@@ -218,112 +211,50 @@ const CreateDevotionalModal = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-
     try {
       const result = await api.createDevotional({ title, verse, content });
-
       if (result.success) {
         UIkit.notification({ message: 'Devocional criado com sucesso!', status: 'success' });
         onCreated();
       } else {
-        UIkit.notification({
-          message: result.message || 'Erro ao criar devocional',
-          status: 'danger',
-        });
+        UIkit.notification({ message: result.message || 'Erro ao criar devocional', status: 'danger' });
       }
     } catch (err: any) {
-      const msg = err?.data?.message || err?.message || 'Erro ao criar devocional';
-      UIkit.notification({ message: msg, status: 'danger' });
+      UIkit.notification({ message: err?.data?.message || err?.message || 'Erro ao criar devocional', status: 'danger' });
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        top: 0, left: 0, right: 0, bottom: 0,
-        backgroundColor: 'rgba(0,0,0,0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1000,
-      }}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-    >
-      <div style={{
-        backgroundColor: 'white',
-        borderRadius: '8px',
-        padding: '32px',
-        width: '90%',
-        maxWidth: '600px',
-        maxHeight: '90vh',
-        overflowY: 'auto',
-        boxShadow: '0 10px 40px rgba(0,0,0,0.2)',
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-          <h2 style={{ margin: 0, fontSize: '22px', fontWeight: '700' }}>Novo Devocional</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#6c757d' }}
-          >
-            ✕
+    <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal-box" style={{ maxWidth: '560px' }}>
+        <div className="modal-header">
+          <h3>Novo Devocional</h3>
+          <button className="modal-close-btn" onClick={onClose}>
+            <span uk-icon="icon: close; ratio: 0.9"></span>
           </button>
         </div>
 
         <form className="uk-form-stacked" onSubmit={handleSubmit}>
           <div className="uk-margin">
             <label className="uk-form-label">Título</label>
-            <input
-              className="uk-input uk-border-rounded"
-              type="text"
-              placeholder="Ex: Fé em Ação"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              required
-              minLength={3}
-            />
+            <input className="uk-input" type="text" placeholder="Ex: Fé em Ação" value={title} onChange={(e) => setTitle(e.target.value)} required minLength={3} />
           </div>
           <div className="uk-margin">
             <label className="uk-form-label">Versículo Chave</label>
-            <input
-              className="uk-input uk-border-rounded"
-              type="text"
-              placeholder="Ex: João 3:16"
-              value={verse}
-              onChange={(e) => setVerse(e.target.value)}
-              required
-            />
+            <input className="uk-input" type="text" placeholder="Ex: João 3:16" value={verse} onChange={(e) => setVerse(e.target.value)} required />
           </div>
           <div className="uk-margin">
             <label className="uk-form-label">Mensagem</label>
-            <textarea
-              className="uk-textarea uk-border-rounded"
-              rows={6}
-              placeholder="Escreva a reflexão de hoje..."
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              required
-              minLength={10}
-            ></textarea>
+            <textarea className="uk-textarea" rows={6} placeholder="Escreva a reflexão de hoje..." value={content} onChange={(e) => setContent(e.target.value)} required minLength={10}></textarea>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '24px' }}>
-            <button
-              type="button"
-              className="uk-button uk-button-default uk-border-rounded"
-              onClick={onClose}
-              disabled={loading}
-            >
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px' }}>
+            <button type="button" className="uk-button uk-button-default" onClick={onClose} disabled={loading}>
               Cancelar
             </button>
-            <button
-              type="submit"
-              className="uk-button uk-button-primary uk-border-rounded"
-              disabled={loading}
-            >
-              {loading ? <span uk-spinner="ratio: 0.6"></span> : 'Salvar'}
+            <button type="submit" className="uk-button uk-button-primary" disabled={loading}>
+              {loading ? <><span uk-spinner="ratio: 0.5"></span> Salvando...</> : <><span uk-icon="icon: check; ratio: 0.85"></span> Salvar</>}
             </button>
           </div>
         </form>

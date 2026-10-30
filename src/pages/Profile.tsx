@@ -72,7 +72,7 @@ const Profile = () => {
           profileImage: result.data.profileImage || '',
         });
       }
-    } catch (err) {
+    } catch {
       UIkit.notification({ message: 'Erro ao carregar perfil', status: 'danger' });
     } finally {
       setLoading(false);
@@ -82,10 +82,7 @@ const Profile = () => {
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    const previewUrl = URL.createObjectURL(file);
-    setProfileImagePreview(previewUrl);
-
+    setProfileImagePreview(URL.createObjectURL(file));
     setUploadingImage(true);
     try {
       const result = await api.uploadProfileImage(file);
@@ -115,7 +112,6 @@ const Profile = () => {
         socialLinks: profile?.socialLinks,
         profileImage: editForm.profileImage || undefined,
       });
-
       if (result.success) {
         setProfile(result.data);
         setIsEditing(false);
@@ -128,26 +124,23 @@ const Profile = () => {
     }
   };
 
-  const getRoleBadgeClass = (role: string) => {
+  const getRoleBadge = (role: string) => {
     switch (role) {
-      case 'admin': return 'uk-label-danger';
-      case 'leader': return 'uk-label-warning';
-      default: return 'uk-label-info';
+      case 'admin': return { label: 'Administrador', cls: 'uk-label-danger' };
+      case 'leader': return { label: 'Líder', cls: 'uk-label-warning' };
+      default: return { label: 'Membro', cls: 'uk-label-info' };
     }
   };
 
-  const getRoleLabel = (role: string) => {
-    switch (role) {
-      case 'admin': return 'Administrador';
-      case 'leader': return 'Líder';
-      default: return 'Membro';
-    }
+  const socialIcons: Record<string, string> = {
+    whatsapp: 'whatsapp', linkedin: 'linkedin',
+    facebook: 'facebook', instagram: 'instagram',
   };
 
   if (loading) {
     return (
-      <div className="uk-text-center uk-margin-large-top">
-        <span uk-spinner="ratio: 3"></span>
+      <div style={{ textAlign: 'center', padding: '80px 0' }}>
+        <span uk-spinner="ratio: 2"></span>
       </div>
     );
   }
@@ -160,224 +153,192 @@ const Profile = () => {
     );
   }
 
-  const backgroundThemes: Record<string, string> = {
-    light: '#ffffff',
-    dark: '#2c3e50',
-    blue: '#3498db',
-    green: '#27ae60',
-    purple: '#8e44ad',
-  };
-
-  const currentAvatarSrc = profileImagePreview || editForm.profileImage || profile.profileImage;
+  const roleBadge = getRoleBadge(profile.role);
+  const avatarSrc = profileImagePreview || editForm.profileImage || profile.profileImage;
 
   return (
-    <div>
-      {/* Header with background */}
-      <div
-        className="uk-padding uk-padding-large uk-border-rounded uk-margin-bottom"
-        style={{
-          backgroundColor: backgroundThemes[profile.backgroundTheme || 'light'] || '#ffffff',
-          color: ['dark', 'blue', 'green', 'purple'].includes(profile.backgroundTheme || '') ? '#fff' : '#000'
-        }}
-      >
-        <div className="uk-grid uk-grid-medium uk-flex-middle" uk-grid="true">
-          <div className="uk-width-auto">
-            <div
-              className="uk-border-circle uk-flex uk-flex-center uk-flex-middle"
-              style={{ width: '120px', height: '120px', backgroundColor: '#ddd', fontSize: '48px', overflow: 'hidden' }}
-            >
-              {profile.profileImage ? (
-                <img src={profile.profileImage} alt={profile.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              ) : (
-                <span uk-icon="icon: user; ratio: 2"></span>
-              )}
-            </div>
-          </div>
-          <div className="uk-width-expand">
-            <h2 className="uk-margin-remove">{profile.name}</h2>
-            {profile.title && <p className="uk-text-lead uk-margin-small">{profile.title}</p>}
-            <p className="uk-margin-small">
-              <span className={`uk-label uk-border-rounded ${getRoleBadgeClass(profile.role)}`}>
-                {getRoleLabel(profile.role)}
-              </span>
-            </p>
-            {profile.location && (
-              <p className="uk-text-small uk-margin-small">
-                <span uk-icon="icon: location"></span> {profile.location}
-              </p>
+    <div style={{ maxWidth: '800px' }}>
+
+      {/* ── PROFILE HEADER ──────────────────────────────────────── */}
+      <div style={{ border: '1px solid var(--border)', background: 'var(--bg)', marginBottom: '20px' }}>
+        {/* Accent top bar */}
+        <div style={{ height: '3px', background: 'var(--nav-bg)' }}></div>
+
+        <div style={{ padding: '24px', display: 'flex', alignItems: 'flex-start', gap: '20px' }}>
+          {/* Avatar */}
+          <div style={{
+            width: '72px', height: '72px',
+            background: 'var(--bg-elevated)',
+            border: '1px solid var(--border-strong)',
+            overflow: 'hidden',
+            flexShrink: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}>
+            {profile.profileImage ? (
+              <img src={profile.profileImage} alt={profile.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            ) : (
+              <span uk-icon="icon: user; ratio: 1.8" style={{ color: 'var(--text-faint)' }}></span>
             )}
-            <p className="uk-text-small uk-margin-remove">Membro desde {new Date(profile.createdAt).toLocaleDateString('pt-BR')}</p>
           </div>
-          {isOwnProfile && (
-            <div className="uk-width-auto">
-              <button
-                className="uk-button uk-button-primary uk-border-rounded"
-                onClick={() => setIsEditing(!isEditing)}
-              >
-                <span uk-icon="pencil" className="uk-margin-small-right"></span>
-                {isEditing ? 'Cancelar' : 'Editar Perfil'}
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
 
-      {/* Edit Form */}
-      {isOwnProfile && isEditing && (
-        <div className="uk-card uk-card-default uk-card-body uk-margin-bottom uk-border-rounded">
-          <h3 className="uk-card-title">Editar Perfil</h3>
-          <form onSubmit={handleSaveProfile} className="uk-form-stacked">
-            <div className="uk-grid uk-grid-medium" uk-grid="true">
-
-              {/* Foto de Perfil */}
-              <div className="uk-width-1-1">
-                <label className="uk-form-label">Foto de Perfil</label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginTop: '8px' }}>
-                  <div
-                    style={{
-                      width: '80px',
-                      height: '80px',
-                      borderRadius: '50%',
-                      backgroundColor: '#e9ecef',
-                      overflow: 'hidden',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      border: '2px dashed #adb5bd',
-                      cursor: 'pointer',
-                      flexShrink: 0,
-                    }}
-                    onClick={() => document.getElementById('profileImageInput')?.click()}
-                  >
-                    {currentAvatarSrc ? (
-                      <img src={currentAvatarSrc} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    ) : (
-                      <span uk-icon="icon: camera; ratio: 1.5" style={{ color: '#adb5bd' }}></span>
-                    )}
-                  </div>
-                  <div>
-                    <input
-                      id="profileImageInput"
-                      type="file"
-                      accept="image/jpeg,image/png,image/gif,image/webp"
-                      style={{ display: 'none' }}
-                      onChange={handleImageSelect}
-                    />
-                    <button
-                      type="button"
-                      className="uk-button uk-button-default uk-border-rounded"
-                      onClick={() => document.getElementById('profileImageInput')?.click()}
-                      disabled={uploadingImage}
-                    >
-                      {uploadingImage ? 'Enviando...' : 'Alterar Foto'}
-                    </button>
-                    {editForm.profileImage && !uploadingImage && (
-                      <p className="uk-text-small uk-text-success" style={{ marginTop: '6px', marginBottom: 0 }}>
-                        ✓ Foto pronta para salvar
-                      </p>
-                    )}
-                  </div>
+          {/* Info */}
+          <div style={{ flex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
+              <div>
+                <h2 style={{ margin: '0 0 4px', fontSize: '20px', fontWeight: 700 }}>{profile.name}</h2>
+                {profile.title && (
+                  <p style={{ margin: '0 0 8px', fontSize: '13px', color: 'var(--text-muted)' }}>{profile.title}</p>
+                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                  <span className={`uk-label ${roleBadge.cls}`}>{roleBadge.label}</span>
+                  {profile.location && (
+                    <span style={{ fontSize: '12px', color: 'var(--text-faint)', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                      <span uk-icon="icon: location; ratio: 0.75"></span>
+                      {profile.location}
+                    </span>
+                  )}
+                  <span style={{ fontSize: '12px', color: 'var(--text-faint)' }}>
+                    Membro desde {new Date(profile.createdAt).toLocaleDateString('pt-BR')}
+                  </span>
                 </div>
               </div>
 
-              <div className="uk-width-1-2@m">
-                <label className="uk-form-label">Nome</label>
-                <input
-                  className="uk-input uk-border-rounded"
-                  type="text"
-                  value={editForm.name}
-                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="uk-width-1-2@m">
-                <label className="uk-form-label">Idade</label>
-                <input
-                  className="uk-input uk-border-rounded"
-                  type="number"
-                  min="1"
-                  max="150"
-                  value={editForm.age}
-                  onChange={(e) => setEditForm({ ...editForm, age: e.target.value })}
-                />
-              </div>
-              <div className="uk-width-1-2@m">
-                <label className="uk-form-label">Localização</label>
-                <input
-                  className="uk-input uk-border-rounded"
-                  type="text"
-                  placeholder="Ex: São Paulo, SP"
-                  value={editForm.location}
-                  onChange={(e) => setEditForm({ ...editForm, location: e.target.value })}
-                />
-              </div>
-              <div className="uk-width-1-2@m">
-                <label className="uk-form-label">Título / Cargo</label>
-                <input
-                  className="uk-input uk-border-rounded"
-                  type="text"
-                  placeholder="Ex: Estudante, Desenvolvedor"
-                  value={editForm.title}
-                  onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
-                />
-              </div>
-              <div className="uk-width-1-2@m">
-                <label className="uk-form-label">Tema de Fundo</label>
-                <select
-                  className="uk-select uk-border-rounded"
-                  value={editForm.backgroundTheme}
-                  onChange={(e) => setEditForm({ ...editForm, backgroundTheme: e.target.value })}
+              {isOwnProfile && (
+                <button
+                  onClick={() => setIsEditing(!isEditing)}
+                  style={{
+                    padding: '0 14px', height: '32px',
+                    background: isEditing ? 'var(--bg-surface)' : 'transparent',
+                    color: 'var(--text-muted)',
+                    border: '1px solid var(--border-strong)',
+                    fontSize: '12px', fontFamily: 'inherit', fontWeight: 500, cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', gap: '5px',
+                    transition: 'all 160ms ease', whiteSpace: 'nowrap'
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.color = 'var(--accent)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-strong)'; e.currentTarget.style.color = 'var(--text-muted)'; }}
                 >
-                  <option value="light">Claro</option>
-                  <option value="dark">Escuro</option>
-                  <option value="blue">Azul</option>
-                  <option value="green">Verde</option>
-                  <option value="purple">Roxo</option>
-                </select>
-              </div>
-              <div className="uk-width-1-1">
-                <label className="uk-form-label">Bio / Descrição</label>
-                <textarea
-                  className="uk-textarea uk-border-rounded"
-                  rows={4}
-                  placeholder="Conte um pouco sobre você..."
-                  value={editForm.bio}
-                  onChange={(e) => setEditForm({ ...editForm, bio: e.target.value })}
-                ></textarea>
-              </div>
-              <div className="uk-width-1-1">
-                <label className="uk-form-label">Habilidades (separadas por vírgula)</label>
-                <input
-                  className="uk-input uk-border-rounded"
-                  type="text"
-                  placeholder="Ex: JavaScript, Design, Liderança"
-                  value={editForm.skills.join(', ')}
-                  onChange={(e) => setEditForm({ ...editForm, skills: e.target.value.split(',').map(s => s.trim()) })}
-                />
-              </div>
+                  <span uk-icon={`icon: ${isEditing ? 'close' : 'pencil'}; ratio: 0.8`}></span>
+                  {isEditing ? 'Cancelar' : 'Editar Perfil'}
+                </button>
+              )}
             </div>
-            <button className="uk-button uk-button-primary uk-margin-top uk-border-rounded" type="submit">
-              Salvar Alterações
-            </button>
-          </form>
+          </div>
+        </div>
+      </div>
+
+      {/* ── EDIT FORM ────────────────────────────────────────────── */}
+      {isOwnProfile && isEditing && (
+        <div style={{ border: '1px solid var(--border)', background: 'var(--bg)', marginBottom: '20px' }}>
+          <div style={{ padding: '12px 20px', background: 'var(--bg-surface)', borderBottom: '1px solid var(--border)' }}>
+            <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
+              Editar Perfil
+            </span>
+          </div>
+          <div style={{ padding: '20px' }}>
+            <form onSubmit={handleSaveProfile} className="uk-form-stacked">
+
+              {/* Avatar upload */}
+              <div style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '16px' }}>
+                <div
+                  style={{
+                    width: '64px', height: '64px',
+                    border: '1px dashed var(--border-strong)',
+                    background: 'var(--bg-elevated)',
+                    overflow: 'hidden',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    cursor: 'pointer', flexShrink: 0
+                  }}
+                  onClick={() => document.getElementById('profileImageInput')?.click()}
+                >
+                  {avatarSrc ? (
+                    <img src={avatarSrc} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <span uk-icon="icon: camera; ratio: 1.2" style={{ color: 'var(--text-faint)' }}></span>
+                  )}
+                </div>
+                <div>
+                  <input id="profileImageInput" type="file" accept="image/jpeg,image/png,image/gif,image/webp" style={{ display: 'none' }} onChange={handleImageSelect} />
+                  <button
+                    type="button"
+                    className="uk-button uk-button-default"
+                    onClick={() => document.getElementById('profileImageInput')?.click()}
+                    disabled={uploadingImage}
+                    style={{ fontSize: '12px', height: '30px' }}
+                  >
+                    {uploadingImage ? 'Enviando...' : 'Alterar Foto'}
+                  </button>
+                  {editForm.profileImage && !uploadingImage && (
+                    <p style={{ margin: '5px 0 0', fontSize: '12px', color: 'var(--success)' }}>
+                      <span uk-icon="icon: check; ratio: 0.8"></span> Foto pronta
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', alignItems: 'start' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label className="uk-form-label" style={{ marginBottom: 0 }}>Nome</label>
+                  <input className="uk-input" type="text" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} required />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label className="uk-form-label" style={{ marginBottom: 0 }}>Idade</label>
+                  <input className="uk-input" type="number" min="1" max="150" value={editForm.age} onChange={(e) => setEditForm({ ...editForm, age: e.target.value })} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label className="uk-form-label" style={{ marginBottom: 0 }}>Localização</label>
+                  <input className="uk-input" type="text" placeholder="Ex: São Paulo, SP" value={editForm.location} onChange={(e) => setEditForm({ ...editForm, location: e.target.value })} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label className="uk-form-label" style={{ marginBottom: 0 }}>Título / Cargo</label>
+                  <input className="uk-input" type="text" placeholder="Ex: Líder de Jovens" value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', gridColumn: '1 / -1' }}>
+                  <label className="uk-form-label" style={{ marginBottom: 0 }}>Bio</label>
+                  <textarea className="uk-textarea" rows={3} placeholder="Conte um pouco sobre você..." value={editForm.bio} onChange={(e) => setEditForm({ ...editForm, bio: e.target.value })}></textarea>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', gridColumn: '1 / -1' }}>
+                  <label className="uk-form-label" style={{ marginBottom: 0 }}>Habilidades (separadas por vírgula)</label>
+                  <input className="uk-input" type="text" placeholder="Ex: Liderança, Música, Design" value={editForm.skills.join(', ')} onChange={(e) => setEditForm({ ...editForm, skills: e.target.value.split(',').map(s => s.trim()) })} />
+                </div>
+              </div>
+
+              <div style={{ marginTop: '16px' }}>
+                <button className="uk-button uk-button-primary" type="submit" style={{ height: '36px' }}>
+                  <span uk-icon="icon: check; ratio: 0.85"></span>
+                  Salvar Alterações
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
-      {/* Bio Section */}
+      {/* ── BIO ──────────────────────────────────────────────────── */}
       {profile.bio && (
-        <div className="uk-card uk-card-default uk-card-body uk-margin-bottom uk-border-rounded">
-          <h4 className="uk-text-bold">Sobre</h4>
-          <p>{profile.bio}</p>
+        <div style={{ border: '1px solid var(--border)', background: 'var(--bg)', marginBottom: '16px' }}>
+          <div style={{ padding: '12px 20px', background: 'var(--bg-surface)', borderBottom: '1px solid var(--border)' }}>
+            <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Sobre</span>
+          </div>
+          <div style={{ padding: '16px 20px' }}>
+            <p style={{ margin: 0, fontSize: '14px', color: 'var(--text)', lineHeight: 1.7 }}>{profile.bio}</p>
+          </div>
         </div>
       )}
 
-      {/* Skills */}
+      {/* ── SKILLS ──────────────────────────────────────────────── */}
       {profile.skills && profile.skills.length > 0 && (
-        <div className="uk-card uk-card-default uk-card-body uk-margin-bottom uk-border-rounded">
-          <h4 className="uk-text-bold">Habilidades</h4>
-          <div className="uk-flex uk-flex-wrap uk-gap">
-            {profile.skills.map((skill, idx) => (
-              <span key={idx} className="uk-label uk-label-info uk-border-rounded">
+        <div style={{ border: '1px solid var(--border)', background: 'var(--bg)', marginBottom: '16px' }}>
+          <div style={{ padding: '12px 20px', background: 'var(--bg-surface)', borderBottom: '1px solid var(--border)' }}>
+            <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Habilidades</span>
+          </div>
+          <div style={{ padding: '16px 20px', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+            {profile.skills.map((skill, i) => (
+              <span key={i} style={{
+                padding: '4px 12px', fontSize: '12px', fontWeight: 500,
+                background: 'var(--bg-elevated)', border: '1px solid var(--border-strong)',
+                color: 'var(--text-muted)'
+              }}>
                 {skill}
               </span>
             ))}
@@ -385,47 +346,41 @@ const Profile = () => {
         </div>
       )}
 
-      {/* Social Links */}
-      {profile.socialLinks && profile.socialLinks.length > 0 && (
-        <div className="uk-card uk-card-default uk-card-body uk-margin-bottom uk-border-rounded">
-          <h4 className="uk-text-bold">Redes Sociais</h4>
-          <div className="uk-flex uk-flex-wrap uk-gap">
-            {profile.socialLinks.map((link: SocialLink) => {
-              const icons: any = {
-                whatsapp: 'whatsapp',
-                linkedin: 'linkedin',
-                facebook: 'facebook',
-                instagram: 'instagram',
-              };
-              return (
-                <a
-                  key={link.id}
-                  href={link.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="uk-icon-button"
-                  title={link.platform}
-                >
-                  <span uk-icon={icons[link.platform]}></span>
-                </a>
-              );
-            })}
+      {/* ── SOCIAL LINKS ────────────────────────────────────────── */}
+      {profile.socialLinks?.length > 0 && (
+        <div style={{ border: '1px solid var(--border)', background: 'var(--bg)', marginBottom: '16px' }}>
+          <div style={{ padding: '12px 20px', background: 'var(--bg-surface)', borderBottom: '1px solid var(--border)' }}>
+            <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Redes Sociais</span>
+          </div>
+          <div style={{ padding: '16px 20px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            {profile.socialLinks.map((link: SocialLink) => (
+              <a
+                key={link.id}
+                href={link.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="uk-icon-button"
+                title={link.platform}
+              >
+                <span uk-icon={socialIcons[link.platform] || 'world'}></span>
+              </a>
+            ))}
           </div>
         </div>
       )}
 
-      {/* Achievements/Badges */}
-      {profile.achievements && profile.achievements.length > 0 && (
-        <div className="uk-card uk-card-default uk-card-body uk-margin-bottom uk-border-rounded">
-          <h4 className="uk-text-bold">Distintivos</h4>
-          <div className="uk-grid uk-grid-medium" uk-grid="true">
-            {profile.achievements.map((achievement: any) => (
-              <div key={achievement.id} className="uk-width-1-3@m uk-text-center">
-                <div className="uk-text-lead">🏆</div>
-                <p className="uk-text-bold uk-margin-small">{achievement.name}</p>
-                {achievement.description && (
-                  <p className="uk-text-small uk-text-muted">{achievement.description}</p>
-                )}
+      {/* ── ACHIEVEMENTS ────────────────────────────────────────── */}
+      {profile.achievements?.length > 0 && (
+        <div style={{ border: '1px solid var(--border)', background: 'var(--bg)', marginBottom: '16px' }}>
+          <div style={{ padding: '12px 20px', background: 'var(--bg-surface)', borderBottom: '1px solid var(--border)' }}>
+            <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Distintivos</span>
+          </div>
+          <div style={{ padding: '20px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '16px' }}>
+            {profile.achievements.map((a: any) => (
+              <div key={a.id} style={{ textAlign: 'center', padding: '16px', border: '1px solid var(--border)' }}>
+                <span uk-icon="icon: star; ratio: 1.8" style={{ color: 'var(--warning)', display: 'block', marginBottom: '8px' }}></span>
+                <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)', marginBottom: '4px' }}>{a.name}</div>
+                {a.description && <div style={{ fontSize: '12px', color: 'var(--text-faint)' }}>{a.description}</div>}
               </div>
             ))}
           </div>

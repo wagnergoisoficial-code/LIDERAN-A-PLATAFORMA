@@ -8,58 +8,41 @@ interface AvatarProps {
 }
 
 const getInitials = (name: string): string => {
-  return name
-    .split(' ')
-    .map(part => part[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2);
+  if (!name) return '?';
+  return name.split(' ').map(p => p[0]).filter(Boolean).join('').toUpperCase().slice(0, 2) || '?';
 };
 
 const getColorFromName = (name: string): string => {
-  const colors = [
-    '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8',
-    '#F7DC6F', '#BB8FCE', '#85C1E2', '#F8B88B', '#ABEBC6'
-  ];
+  const colors = ['#3b82f6', '#6366f1', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#0ea5e9', '#ef4444'];
+  if (!name) return colors[0];
   let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  }
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
   return colors[Math.abs(hash) % colors.length];
 };
 
-const Avatar: React.FC<AvatarProps> = ({ 
-  name, 
-  profileImage, 
-  size = 'medium',
-  className 
-}) => {
+const Avatar: React.FC<AvatarProps> = ({ name: nameProp, profileImage, size = 'medium', className }) => {
+  const name = nameProp || '';
   const sizeMap = {
-    small: { width: '32px', height: '32px', fontSize: '12px' },
-    medium: { width: '48px', height: '48px', fontSize: '14px' },
-    large: { width: '64px', height: '64px', fontSize: '16px' }
+    small:  { width: '32px', height: '32px', fontSize: '11px' },
+    medium: { width: '44px', height: '44px', fontSize: '14px' },
+    large:  { width: '64px', height: '64px', fontSize: '18px' },
   };
-
-  const sizeStyle = sizeMap[size];
+  const s = sizeMap[size];
 
   if (profileImage) {
     return (
       <img
         src={profileImage}
         alt={name}
-        className={className}
+        className={`avatar-circle${className ? ` ${className}` : ''}`}
         style={{
-          width: sizeStyle.width,
-          height: sizeStyle.height,
-          borderRadius: '50%',
+          width: s.width, height: s.height,
           objectFit: 'cover',
           display: 'block',
-          border: '2px solid #fff',
-          boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-          ...sizeStyle
+          border: '1px solid var(--border)',
+          flexShrink: 0,
         }}
         onError={(e) => {
-          // Se a imagem não carregar, mostrar fallback
           const target = e.target as HTMLImageElement;
           target.style.display = 'none';
           const parent = target.parentElement;
@@ -75,21 +58,19 @@ const Avatar: React.FC<AvatarProps> = ({
 
   return (
     <div
-      className={className}
+      className={`avatar-circle${className ? ` ${className}` : ''}`}
       style={{
-        width: sizeStyle.width,
-        height: sizeStyle.height,
-        borderRadius: '50%',
+        width: s.width, height: s.height,
         backgroundColor: getColorFromName(name),
         color: 'white',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        fontWeight: '600',
-        fontSize: sizeStyle.fontSize,
-        border: '2px solid #fff',
-        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-        flexShrink: 0
+        fontWeight: 600,
+        fontSize: s.fontSize,
+        border: '1px solid rgba(0,0,0,0.08)',
+        flexShrink: 0,
+        letterSpacing: '0.02em',
       }}
       title={name}
     >

@@ -19,6 +19,15 @@ async function startServer() {
       appType: "spa",
     });
     app.use(vite.middlewares);
+    // Explicit SPA fallback for any route not handled by Vite middleware
+    app.use('*', async (req, res, next) => {
+      try {
+        const html = await vite.transformIndexHtml(req.originalUrl,
+          `<!doctype html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/><title>Ichurch</title></head><body><div id="root"></div><script type="module" src="/src/main.tsx"></script></body></html>`
+        );
+        res.status(200).set({ 'Content-Type': 'text/html' }).end(html);
+      } catch (e) { next(e); }
+    });
   } else {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
