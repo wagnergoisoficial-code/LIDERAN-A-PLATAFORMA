@@ -51,9 +51,10 @@ const Login = () => {
               width: '32px', height: '32px',
               background: 'var(--nav-bg)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              border: '1px solid var(--nav-border)'
+              border: '1px solid var(--nav-border)',
+              borderRadius: 'var(--radius-sm)'
             }}>
-              <span uk-icon="icon: heart; ratio: 0.9" style={{ color: 'var(--accent)' }}></span>
+              <span uk-icon="icon: heart; ratio: 0.9" style={{ color: '#fff' }}></span>
             </div>
             <span style={{ fontSize: '18px', fontWeight: 700, letterSpacing: '-0.04em', color: 'var(--text)' }}>
               ICHURCH
@@ -65,9 +66,7 @@ const Login = () => {
         </div>
 
         {/* Form Card */}
-        <div style={{ border: '1px solid var(--border-strong)', background: 'var(--bg)' }}>
-          {/* Top accent bar */}
-          <div style={{ height: '2px', background: 'var(--accent)' }}></div>
+        <div className="card" style={{ borderColor: 'var(--border-strong)', borderRadius: 'var(--radius-lg)' }}>
 
           <div style={{ padding: '28px' }}>
             <form className="uk-form-stacked" onSubmit={handleLogin}>

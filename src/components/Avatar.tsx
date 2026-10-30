@@ -12,14 +12,6 @@ const getInitials = (name: string): string => {
   return name.split(' ').map(p => p[0]).filter(Boolean).join('').toUpperCase().slice(0, 2) || '?';
 };
 
-const getColorFromName = (name: string): string => {
-  const colors = ['#3b82f6', '#6366f1', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#0ea5e9', '#ef4444'];
-  if (!name) return colors[0];
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  return colors[Math.abs(hash) % colors.length];
-};
-
 const Avatar: React.FC<AvatarProps> = ({ name: nameProp, profileImage, size = 'medium', className }) => {
   const name = nameProp || '';
   const sizeMap = {
@@ -47,8 +39,8 @@ const Avatar: React.FC<AvatarProps> = ({ name: nameProp, profileImage, size = 'm
           target.style.display = 'none';
           const parent = target.parentElement;
           if (parent) {
-            parent.style.backgroundColor = getColorFromName(name);
-            parent.style.color = 'white';
+            parent.style.backgroundColor = 'var(--bg-elevated)';
+            parent.style.color = 'var(--text-muted)';
             parent.innerHTML = getInitials(name);
           }
         }}
@@ -61,14 +53,14 @@ const Avatar: React.FC<AvatarProps> = ({ name: nameProp, profileImage, size = 'm
       className={`avatar-circle${className ? ` ${className}` : ''}`}
       style={{
         width: s.width, height: s.height,
-        backgroundColor: getColorFromName(name),
-        color: 'white',
+        backgroundColor: 'var(--bg-elevated)',
+        color: 'var(--text-muted)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         fontWeight: 600,
         fontSize: s.fontSize,
-        border: '1px solid rgba(0,0,0,0.08)',
+        border: '1px solid var(--border)',
         flexShrink: 0,
         letterSpacing: '0.02em',
       }}

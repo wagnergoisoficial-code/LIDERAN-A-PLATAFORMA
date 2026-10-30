@@ -3,6 +3,8 @@ import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import UIkit from 'uikit';
 import Avatar from '../components/Avatar';
+import PageHeader from '../components/PageHeader';
+import EmptyState from '../components/EmptyState';
 
 interface Devotional {
   id: string;
@@ -72,52 +74,31 @@ const Devotionals = () => {
   return (
     <div>
       {/* Page header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '24px', paddingBottom: '16px', borderBottom: '1px solid var(--border)' }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
-            <span uk-icon="icon: book; ratio: 1.1" style={{ color: 'var(--accent)' }}></span>
-            <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 700, letterSpacing: '-0.02em' }}>Devocionais Diários</h2>
-          </div>
-          <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>
-            Reflexões preparadas pelos líderes — disponíveis por 24h
-          </p>
-        </div>
-        {isLeaderOrAdmin && (
-          <button
-            className="uk-button uk-button-primary"
-            onClick={() => setShowModal(true)}
-            style={{ height: '36px', whiteSpace: 'nowrap' }}
-          >
+      <PageHeader
+        icon="file-text"
+        title="Devocionais Diários"
+        subtitle="Reflexões preparadas pelos líderes — disponíveis por 24h"
+        actions={isLeaderOrAdmin && (
+          <button className="uk-button uk-button-primary" onClick={() => setShowModal(true)}>
             <span uk-icon="icon: plus; ratio: 0.85"></span>
             Novo Devocional
           </button>
         )}
-      </div>
+      />
 
       {loading ? (
         <div style={{ textAlign: 'center', padding: '60px 0' }}>
           <span uk-spinner="ratio: 2"></span>
         </div>
       ) : activeDevotionals.length === 0 ? (
-        <div style={{ border: '1px solid var(--border)', padding: '60px 24px', textAlign: 'center', background: 'var(--bg-surface)' }}>
-          <span uk-icon="icon: heart; ratio: 2.5" style={{ color: 'var(--text-faint)', display: 'block', marginBottom: '16px' }}></span>
-          <p style={{ fontSize: '15px', color: 'var(--text-muted)', margin: '0 0 6px', fontWeight: 500 }}>
-            Nenhum devocional ativo no momento
-          </p>
-          <p style={{ fontSize: '13px', color: 'var(--text-faint)', margin: 0 }}>
-            Volte mais tarde para novas reflexões espirituais
-          </p>
-        </div>
+        <EmptyState icon="file-text" title="Nenhum devocional ativo no momento" text="Volte mais tarde para novas reflexões espirituais" />
       ) : (
         <div className="uk-grid uk-grid-medium" uk-grid="masonry: true">
           {activeDevotionals.map((dev) => (
             <div key={dev.id} className="uk-width-1-2@m">
-              <div style={{ border: '1px solid var(--border)', background: 'var(--bg)', transition: 'border-color 160ms ease' }}
-                onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'var(--border-strong)')}
-                onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'var(--border)')}
-              >
+              <div className="card">
                 {/* Card header */}
-                <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-surface)' }}>
+                <div className="card-header">
                   <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 600 }}>{dev.title}</h3>
                   <StatusBadge dev={dev} />
                 </div>
@@ -130,7 +111,7 @@ const Devotionals = () => {
 
                 {/* Verse */}
                 <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
-                  <blockquote style={{ borderLeft: '2px solid var(--accent)', paddingLeft: '12px', margin: 0 }}>
+                  <blockquote style={{ borderLeft: '2px solid var(--border-strong)', paddingLeft: '12px', margin: 0 }}>
                     <p style={{ margin: 0, fontSize: '13px', fontStyle: 'italic', color: 'var(--text-muted)', lineHeight: 1.6 }}>
                       {dev.verse}
                     </p>
@@ -146,9 +127,8 @@ const Devotionals = () => {
                 {isLeaderOrAdmin && (
                   <div style={{ padding: '10px 16px', borderTop: '1px solid var(--border)', background: 'var(--bg-surface)', display: 'flex', justifyContent: 'flex-end' }}>
                     <button
-                      className="uk-button uk-button-text uk-text-danger"
+                      className="uk-button uk-button-danger uk-button-small"
                       onClick={() => handleMarkInactive(dev.id)}
-                      style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}
                     >
                       <span uk-icon="icon: trash; ratio: 0.8"></span>
                       Marcar inativa
@@ -163,11 +143,9 @@ const Devotionals = () => {
 
       {/* Inactive history */}
       {isLeaderOrAdmin && inactiveDevotionals.length > 0 && (
-        <div style={{ marginTop: '32px', border: '1px solid var(--border)', background: 'var(--bg)' }}>
-          <div style={{ padding: '12px 16px', background: 'var(--bg-surface)', borderBottom: '1px solid var(--border)' }}>
-            <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
-              Histórico Inativo
-            </span>
+        <div className="card" style={{ marginTop: '32px' }}>
+          <div className="card-header">
+            <span className="card-title">Histórico Inativo</span>
           </div>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <tbody>
@@ -177,9 +155,8 @@ const Devotionals = () => {
                   <td style={{ padding: '10px 16px', fontSize: '12px', color: 'var(--text-muted)' }}>{dev.user?.name}</td>
                   <td style={{ padding: '10px 16px', textAlign: 'right' }}>
                     <button
-                      className="uk-button uk-button-text uk-text-primary"
+                      className="uk-button uk-button-success uk-button-small"
                       onClick={() => handleReactivate(dev.id)}
-                      style={{ fontSize: '12px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                     >
                       <span uk-icon="icon: reply; ratio: 0.8"></span>
                       Reativar

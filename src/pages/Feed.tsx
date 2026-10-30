@@ -3,6 +3,8 @@ import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import UIkit from 'uikit';
 import Avatar from '../components/Avatar';
+import PageHeader from '../components/PageHeader';
+import EmptyState from '../components/EmptyState';
 
 interface Comment {
   id: string; content: string; userId: string;
@@ -26,7 +28,7 @@ const REACTION_CONFIG = [
   { type: 'praying', icon: 'settings',       label: 'Orando'  },
   { type: 'heart',   icon: 'heart',          label: 'Amor'    },
   { type: 'fire',    icon: 'bolt',           label: 'Fogo'    },
-  { type: 'strong',  icon: 'thumbnails-up',  label: 'Forte'   },
+  { type: 'strong',  icon: 'happy',          label: 'Forte'   },
 ];
 
 const Feed = () => {
@@ -123,23 +125,12 @@ const Feed = () => {
       {/* Main feed */}
       <div className="uk-width-2-3@m">
 
-        <div style={{ marginBottom: '24px', paddingBottom: '16px', borderBottom: '1px solid var(--border)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span uk-icon="icon: rss; ratio: 1.1" style={{ color: 'var(--accent)' }}></span>
-            <h1 style={{ margin: 0, fontSize: '20px', fontWeight: 700, letterSpacing: '-0.02em' }}>Feed da Comunidade</h1>
-          </div>
-          <p style={{ margin: '6px 0 0 0', fontSize: '13px', color: 'var(--text-muted)' }}>
-            Mensagens e inspirações compartilhadas pela comunidade
-          </p>
-        </div>
+        <PageHeader icon="rss" title="Feed da Comunidade" subtitle="Mensagens e inspirações compartilhadas pela comunidade" />
 
         {/* Pinned Announcements */}
         {pinnedPosts.length > 0 && (
           <div style={{ marginBottom: '24px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
-              <span uk-icon="icon: pin; ratio: 0.8" style={{ color: 'var(--warning)' }}></span>
-              <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--warning)' }}>Fixados</span>
-            </div>
+            <div className="list-label">Fixados</div>
             {pinnedPosts.map(post => (
               <PostCard key={post.id} post={post} currentUserId={user?.id || ''} userRole={user?.role || ''}
                 onComment={handleAddComment} onReact={handleReact} onPin={handlePin} pinned />
@@ -151,11 +142,7 @@ const Feed = () => {
         {loadingPosts ? (
           <div style={{ textAlign: 'center', padding: '60px 0' }}><span uk-spinner="ratio: 2"></span></div>
         ) : regularPosts.length === 0 && pinnedPosts.length === 0 ? (
-          <div style={{ border: '1px solid var(--border)', padding: '60px 24px', textAlign: 'center', background: 'var(--bg-surface)' }}>
-            <span uk-icon="icon: pencil; ratio: 2.5" style={{ color: 'var(--text-faint)', display: 'block', marginBottom: '16px' }}></span>
-            <p style={{ fontSize: '15px', color: 'var(--text-muted)', margin: '0 0 6px 0', fontWeight: 500 }}>Nenhum post ainda</p>
-            <p style={{ fontSize: '13px', color: 'var(--text-faint)', margin: 0 }}>Seja o primeiro a compartilhar algo inspirador</p>
-          </div>
+          <EmptyState icon="pencil" title="Nenhum post ainda" text="Seja o primeiro a compartilhar algo inspirador" />
         ) : (
           regularPosts.map(post => (
             <PostCard key={post.id} post={post} currentUserId={user?.id || ''} userRole={user?.role || ''}
@@ -170,15 +157,14 @@ const Feed = () => {
 
           {/* Weekly Ranking */}
           {ranking.length > 0 && (
-            <div style={{ border: '1px solid var(--border)', background: 'var(--bg)' }}>
-              <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', background: 'var(--bg-surface)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span uk-icon="icon: star; ratio: 0.8" style={{ color: 'var(--warning)' }}></span>
-                <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Ranking Semanal</span>
+            <div className="card">
+              <div className="card-header">
+                <span className="card-title">Ranking Semanal</span>
               </div>
               <div style={{ padding: '4px 0' }}>
                 {ranking.map((m, i) => (
                   <div key={m.userId} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 16px' }}>
-                    <span style={{ width: '18px', fontSize: '12px', fontWeight: 700, color: i === 0 ? 'var(--warning)' : 'var(--text-faint)', textAlign: 'center', flexShrink: 0 }}>{i + 1}</span>
+                    <span style={{ width: '18px', fontSize: '12px', fontWeight: 700, color: i === 0 ? 'var(--text)' : 'var(--text-faint)', textAlign: 'center', flexShrink: 0 }}>{i + 1}</span>
                     <Avatar name={m.name || '?'} size="small" />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.name}</div>
@@ -192,10 +178,9 @@ const Feed = () => {
 
           {/* Active Polls */}
           {polls.length > 0 && (
-            <div style={{ border: '1px solid var(--border)', background: 'var(--bg)' }}>
-              <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', background: 'var(--bg-surface)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span uk-icon="icon: list; ratio: 0.8" style={{ color: 'var(--accent)' }}></span>
-                <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Enquetes</span>
+            <div className="card">
+              <div className="card-header">
+                <span className="card-title">Enquetes</span>
               </div>
               {polls.map(poll => (
                 <PollWidget key={poll.id} poll={poll} onVote={handleVotePoll} />
@@ -205,9 +190,9 @@ const Feed = () => {
 
           {/* Info */}
           {ranking.length === 0 && polls.length === 0 && (
-            <div style={{ border: '1px solid var(--border)', background: 'var(--bg)' }}>
-              <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', background: 'var(--bg-surface)' }}>
-                <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Comunidade</span>
+            <div className="card">
+              <div className="card-header">
+                <span className="card-title">Comunidade</span>
               </div>
               <div style={{ padding: '8px 0' }}>
                 <SuggestionItem icon="users" name="Bem-vindo!" subtitle="Explore a comunidade" />
@@ -229,17 +214,17 @@ const PollWidget = ({ poll, onVote }: { poll: Poll; onVote: (pollId: string, opt
         {poll.options.map(opt => (
           <div key={opt.id}>
             {hasVoted ? (
-              <div style={{ position: 'relative', border: `1px solid ${opt.hasVoted ? 'var(--accent)' : 'var(--border)'}`, height: '28px', overflow: 'hidden' }}>
-                <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: `${opt.percentage}%`, background: opt.hasVoted ? 'var(--accent-light)' : 'var(--bg-elevated)', transition: 'width 400ms ease' }} />
-                <div style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 8px', height: '100%' }}>
-                  <span style={{ fontSize: '12px', color: opt.hasVoted ? 'var(--accent)' : 'var(--text-muted)', fontWeight: opt.hasVoted ? 700 : 400 }}>{opt.text}</span>
+              <div style={{ position: 'relative', border: `1px solid ${opt.hasVoted ? 'var(--text-muted)' : 'var(--border)'}`, borderRadius: 'var(--radius-sm)', height: '30px', overflow: 'hidden' }}>
+                <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: `${opt.percentage}%`, background: opt.hasVoted ? 'var(--border)' : 'var(--bg-elevated)', transition: 'width 400ms ease' }} />
+                <div style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 10px', height: '100%' }}>
+                  <span style={{ fontSize: '12px', color: opt.hasVoted ? 'var(--text)' : 'var(--text-muted)', fontWeight: opt.hasVoted ? 700 : 400 }}>{opt.text}</span>
                   <span style={{ fontSize: '11px', color: 'var(--text-faint)', fontWeight: 600 }}>{opt.percentage}%</span>
                 </div>
               </div>
             ) : (
-              <button onClick={() => onVote(poll.id, opt.id)} style={{ width: '100%', height: '28px', border: '1px solid var(--border-strong)', background: 'transparent', fontSize: '12px', color: 'var(--text-muted)', cursor: 'pointer', textAlign: 'left', padding: '0 8px', fontFamily: 'inherit' }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.color = 'var(--accent)'; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-strong)'; e.currentTarget.style.color = 'var(--text-muted)'; }}>
+              <button onClick={() => onVote(poll.id, opt.id)} style={{ width: '100%', height: '30px', border: '1px solid var(--border-strong)', borderRadius: 'var(--radius-sm)', background: 'transparent', fontSize: '12px', color: 'var(--text)', cursor: 'pointer', textAlign: 'left', padding: '0 10px', fontFamily: 'inherit' }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--text-muted)'; e.currentTarget.style.background = 'var(--bg-surface)'; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-strong)'; e.currentTarget.style.background = 'transparent'; }}>
                 {opt.text}
               </button>
             )}
@@ -253,9 +238,7 @@ const PollWidget = ({ poll, onVote }: { poll: Poll; onVote: (pollId: string, opt
 
 const SuggestionItem = ({ icon, name, subtitle }: { icon: string; name: string; subtitle: string }) => (
   <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 20px' }}>
-    <div style={{ width: '32px', height: '32px', border: '1px solid var(--border-strong)', background: 'var(--bg-elevated)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-      <span uk-icon={`icon: ${icon}; ratio: 0.8`} style={{ color: 'var(--text-muted)' }}></span>
-    </div>
+    <span uk-icon={`icon: ${icon}; ratio: 0.9`} style={{ color: 'var(--text)', flexShrink: 0 }}></span>
     <div>
       <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>{name}</div>
       <div style={{ fontSize: '12px', color: 'var(--text-faint)' }}>{subtitle}</div>
@@ -288,9 +271,7 @@ const PostCard = ({ post, currentUserId, userRole, onComment, onReact, onPin, pi
   const totalReactions = Object.values(reactions).reduce((s, v) => s + v, 0);
 
   return (
-    <div style={{ border: `1px solid ${pinned ? 'var(--warning)' : 'var(--border)'}`, background: pinned ? '#fffdf5' : 'var(--bg)', marginBottom: '16px', transition: 'border-color 160ms ease' }}
-      onMouseEnter={e => { if (!pinned) e.currentTarget.style.borderColor = 'var(--border-strong)'; }}
-      onMouseLeave={e => { if (!pinned) e.currentTarget.style.borderColor = 'var(--border)'; }}>
+    <div className="card" style={{ marginBottom: '16px', borderColor: pinned ? 'var(--border-strong)' : undefined }}>
 
       {/* Author row */}
       <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -302,9 +283,8 @@ const PostCard = ({ post, currentUserId, userRole, onComment, onReact, onPin, pi
           </div>
         </div>
         {canPin && (
-          <button className="action-btn" title={post.isPinned ? 'Desafixar' : 'Fixar'} onClick={() => onPin(post.id, post.isPinned)}
-            style={{ border: `1px solid ${post.isPinned ? 'var(--warning)' : 'var(--border-strong)'}`, color: post.isPinned ? 'var(--warning)' : undefined }}>
-            <span uk-icon="icon: pin; ratio: 0.8"></span>
+          <button className={`action-btn${post.isPinned ? ' is-on' : ''}`} title={post.isPinned ? 'Desafixar' : 'Fixar'} onClick={() => onPin(post.id, post.isPinned)}>
+            <span uk-icon="icon: bookmark; ratio: 0.8"></span>
           </button>
         )}
       </div>
@@ -345,7 +325,7 @@ const PostCard = ({ post, currentUserId, userRole, onComment, onReact, onPin, pi
           return (
             <button key={r.type} onClick={() => onReact(post.id, r.type, hasReacted)}
               title={r.label}
-              style={{ background: hasReacted ? 'var(--accent-light)' : 'none', border: `1px solid ${hasReacted ? 'var(--accent)' : 'transparent'}`, cursor: 'pointer', padding: '5px 8px', display: 'flex', alignItems: 'center', gap: '4px', color: hasReacted ? 'var(--accent)' : 'var(--text-muted)', fontSize: '12px', fontWeight: hasReacted ? 600 : 400, transition: 'all 120ms ease' }}
+              style={{ background: hasReacted ? 'var(--accent)' : 'none', border: `1px solid ${hasReacted ? 'var(--accent)' : 'transparent'}`, borderRadius: 'var(--radius-sm)', cursor: 'pointer', padding: '5px 9px', display: 'flex', alignItems: 'center', gap: '5px', color: hasReacted ? '#fff' : 'var(--text-muted)', fontSize: '12px', fontWeight: hasReacted ? 600 : 400, fontFamily: 'inherit', transition: 'all 120ms ease' }}
               onMouseEnter={e => { if (!hasReacted) { e.currentTarget.style.background = 'var(--bg-elevated)'; e.currentTarget.style.borderColor = 'var(--border)'; } }}
               onMouseLeave={e => { if (!hasReacted) { e.currentTarget.style.background = 'none'; e.currentTarget.style.borderColor = 'transparent'; } }}>
               <span uk-icon={`icon: ${r.icon}; ratio: 0.8`}></span>
@@ -356,8 +336,8 @@ const PostCard = ({ post, currentUserId, userRole, onComment, onReact, onPin, pi
 
         {post.comments.length > 0 && (
           <button onClick={() => setShowComments(!showComments)}
-            style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', padding: '5px 8px', display: 'flex', alignItems: 'center', gap: '5px', color: showComments ? 'var(--accent)' : 'var(--text-muted)', fontSize: '12px', fontWeight: 500, transition: 'color 160ms ease' }}
-            onMouseEnter={e => e.currentTarget.style.color = 'var(--accent)'}
+            style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', padding: '5px 8px', display: 'flex', alignItems: 'center', gap: '5px', color: showComments ? 'var(--text)' : 'var(--text-muted)', fontSize: '12px', fontWeight: 500, fontFamily: 'inherit', transition: 'color 160ms ease' }}
+            onMouseEnter={e => e.currentTarget.style.color = 'var(--text)'}
             onMouseLeave={e => { if (!showComments) e.currentTarget.style.color = 'var(--text-muted)'; }}>
             <span uk-icon="icon: comment; ratio: 0.9"></span>
             {post.comments.length} comentário{post.comments.length !== 1 ? 's' : ''}
@@ -387,14 +367,9 @@ const PostCard = ({ post, currentUserId, userRole, onComment, onReact, onPin, pi
 
       {/* Comment input */}
       <form onSubmit={submitComment} style={{ padding: '12px 16px', borderTop: '1px solid var(--border)', display: 'flex', gap: '8px' }}>
-        <input type="text" placeholder="Escreva um comentário..." value={commentText} onChange={e => setCommentText(e.target.value)}
-          style={{ flex: 1, padding: '0 12px', height: '34px', border: '1px solid var(--border-strong)', background: 'var(--bg)', color: 'var(--text)', fontSize: '13px', fontFamily: 'inherit', outline: 'none', transition: 'border-color 160ms ease' }}
-          onFocus={e => e.target.style.borderColor = 'var(--accent)'}
-          onBlur={e => e.target.style.borderColor = 'var(--border-strong)'} />
-        <button type="submit"
-          style={{ padding: '0 14px', height: '34px', background: 'var(--accent)', color: '#fff', border: '1px solid var(--accent)', fontSize: '13px', fontFamily: 'inherit', fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', transition: 'background 160ms ease, transform 160ms ease' }}
-          onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent-dark)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'var(--accent)'; e.currentTarget.style.transform = 'translateY(0)'; }}>
+        <input type="text" className="uk-input" placeholder="Escreva um comentário..." value={commentText} onChange={e => setCommentText(e.target.value)}
+          style={{ flex: 1 }} />
+        <button type="submit" className="uk-button uk-button-primary">
           <span uk-icon="icon: reply; ratio: 0.8"></span>
           Enviar
         </button>

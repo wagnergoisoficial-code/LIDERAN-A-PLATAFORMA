@@ -8,11 +8,12 @@ const icons: Record<string, string> = {
   warning: 'warning',
 };
 
+// Avisos neutros: o tipo é indicado pelo ícone, não pela cor
 const colors: Record<string, { bg: string; border: string; icon: string }> = {
-  success: { bg: 'var(--success-light)', border: 'var(--success)', icon: 'var(--success)' },
-  error:   { bg: 'var(--danger-light)',  border: 'var(--danger)',  icon: 'var(--danger)' },
-  info:    { bg: 'var(--accent-light)',  border: 'var(--accent)',  icon: 'var(--accent)' },
-  warning: { bg: '#fffbeb',             border: 'var(--warning)', icon: 'var(--warning)' },
+  success: { bg: 'var(--bg)', border: 'var(--border-strong)', icon: 'var(--text)' },
+  error:   { bg: 'var(--bg)', border: 'var(--border-strong)', icon: 'var(--text)' },
+  info:    { bg: 'var(--bg)', border: 'var(--border-strong)', icon: 'var(--text)' },
+  warning: { bg: 'var(--bg)', border: 'var(--border-strong)', icon: 'var(--text)' },
 };
 
 const ToastContainer: React.FC = () => {
@@ -31,6 +32,7 @@ const ToastContainer: React.FC = () => {
             style={{
               background: c.bg,
               border: `1px solid ${c.border}`,
+              borderRadius: 'var(--radius)',
               padding: '10px 14px',
               display: 'flex',
               alignItems: 'center',

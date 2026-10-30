@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import UIkit from 'uikit';
+import PageHeader from '../components/PageHeader';
+import EmptyState from '../components/EmptyState';
 
 interface Attendee { id: string; name: string; profileImage?: string; }
 interface Event {
@@ -72,24 +74,17 @@ const Events: React.FC = () => {
   const past = events.filter(e => new Date(e.startDate) < new Date());
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg)', padding: '32px 24px' }}>
-      <div style={{ maxWidth: '860px', margin: '0 auto' }}>
-
-        {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px' }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-              <span uk-icon="icon: calendar; ratio: 1.1" style={{ color: 'var(--accent)' }}></span>
-              <h1 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: 'var(--text)' }}>Agenda</h1>
-            </div>
-            <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>Eventos e atividades da comunidade</p>
-          </div>
-          {(user?.role === 'leader' || user?.role === 'admin') && (
-            <button className="uk-button uk-button-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', height: '36px', padding: '0 16px' }} onClick={() => setShowModal(true)}>
+    <div>
+        <PageHeader
+          icon="calendar"
+          title="Agenda"
+          subtitle="Eventos e atividades da comunidade"
+          actions={(user?.role === 'leader' || user?.role === 'admin') && (
+            <button className="uk-button uk-button-primary" onClick={() => setShowModal(true)}>
               <span uk-icon="icon: plus; ratio: 0.85"></span> Novo Evento
             </button>
           )}
-        </div>
+        />
 
         {loading ? (
           <div style={{ textAlign: 'center', padding: '60px', color: 'var(--text-muted)' }}>
@@ -100,7 +95,7 @@ const Events: React.FC = () => {
             {/* Upcoming */}
             {upcoming.length > 0 && (
               <div style={{ marginBottom: '32px' }}>
-                <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.1em', color: 'var(--text-faint)', textTransform: 'uppercase', marginBottom: '12px' }}>Próximos</div>
+                <div className="list-label">Próximos</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   {upcoming.map(ev => <EventCard key={ev.id} event={ev} userId={user?.id || ''} userRole={user?.role || ''} onRsvp={handleRsvp} onDelete={handleDelete} />)}
                 </div>
@@ -110,7 +105,7 @@ const Events: React.FC = () => {
             {/* Past */}
             {past.length > 0 && (
               <div>
-                <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.1em', color: 'var(--text-faint)', textTransform: 'uppercase', marginBottom: '12px' }}>Passados</div>
+                <div className="list-label">Passados</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   {past.map(ev => <EventCard key={ev.id} event={ev} userId={user?.id || ''} userRole={user?.role || ''} onRsvp={handleRsvp} onDelete={handleDelete} past />)}
                 </div>
@@ -118,22 +113,18 @@ const Events: React.FC = () => {
             )}
 
             {events.length === 0 && (
-              <div style={{ textAlign: 'center', padding: '80px 20px', border: '1px dashed var(--border)', color: 'var(--text-faint)' }}>
-                <span uk-icon="icon: calendar; ratio: 2" style={{ display: 'block', marginBottom: '12px' }}></span>
-                <p style={{ margin: 0, fontSize: '14px' }}>Nenhum evento ainda</p>
-              </div>
+              <EmptyState icon="calendar" title="Nenhum evento ainda" text="Os eventos da comunidade aparecem aqui" />
             )}
           </>
         )}
-      </div>
 
       {/* Create Modal */}
       {showModal && (
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
           <div className="modal-box" style={{ maxWidth: '480px' }} onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <span style={{ fontWeight: 700, fontSize: '15px' }}>Novo Evento</span>
-              <button className="action-btn" onClick={() => setShowModal(false)}><span uk-icon="icon: close; ratio: 0.85"></span></button>
+              <h4>Novo Evento</h4>
+              <button className="modal-close-btn" onClick={() => setShowModal(false)}><span uk-icon="icon: close; ratio: 0.9"></span></button>
             </div>
             <form onSubmit={handleCreate}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -186,14 +177,14 @@ const EventCard: React.FC<EventCardProps> = ({ event, userId, userRole, onRsvp, 
   const rsvpStatus = event.myStatus;
 
   return (
-    <div style={{ border: `1px solid ${past ? 'var(--border)' : 'var(--border-strong)'}`, background: past ? 'var(--bg-surface)' : 'var(--bg)', opacity: past ? 0.7 : 1 }}>
+    <div className="card" style={{ background: past ? 'var(--bg-surface)' : 'var(--bg)', opacity: past ? 0.7 : 1 }}>
       <div style={{ display: 'flex', gap: '0' }}>
         {/* Date column */}
-        <div style={{ width: '72px', flexShrink: 0, background: past ? 'var(--bg-elevated)' : 'var(--accent)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '16px 8px' }}>
-          <span style={{ fontSize: '22px', fontWeight: 800, color: past ? 'var(--text-muted)' : 'white', lineHeight: 1 }}>
+        <div style={{ width: '72px', flexShrink: 0, background: 'var(--bg-surface)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '16px 8px' }}>
+          <span style={{ fontSize: '22px', fontWeight: 800, color: past ? 'var(--text-muted)' : 'var(--text)', lineHeight: 1 }}>
             {new Date(event.startDate).getDate()}
           </span>
-          <span style={{ fontSize: '11px', fontWeight: 600, color: past ? 'var(--text-faint)' : 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             {new Date(event.startDate).toLocaleDateString('pt-BR', { month: 'short' })}
           </span>
         </div>
@@ -217,8 +208,8 @@ const EventCard: React.FC<EventCardProps> = ({ event, userId, userRole, onRsvp, 
               </div>
             </div>
             {canDelete && (
-              <button className="action-btn danger" title="Excluir" onClick={() => onDelete(event.id)}>
-                <span uk-icon="icon: trash; ratio: 0.8"></span>
+              <button className="uk-button uk-button-danger uk-button-small" title="Excluir evento" onClick={() => onDelete(event.id)}>
+                <span uk-icon="icon: trash; ratio: 0.75"></span> Excluir
               </button>
             )}
           </div>
@@ -239,7 +230,7 @@ const EventCard: React.FC<EventCardProps> = ({ event, userId, userRole, onRsvp, 
                   const isActive = rsvpStatus === s;
                   return (
                     <button key={s} onClick={() => onRsvp(event.id, isActive ? 'none' : s)}
-                      style={{ height: '28px', padding: '0 10px', fontSize: '12px', fontWeight: 600, border: `1px solid ${isActive ? 'var(--accent)' : 'var(--border-strong)'}`, background: isActive ? 'var(--accent-light)' : 'transparent', color: isActive ? 'var(--accent)' : 'var(--text-muted)', cursor: 'pointer' }}>
+                      style={{ height: '30px', padding: '0 12px', fontSize: '12px', fontWeight: 600, fontFamily: 'inherit', borderRadius: 'var(--radius-sm)', border: `1px solid ${isActive ? 'var(--accent)' : 'var(--border-strong)'}`, background: isActive ? 'var(--accent)' : 'transparent', color: isActive ? '#fff' : 'var(--text-muted)', cursor: 'pointer' }}>
                       {labels[s]}
                     </button>
                   );

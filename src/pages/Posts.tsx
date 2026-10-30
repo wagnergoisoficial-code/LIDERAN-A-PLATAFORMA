@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import ImageUploadInput from '../components/ImageUploadInput';
+import PageHeader from '../components/PageHeader';
 import UIkit from 'uikit';
 
 const Posts = () => {
@@ -58,27 +59,17 @@ const Posts = () => {
   return (
     <div>
       {/* Page header */}
-      <div style={{ marginBottom: '24px', paddingBottom: '16px', borderBottom: '1px solid var(--border)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
-          <span uk-icon="icon: pencil; ratio: 1.1" style={{ color: 'var(--accent)' }}></span>
-          <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 700, letterSpacing: '-0.02em' }}>Criar Post</h2>
-        </div>
-        <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>
-          Compartilhe sua fé e inspirações com a comunidade
-        </p>
-      </div>
+      <PageHeader icon="pencil" title="Criar Post" subtitle="Compartilhe sua fé e inspirações com a comunidade" />
 
       <div className="uk-grid uk-grid-medium" uk-grid="">
         {/* Form */}
         <div className="uk-width-2-3@m">
-          <div style={{ border: '1px solid var(--border)', background: 'var(--bg)' }}>
-            <div style={{ padding: '12px 20px', background: 'var(--bg-surface)', borderBottom: '1px solid var(--border)' }}>
-              <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
-                Nova Publicação
-              </span>
+          <div className="card">
+            <div className="card-header">
+              <span className="card-title">Nova Publicação</span>
             </div>
 
-            <div style={{ padding: '20px' }}>
+            <div className="card-body">
               <form onSubmit={handleCreatePost}>
                 <div className="uk-margin">
                   <label className="uk-form-label">Mensagem</label>
@@ -116,8 +107,8 @@ const Posts = () => {
 
           {/* Recent posts notice */}
           {recentPosts.length > 0 && (
-            <div style={{ marginTop: '16px', border: '1px solid var(--border)', background: 'var(--bg-surface)', padding: '14px 20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <span uk-icon="icon: check; ratio: 0.9" style={{ color: 'var(--success)', flexShrink: 0 }}></span>
+            <div className="card" style={{ marginTop: '16px', background: 'var(--bg-surface)', padding: '14px 20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span uk-icon="icon: check; ratio: 0.9" style={{ flexShrink: 0 }}></span>
               <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
                 Você tem <strong style={{ color: 'var(--text)' }}>{recentPosts.length}</strong> posts no feed.
               </span>
@@ -127,11 +118,9 @@ const Posts = () => {
 
         {/* Sidebar tips */}
         <div className="uk-width-1-3@m">
-          <div style={{ border: '1px solid var(--border)', background: 'var(--bg)' }} uk-sticky="offset: 72">
-            <div style={{ padding: '12px 20px', background: 'var(--bg-surface)', borderBottom: '1px solid var(--border)' }}>
-              <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
-                Dicas de Post
-              </span>
+          <div className="card" uk-sticky="offset: 72">
+            <div className="card-header">
+              <span className="card-title">Dicas de Post</span>
             </div>
             <div style={{ padding: '16px 20px' }}>
               {[
@@ -141,7 +130,7 @@ const Posts = () => {
                 { icon: 'star', text: 'Compartilhe mensagens inspiradoras e edificantes' },
               ].map(({ icon, text }, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', marginBottom: i < 3 ? '14px' : 0 }}>
-                  <span uk-icon={`icon: ${icon}; ratio: 0.85`} style={{ color: 'var(--accent)', flexShrink: 0, marginTop: '1px' }}></span>
+                  <span uk-icon={`icon: ${icon}; ratio: 0.85`} style={{ flexShrink: 0, marginTop: '1px' }}></span>
                   <span style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.5 }}>{text}</span>
                 </div>
               ))}

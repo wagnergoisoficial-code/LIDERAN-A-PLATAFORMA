@@ -54,14 +54,12 @@ const ChurchCreate: React.FC<ChurchCreateProps> = ({ onChurchCreated }) => {
   };
 
   return (
-    <div style={{ border: '1px solid var(--border)', background: 'var(--bg)' }}>
-      <div style={{ padding: '12px 20px', background: 'var(--bg-surface)', borderBottom: '1px solid var(--border)' }}>
-        <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
-          Nova Comunidade
-        </span>
+    <div className="card">
+      <div className="card-header">
+        <span className="card-title">Nova Comunidade</span>
       </div>
 
-      <div style={{ padding: '20px' }}>
+      <div className="card-body">
         <form onSubmit={handleSubmit} className="uk-form-stacked">
           <div className="uk-margin">
             <label className="uk-form-label">Nome da Comunidade *</label>
@@ -88,10 +86,11 @@ const ChurchCreate: React.FC<ChurchCreateProps> = ({ onChurchCreated }) => {
                       display: 'flex', alignItems: 'center', gap: '6px',
                       padding: '5px 12px',
                       border: `1px solid ${active ? 'var(--accent)' : 'var(--border-strong)'}`,
-                      background: active ? 'var(--accent-light)' : 'transparent',
+                      borderRadius: 'var(--radius-sm)',
+                      background: active ? 'var(--accent)' : 'transparent',
                       cursor: 'pointer',
                       fontSize: '12px', fontWeight: 500,
-                      color: active ? 'var(--accent-dark)' : 'var(--text-muted)',
+                      color: active ? '#fff' : 'var(--text-muted)',
                       transition: 'all 160ms ease',
                       textTransform: 'capitalize'
                     }}

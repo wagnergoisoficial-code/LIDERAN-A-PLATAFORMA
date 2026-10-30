@@ -3,6 +3,8 @@ import { useParams } from 'react-router-dom';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import UIkit from 'uikit';
+import EmptyState from '../components/EmptyState';
+import PageHeader from '../components/PageHeader';
 
 interface UserProfile {
   id: string;
@@ -147,9 +149,7 @@ const Profile = () => {
 
   if (!profile) {
     return (
-      <div className="uk-alert uk-alert-danger">
-        <p>Usuário não encontrado</p>
-      </div>
+      <EmptyState icon="user" title="Usuário não encontrado" />
     );
   }
 
@@ -157,12 +157,21 @@ const Profile = () => {
   const avatarSrc = profileImagePreview || editForm.profileImage || profile.profileImage;
 
   return (
-    <div style={{ maxWidth: '800px' }}>
+    <div>
+      <PageHeader
+        icon="user"
+        title={isOwnProfile ? 'Meu Perfil' : 'Perfil'}
+        subtitle={isOwnProfile ? 'Suas informações na comunidade' : 'Informações do membro'}
+        actions={isOwnProfile && (
+          <button className="uk-button uk-button-default" onClick={() => setIsEditing(!isEditing)}>
+            <span uk-icon={`icon: ${isEditing ? 'close' : 'pencil'}; ratio: 0.8`}></span>
+            {isEditing ? 'Cancelar' : 'Editar Perfil'}
+          </button>
+        )}
+      />
 
       {/* ── PROFILE HEADER ──────────────────────────────────────── */}
-      <div style={{ border: '1px solid var(--border)', background: 'var(--bg)', marginBottom: '20px' }}>
-        {/* Accent top bar */}
-        <div style={{ height: '3px', background: 'var(--nav-bg)' }}></div>
+      <div className="card" style={{ marginBottom: '20px' }}>
 
         <div style={{ padding: '24px', display: 'flex', alignItems: 'flex-start', gap: '20px' }}>
           {/* Avatar */}
@@ -170,6 +179,7 @@ const Profile = () => {
             width: '72px', height: '72px',
             background: 'var(--bg-elevated)',
             border: '1px solid var(--border-strong)',
+            borderRadius: '50%',
             overflow: 'hidden',
             flexShrink: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center'
@@ -182,46 +192,22 @@ const Profile = () => {
           </div>
 
           {/* Info */}
-          <div style={{ flex: 1 }}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
-              <div>
-                <h2 style={{ margin: '0 0 4px', fontSize: '20px', fontWeight: 700 }}>{profile.name}</h2>
-                {profile.title && (
-                  <p style={{ margin: '0 0 8px', fontSize: '13px', color: 'var(--text-muted)' }}>{profile.title}</p>
-                )}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                  <span className={`uk-label ${roleBadge.cls}`}>{roleBadge.label}</span>
-                  {profile.location && (
-                    <span style={{ fontSize: '12px', color: 'var(--text-faint)', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                      <span uk-icon="icon: location; ratio: 0.75"></span>
-                      {profile.location}
-                    </span>
-                  )}
-                  <span style={{ fontSize: '12px', color: 'var(--text-faint)' }}>
-                    Membro desde {new Date(profile.createdAt).toLocaleDateString('pt-BR')}
-                  </span>
-                </div>
-              </div>
-
-              {isOwnProfile && (
-                <button
-                  onClick={() => setIsEditing(!isEditing)}
-                  style={{
-                    padding: '0 14px', height: '32px',
-                    background: isEditing ? 'var(--bg-surface)' : 'transparent',
-                    color: 'var(--text-muted)',
-                    border: '1px solid var(--border-strong)',
-                    fontSize: '12px', fontFamily: 'inherit', fontWeight: 500, cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', gap: '5px',
-                    transition: 'all 160ms ease', whiteSpace: 'nowrap'
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.color = 'var(--accent)'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-strong)'; e.currentTarget.style.color = 'var(--text-muted)'; }}
-                >
-                  <span uk-icon={`icon: ${isEditing ? 'close' : 'pencil'}; ratio: 0.8`}></span>
-                  {isEditing ? 'Cancelar' : 'Editar Perfil'}
-                </button>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h2 style={{ margin: '0 0 4px', fontSize: '18px', fontWeight: 700 }}>{profile.name}</h2>
+            {profile.title && (
+              <p style={{ margin: '0 0 8px', fontSize: '13px', color: 'var(--text-muted)' }}>{profile.title}</p>
+            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+              <span className={`uk-label ${roleBadge.cls}`}>{roleBadge.label}</span>
+              {profile.location && (
+                <span style={{ fontSize: '12px', color: 'var(--text-faint)', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                  <span uk-icon="icon: location; ratio: 0.75"></span>
+                  {profile.location}
+                </span>
               )}
+              <span style={{ fontSize: '12px', color: 'var(--text-faint)' }}>
+                Membro desde {new Date(profile.createdAt).toLocaleDateString('pt-BR')}
+              </span>
             </div>
           </div>
         </div>
@@ -229,13 +215,11 @@ const Profile = () => {
 
       {/* ── EDIT FORM ────────────────────────────────────────────── */}
       {isOwnProfile && isEditing && (
-        <div style={{ border: '1px solid var(--border)', background: 'var(--bg)', marginBottom: '20px' }}>
-          <div style={{ padding: '12px 20px', background: 'var(--bg-surface)', borderBottom: '1px solid var(--border)' }}>
-            <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
-              Editar Perfil
-            </span>
+        <div className="card" style={{ marginBottom: '20px' }}>
+          <div className="card-header">
+            <span className="card-title">Editar Perfil</span>
           </div>
-          <div style={{ padding: '20px' }}>
+          <div className="card-body">
             <form onSubmit={handleSaveProfile} className="uk-form-stacked">
 
               {/* Avatar upload */}
@@ -244,6 +228,7 @@ const Profile = () => {
                   style={{
                     width: '64px', height: '64px',
                     border: '1px dashed var(--border-strong)',
+                    borderRadius: '50%',
                     background: 'var(--bg-elevated)',
                     overflow: 'hidden',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -269,7 +254,7 @@ const Profile = () => {
                     {uploadingImage ? 'Enviando...' : 'Alterar Foto'}
                   </button>
                   {editForm.profileImage && !uploadingImage && (
-                    <p style={{ margin: '5px 0 0', fontSize: '12px', color: 'var(--success)' }}>
+                    <p style={{ margin: '5px 0 0', fontSize: '12px', color: 'var(--text-muted)' }}>
                       <span uk-icon="icon: check; ratio: 0.8"></span> Foto pronta
                     </p>
                   )}
@@ -316,10 +301,8 @@ const Profile = () => {
 
       {/* ── BIO ──────────────────────────────────────────────────── */}
       {profile.bio && (
-        <div style={{ border: '1px solid var(--border)', background: 'var(--bg)', marginBottom: '16px' }}>
-          <div style={{ padding: '12px 20px', background: 'var(--bg-surface)', borderBottom: '1px solid var(--border)' }}>
-            <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Sobre</span>
-          </div>
+        <div className="card" style={{ marginBottom: '16px' }}>
+          <div className="card-header"><span className="card-title">Sobre</span></div>
           <div style={{ padding: '16px 20px' }}>
             <p style={{ margin: 0, fontSize: '14px', color: 'var(--text)', lineHeight: 1.7 }}>{profile.bio}</p>
           </div>
@@ -328,17 +311,11 @@ const Profile = () => {
 
       {/* ── SKILLS ──────────────────────────────────────────────── */}
       {profile.skills && profile.skills.length > 0 && (
-        <div style={{ border: '1px solid var(--border)', background: 'var(--bg)', marginBottom: '16px' }}>
-          <div style={{ padding: '12px 20px', background: 'var(--bg-surface)', borderBottom: '1px solid var(--border)' }}>
-            <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Habilidades</span>
-          </div>
+        <div className="card" style={{ marginBottom: '16px' }}>
+          <div className="card-header"><span className="card-title">Habilidades</span></div>
           <div style={{ padding: '16px 20px', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
             {profile.skills.map((skill, i) => (
-              <span key={i} style={{
-                padding: '4px 12px', fontSize: '12px', fontWeight: 500,
-                background: 'var(--bg-elevated)', border: '1px solid var(--border-strong)',
-                color: 'var(--text-muted)'
-              }}>
+              <span key={i} className="tag">
                 {skill}
               </span>
             ))}
@@ -348,10 +325,8 @@ const Profile = () => {
 
       {/* ── SOCIAL LINKS ────────────────────────────────────────── */}
       {profile.socialLinks?.length > 0 && (
-        <div style={{ border: '1px solid var(--border)', background: 'var(--bg)', marginBottom: '16px' }}>
-          <div style={{ padding: '12px 20px', background: 'var(--bg-surface)', borderBottom: '1px solid var(--border)' }}>
-            <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Redes Sociais</span>
-          </div>
+        <div className="card" style={{ marginBottom: '16px' }}>
+          <div className="card-header"><span className="card-title">Redes Sociais</span></div>
           <div style={{ padding: '16px 20px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             {profile.socialLinks.map((link: SocialLink) => (
               <a
@@ -371,14 +346,12 @@ const Profile = () => {
 
       {/* ── ACHIEVEMENTS ────────────────────────────────────────── */}
       {profile.achievements?.length > 0 && (
-        <div style={{ border: '1px solid var(--border)', background: 'var(--bg)', marginBottom: '16px' }}>
-          <div style={{ padding: '12px 20px', background: 'var(--bg-surface)', borderBottom: '1px solid var(--border)' }}>
-            <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Distintivos</span>
-          </div>
+        <div className="card" style={{ marginBottom: '16px' }}>
+          <div className="card-header"><span className="card-title">Distintivos</span></div>
           <div style={{ padding: '20px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '16px' }}>
             {profile.achievements.map((a: any) => (
-              <div key={a.id} style={{ textAlign: 'center', padding: '16px', border: '1px solid var(--border)' }}>
-                <span uk-icon="icon: star; ratio: 1.8" style={{ color: 'var(--warning)', display: 'block', marginBottom: '8px' }}></span>
+              <div key={a.id} style={{ textAlign: 'center', padding: '16px', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
+                <span uk-icon="icon: star; ratio: 1.8" style={{ display: 'block', marginBottom: '8px' }}></span>
                 <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)', marginBottom: '4px' }}>{a.name}</div>
                 {a.description && <div style={{ fontSize: '12px', color: 'var(--text-faint)' }}>{a.description}</div>}
               </div>

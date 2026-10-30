@@ -4,6 +4,8 @@ import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import UIkit from 'uikit';
 import Avatar from '../components/Avatar';
+import PageHeader from '../components/PageHeader';
+import EmptyState from '../components/EmptyState';
 
 interface Member {
   id: string; name: string; email: string; role: string;
@@ -19,8 +21,8 @@ const emptyAddForm = { name: '', email: '', password: '', confirmPassword: '', a
 
 const engagementColor = (pct: number) => {
   if (pct >= 30) return 'var(--success)';
-  if (pct >= 15) return '#f97316';
-  if (pct >= 5)  return 'var(--warning)';
+  if (pct >= 15) return 'var(--accent)';
+  if (pct >= 5)  return 'var(--text-muted)';
   return 'var(--text-faint)';
 };
 
@@ -34,7 +36,7 @@ const EngagementBar = ({ stat }: { stat: MemberStat | undefined }) => {
         <div className="engagement-track" style={{ flex: 1 }}>
           <div className="engagement-fill" style={{ width: `${pct}%`, background: color }} />
         </div>
-        <span style={{ fontSize: '11px', fontWeight: 700, color, minWidth: '30px', textAlign: 'right' }}>{pct}%</span>
+        <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text)', minWidth: '30px', textAlign: 'right' }}>{pct}%</span>
       </div>
       <div style={{ fontSize: '10px', color: 'var(--text-faint)', marginTop: '2px' }}>
         {stat.posts}p · {stat.comments}c · {stat.messages}m
@@ -174,31 +176,25 @@ const Users = () => {
   return (
     <div>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px', paddingBottom: '16px', borderBottom: '1px solid var(--border)' }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
-            <span uk-icon="icon: users; ratio: 1.1" style={{ color: 'var(--accent)' }}></span>
-            <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 700, letterSpacing: '-0.02em' }}>Membros</h2>
-          </div>
-          <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>
-            Conheça os irmãos que fazem parte desta comunidade
-          </p>
-        </div>
-        {isLeaderOrAdmin && (
-          <button className="uk-button uk-button-primary" onClick={() => setShowAddModal(true)} style={{ height: '36px', whiteSpace: 'nowrap' }}>
+      <PageHeader
+        icon="users"
+        title="Membros"
+        subtitle="Conheça os irmãos que fazem parte desta comunidade"
+        actions={isLeaderOrAdmin && (
+          <button className="uk-button uk-button-primary" onClick={() => setShowAddModal(true)}>
             <span uk-icon="icon: plus; ratio: 0.85"></span>
             Novo Membro
           </button>
         )}
-      </div>
+      />
 
       {/* Engagement legend */}
       {isLeaderOrAdmin && !loading && members.length > 0 && (
-        <div style={{ display: 'flex', gap: '16px', marginBottom: '16px', padding: '10px 16px', border: '1px solid var(--border)', background: 'var(--bg-surface)', fontSize: '11px', color: 'var(--text-muted)', flexWrap: 'wrap', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '16px', marginBottom: '16px', padding: '10px 16px', border: '1px solid var(--border)', borderRadius: 'var(--radius)', background: 'var(--bg-surface)', fontSize: '11px', color: 'var(--text-muted)', flexWrap: 'wrap', alignItems: 'center' }}>
           <span style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Engajamento:</span>
-          {[{ color: 'var(--success)', label: 'Alto ≥30%' }, { color: '#f97316', label: 'Médio ≥15%' }, { color: 'var(--warning)', label: 'Baixo ≥5%' }, { color: 'var(--text-faint)', label: 'Inativo <5%' }].map(({ color, label }) => (
+          {[{ color: 'var(--success)', label: 'Alto ≥30%' }, { color: 'var(--accent)', label: 'Médio ≥15%' }, { color: 'var(--text-muted)', label: 'Baixo ≥5%' }, { color: 'var(--text-faint)', label: 'Inativo <5%' }].map(({ color, label }) => (
             <span key={label} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <span style={{ width: '8px', height: '8px', background: color, display: 'inline-block' }}></span>
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: color, display: 'inline-block' }}></span>
               {label}
             </span>
           ))}
@@ -211,13 +207,9 @@ const Users = () => {
           <span uk-spinner="ratio: 2"></span>
         </div>
       ) : members.length === 0 ? (
-        <div style={{ padding: '60px 24px', border: '1px solid var(--border)', background: 'var(--bg-surface)', textAlign: 'center' }}>
-          <span uk-icon="icon: users; ratio: 2.5" style={{ color: 'var(--text-faint)', display: 'block', marginBottom: '14px' }}></span>
-          <p style={{ fontSize: '14px', color: 'var(--text-muted)', margin: '0 0 4px', fontWeight: 500 }}>Nenhum membro cadastrado</p>
-          {isLeaderOrAdmin && <p style={{ fontSize: '13px', color: 'var(--text-faint)', margin: 0 }}>Clique em "Novo Membro" para começar</p>}
-        </div>
+        <EmptyState icon="users" title="Nenhum membro cadastrado" text={isLeaderOrAdmin ? 'Clique em "Novo Membro" para começar' : undefined} />
       ) : (
-        <div style={{ border: '1px solid var(--border)', overflowX: 'auto' }}>
+        <div className="card" style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: 'var(--bg-surface)', borderBottom: '1px solid var(--border-strong)' }}>
@@ -254,12 +246,10 @@ const Users = () => {
                       {isLeaderOrAdmin && deletingMemberId === m.id ? (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center' }}>
                           <span style={{ fontSize: '11px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Confirmar?</span>
-                          <button onClick={() => handleDelete(m.id)} disabled={deleteLoading}
-                            style={{ padding: '3px 10px', background: 'var(--danger)', color: '#fff', border: '1px solid var(--danger)', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>
+                          <button className="uk-button uk-button-danger uk-button-small" onClick={() => handleDelete(m.id)} disabled={deleteLoading}>
                             {deleteLoading ? '...' : 'Sim'}
                           </button>
-                          <button onClick={() => setDeletingMemberId(null)}
-                            style={{ padding: '3px 10px', background: 'transparent', color: 'var(--text-muted)', border: '1px solid var(--border-strong)', fontSize: '11px', cursor: 'pointer' }}>
+                          <button className="uk-button uk-button-default uk-button-small" onClick={() => setDeletingMemberId(null)}>
                             Não
                           </button>
                         </div>

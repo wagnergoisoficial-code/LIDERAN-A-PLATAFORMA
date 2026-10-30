@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import UIkit from 'uikit';
 import Avatar from './Avatar';
+import EmptyState from './EmptyState';
 
 interface ChurchMembersProps {
   churchId: string;
@@ -126,14 +127,11 @@ const ChurchMembers: React.FC<ChurchMembersProps> = ({ churchId }) => {
   return (
     <div>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-        <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
-          Membros da Comunidade
-        </span>
+      <div className="section-head">
+        <span className="list-label">Membros da Comunidade</span>
         <button
           onClick={() => setShowAddModal(true)}
-          className="uk-button uk-button-primary"
-          style={{ height: '30px', fontSize: '12px' }}
+          className="uk-button uk-button-primary uk-button-small"
         >
           <span uk-icon="icon: plus; ratio: 0.8"></span>
           Novo Membro
@@ -145,7 +143,7 @@ const ChurchMembers: React.FC<ChurchMembersProps> = ({ churchId }) => {
           <span uk-spinner="ratio: 0.8"></span>
         </div>
       ) : members.length > 0 ? (
-        <div style={{ overflowX: 'auto', border: '1px solid var(--border)' }}>
+        <div className="card" style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
             <thead>
               <tr style={{ background: 'var(--bg-surface)', borderBottom: '1px solid var(--border-strong)' }}>
@@ -173,15 +171,15 @@ const ChurchMembers: React.FC<ChurchMembersProps> = ({ churchId }) => {
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center' }}>
                         <span style={{ fontSize: '11px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Confirmar remoção?</span>
                         <button
+                          className="uk-button uk-button-danger uk-button-small"
                           onClick={() => handleDelete(member.id)}
                           disabled={deleteLoading}
-                          style={{ padding: '3px 10px', background: 'var(--danger)', color: '#fff', border: '1px solid var(--danger)', fontSize: '11px', fontWeight: 600, cursor: 'pointer', transition: 'all 160ms ease' }}
                         >
                           {deleteLoading ? '...' : 'Sim'}
                         </button>
                         <button
+                          className="uk-button uk-button-default uk-button-small"
                           onClick={() => setDeletingMemberId(null)}
-                          style={{ padding: '3px 10px', background: 'transparent', color: 'var(--text-muted)', border: '1px solid var(--border-strong)', fontSize: '11px', cursor: 'pointer' }}
                         >
                           Não
                         </button>
@@ -203,15 +201,7 @@ const ChurchMembers: React.FC<ChurchMembersProps> = ({ churchId }) => {
           </table>
         </div>
       ) : (
-        <div style={{ padding: '48px 24px', border: '1px solid var(--border)', background: 'var(--bg-surface)', textAlign: 'center' }}>
-          <span uk-icon="icon: users; ratio: 2" style={{ color: 'var(--text-faint)', display: 'block', marginBottom: '12px' }}></span>
-          <p style={{ fontSize: '14px', color: 'var(--text-muted)', margin: '0 0 4px', fontWeight: 500 }}>
-            Nenhum membro cadastrado
-          </p>
-          <p style={{ fontSize: '13px', color: 'var(--text-faint)', margin: 0 }}>
-            Clique em "Novo Membro" para começar
-          </p>
-        </div>
+        <EmptyState icon="users" title="Nenhum membro cadastrado" text='Clique em "Novo Membro" para começar' />
       )}
 
       {/* ADD MODAL */}

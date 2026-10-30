@@ -4,6 +4,8 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import Avatar from '../components/Avatar';
 import { SkeletonList } from '../components/Skeleton';
+import PageHeader from '../components/PageHeader';
+import EmptyState from '../components/EmptyState';
 
 interface GroupMember {
   id: string;
@@ -109,30 +111,21 @@ const Groups: React.FC = () => {
   };
 
   const CategoryBadge = ({ cat }: { cat: string }) => (
-    <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', padding: '2px 8px', background: 'var(--accent-light)', color: 'var(--accent)', border: '1px solid var(--accent)' }}>
-      {CATEGORIES[cat] || cat}
-    </span>
+    <span className="uk-label">{CATEGORIES[cat] || cat}</span>
   );
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg)', padding: '32px 24px' }}>
-      <div style={{ maxWidth: '900px', margin: '0 auto' }}>
-
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '28px', paddingBottom: '20px', borderBottom: '1px solid var(--border)' }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
-              <span uk-icon="icon: users; ratio: 1.1" style={{ color: 'var(--accent)' }}></span>
-              <h1 style={{ margin: 0, fontSize: '20px', fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--text)' }}>Células & Ministérios</h1>
-            </div>
-            <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>Grupos e ministérios da comunidade</p>
-          </div>
-          {isLeader && (
-            <button onClick={() => setShowForm(true)} className="uk-button uk-button-primary" style={{ fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+    <div>
+        <PageHeader
+          icon="users"
+          title="Células & Ministérios"
+          subtitle="Grupos e ministérios da comunidade"
+          actions={isLeader && (
+            <button onClick={() => setShowForm(true)} className="uk-button uk-button-primary">
               <span uk-icon="icon: plus; ratio: 0.8"></span> Novo Grupo
             </button>
           )}
-        </div>
+        />
 
         {/* Detail */}
         {selected ? (
@@ -140,7 +133,7 @@ const Groups: React.FC = () => {
             <button onClick={() => setSelected(null)} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '20px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '13px', padding: 0 }}>
               <span uk-icon="icon: arrow-left; ratio: 0.8"></span> Voltar
             </button>
-            <div style={{ border: '1px solid var(--border)', padding: '24px' }}>
+            <div className="card" style={{ padding: '24px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
                 <div>
                   <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '6px' }}>
@@ -165,13 +158,15 @@ const Groups: React.FC = () => {
                     </button>
                   )}
                   {isLeader && (
-                    <button onClick={() => handleDelete(selected.id)} style={{ background: 'none', border: '1px solid var(--danger)', padding: '6px 12px', cursor: 'pointer', fontSize: '12px', color: 'var(--danger)' }}>Excluir</button>
+                    <button onClick={() => handleDelete(selected.id)} className="uk-button uk-button-danger uk-button-small">
+                      <span uk-icon="icon: trash; ratio: 0.75"></span> Excluir
+                    </button>
                   )}
                 </div>
               </div>
 
               <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--border)' }}>
-                <div style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-faint)', marginBottom: '12px' }}>
+                <div className="list-label">
                   {selected.memberCount} {selected.memberCount === 1 ? 'membro' : 'membros'}
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -180,7 +175,7 @@ const Groups: React.FC = () => {
                       <Avatar name={m.user.name} profileImage={m.user.profileImage} size="small" />
                       <span style={{ fontSize: '13px', color: 'var(--text)' }}>{m.user.name}</span>
                       {m.userId === selected.leaderId && (
-                        <span style={{ fontSize: '10px', color: 'var(--accent)', fontWeight: 700 }}>LÍDER</span>
+                        <span className="uk-label">Líder</span>
                       )}
                     </div>
                   ))}
@@ -191,24 +186,21 @@ const Groups: React.FC = () => {
         ) : (
           <>
             {loading ? <SkeletonList count={4} /> : groups.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '80px 20px', border: '1px dashed var(--border)', color: 'var(--text-faint)' }}>
-                <span uk-icon="icon: users; ratio: 2" style={{ display: 'block', marginBottom: '12px', color: 'var(--border-strong)' }}></span>
-                <p style={{ margin: 0, fontSize: '14px' }}>Nenhum grupo criado ainda</p>
-              </div>
+              <EmptyState icon="users" title="Nenhum grupo criado ainda" text="As células e ministérios aparecem aqui" />
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
                 {groups.map((g, i) => (
                   <div
                     key={g.id}
-                    className="fade-in-up"
-                    style={{ animationDelay: `${i * 50}ms`, border: '1px solid var(--border)', padding: '18px', cursor: 'pointer', transition: 'border-color var(--t), box-shadow var(--t)' }}
+                    className="card fade-in-up"
+                    style={{ animationDelay: `${i * 50}ms`, padding: '18px', cursor: 'pointer', transition: 'border-color var(--t)' }}
                     onClick={() => setSelected(g)}
-                    onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--accent)')}
+                    onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--border-strong)')}
                     onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
                       <CategoryBadge cat={g.category} />
-                      {g.isMember && <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--success)' }}>● MEMBRO</span>}
+                      {g.isMember && <span className="uk-label">Membro</span>}
                     </div>
                     <div style={{ fontWeight: 700, fontSize: '15px', color: 'var(--text)', marginBottom: '4px' }}>{g.name}</div>
                     {g.description && <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '10px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.description}</div>}
@@ -228,27 +220,27 @@ const Groups: React.FC = () => {
 
         {/* Create modal */}
         {showForm && (
-          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }} onClick={e => { if (e.target === e.currentTarget) setShowForm(false); }}>
-            <div className="fade-in" style={{ background: 'var(--bg)', border: '1px solid var(--border-strong)', width: '100%', maxWidth: '460px' }}>
-              <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontWeight: 700, fontSize: '14px', color: 'var(--text)' }}>Novo Grupo</span>
-                <button onClick={() => setShowForm(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
+          <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setShowForm(false); }}>
+            <div className="modal-box fade-in" style={{ maxWidth: '460px' }}>
+              <div className="modal-header">
+                <h4>Novo Grupo</h4>
+                <button className="modal-close-btn" onClick={() => setShowForm(false)}>
                   <span uk-icon="icon: close; ratio: 0.9"></span>
                 </button>
               </div>
-              <form onSubmit={handleCreate} style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '5px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Nome *</label>
+                  <label className="uk-form-label">Nome *</label>
                   <input className="uk-input" value={form.name} onChange={e => setForm(f => ({...f, name: e.target.value}))} placeholder="Nome do grupo" required />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '5px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Tipo</label>
+                  <label className="uk-form-label">Tipo</label>
                   <select className="uk-select" value={form.category} onChange={e => setForm(f => ({...f, category: e.target.value}))}>
                     {Object.entries(CATEGORIES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '5px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Descrição</label>
+                  <label className="uk-form-label">Descrição</label>
                   <textarea className="uk-textarea" value={form.description} onChange={e => setForm(f => ({...f, description: e.target.value}))} rows={3} placeholder="Breve descrição do grupo..." style={{ resize: 'none' }} />
                 </div>
                 <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
@@ -261,7 +253,6 @@ const Groups: React.FC = () => {
             </div>
           </div>
         )}
-      </div>
     </div>
   );
 };

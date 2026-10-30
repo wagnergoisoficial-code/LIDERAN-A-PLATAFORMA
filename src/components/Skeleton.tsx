@@ -14,7 +14,7 @@ export const Skeleton: React.FC<SkeletonProps> = ({ width = '100%', height = '16
 );
 
 export const SkeletonCard: React.FC = () => (
-  <div style={{ border: '1px solid var(--border)', padding: '16px', marginBottom: '12px' }}>
+  <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '16px', marginBottom: '12px' }}>
     <div style={{ display: 'flex', gap: '10px', marginBottom: '12px' }}>
       <Skeleton width="40px" height="40px" className="avatar-circle" />
       <div style={{ flex: 1 }}>
@@ -31,7 +31,7 @@ export const SkeletonCard: React.FC = () => (
 export const SkeletonList: React.FC<{ count?: number }> = ({ count = 4 }) => (
   <>
     {Array.from({ length: count }).map((_, i) => (
-      <div key={i} style={{ border: '1px solid var(--border)', padding: '14px 16px', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+      <div key={i} style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '14px 16px', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '12px' }}>
         <Skeleton width="36px" height="36px" className="avatar-circle" />
         <div style={{ flex: 1 }}>
           <Skeleton width="50%" height="13px" />

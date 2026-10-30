@@ -65,27 +65,27 @@ const ImageUploadInput: React.FC<ImageUploadInputProps> = ({
               <div
                 onClick={() => fileInputRef.current?.click()}
                 style={{
-                  border: '2px dashed #ccc',
-                  borderRadius: '4px',
+                  border: '2px dashed var(--border-strong)',
+                  borderRadius: 'var(--radius)',
                   padding: '20px',
                   textAlign: 'center',
                   cursor: 'pointer',
-                  backgroundColor: '#fafafa',
+                  backgroundColor: 'var(--bg-surface)',
                   transition: 'all 0.3s ease'
                 }}
                 onDragOver={(e) => {
                   e.preventDefault();
-                  e.currentTarget.style.backgroundColor = '#f0f0f0';
-                  e.currentTarget.style.borderColor = '#999';
+                  e.currentTarget.style.backgroundColor = 'var(--bg-elevated)';
+                  e.currentTarget.style.borderColor = 'var(--text-muted)';
                 }}
                 onDragLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#fafafa';
-                  e.currentTarget.style.borderColor = '#ccc';
+                  e.currentTarget.style.backgroundColor = 'var(--bg-surface)';
+                  e.currentTarget.style.borderColor = 'var(--border-strong)';
                 }}
                 onDrop={(e) => {
                   e.preventDefault();
-                  e.currentTarget.style.backgroundColor = '#fafafa';
-                  e.currentTarget.style.borderColor = '#ccc';
+                  e.currentTarget.style.backgroundColor = 'var(--bg-surface)';
+                  e.currentTarget.style.borderColor = 'var(--border-strong)';
                   
                   const files = e.dataTransfer.files;
                   if (files.length > 0) {
