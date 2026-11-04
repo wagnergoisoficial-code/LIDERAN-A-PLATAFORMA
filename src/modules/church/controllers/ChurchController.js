@@ -135,14 +135,45 @@ class ChurchController {
   async updateMember(req, res, next) {
     try {
       const { churchId, memberId } = req.params;
-      const { name, title, location, age } = req.body;
-      const member = await ChurchService.updateMember(memberId, churchId, { name, title, location, age }, req.user);
+      const { name, title, location, age, birthDate } = req.body;
+      const member = await ChurchService.updateMember(memberId, churchId, { name, title, location, age, birthDate }, req.user);
 
       res.status(200).json({
         success: true,
         message: 'Membro atualizado',
         data: member,
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async moderateMember(req, res, next) {
+    try {
+      const { churchId, memberId } = req.params;
+      const { action, days, reason, reportId } = req.body;
+      const member = await ChurchService.moderateMember(memberId, churchId, { action, days, reason, reportId }, req.user);
+      res.status(200).json({ success: true, message: 'Estado do membro atualizado', data: member });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async authorizeMinor(req, res, next) {
+    try {
+      const { churchId, memberId } = req.params;
+      const member = await ChurchService.authorizeMinor(memberId, churchId, req.uploadedImageUrl || null, req.user);
+      res.status(200).json({ success: true, message: 'Autorização registrada: a conta do menor está ativa', data: member });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async addGuardian(req, res, next) {
+    try {
+      const { churchId, memberId } = req.params;
+      const member = await ChurchService.addGuardian(memberId, churchId, req.body, req.user);
+      res.status(201).json({ success: true, message: 'Responsável vinculado ao membro', data: member });
     } catch (error) {
       next(error);
     }

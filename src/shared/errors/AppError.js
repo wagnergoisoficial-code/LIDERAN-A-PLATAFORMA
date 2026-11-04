@@ -1,9 +1,10 @@
 // Global error classes for structured error handling
 
 class AppError extends Error {
-  constructor(message, statusCode = 500) {
+  constructor(message, statusCode = 500, code) {
     super(message);
     this.statusCode = statusCode;
+    this.code = code;
     this.timestamp = new Date();
     Error.captureStackTrace(this, this.constructor);
   }
@@ -37,6 +38,14 @@ class ForbiddenError extends AuthorizationError {
   }
 }
 
+// Conta suspensa, bloqueada ou à espera da autorização dos pais (o site termina a sessão)
+class AccountRestrictedError extends AppError {
+  constructor(message) {
+    super(message, 403, 'ACCOUNT_RESTRICTED');
+    this.name = 'AccountRestrictedError';
+  }
+}
+
 class NotFoundError extends AppError {
   constructor(message = 'Resource not found') {
     super(message, 404);
@@ -57,6 +66,7 @@ module.exports = {
   AuthenticationError,
   AuthorizationError,
   ForbiddenError,
+  AccountRestrictedError,
   NotFoundError,
   ConflictError,
 };

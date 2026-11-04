@@ -44,6 +44,7 @@ const errorMiddleware = (err, req, res, next) => {
     success: false,
     message: error.message,
     statusCode: error.statusCode,
+    ...(error.code && { code: error.code }),
     timestamp: error.timestamp,
   };
 

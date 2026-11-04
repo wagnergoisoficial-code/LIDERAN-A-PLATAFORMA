@@ -24,6 +24,9 @@ const sermonRoutes = require('./routes/sermon.routes');
 const groupRoutes = require('./routes/group.routes');
 const searchRoutes = require('./routes/search.routes');
 const uploadRoutes = require('./routes/upload.routes');
+const conversationRoutes = require('./routes/conversation.routes');
+const guardianRoutes = require('./routes/guardian.routes');
+const reportRoutes = require('./routes/report.routes');
 
 class App {
   constructor() {
@@ -132,6 +135,9 @@ class App {
     this.app.use('/api/sermons', sermonRoutes);
     this.app.use('/api/groups', groupRoutes);
     this.app.use('/api/search', searchRoutes);
+    this.app.use('/api/conversations', conversationRoutes);
+    this.app.use('/api/guardian', guardianRoutes);
+    this.app.use('/api/reports', reportRoutes);
 
     // 404 handler
     this.app.use((req, res) => {

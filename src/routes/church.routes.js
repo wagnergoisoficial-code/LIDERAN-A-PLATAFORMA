@@ -2,6 +2,7 @@ const router = require('express').Router();
 const ChurchController = require('../modules/church/controllers/ChurchController');
 const authMiddleware = require('../shared/middlewares/auth.middleware');
 const roleMiddleware = require('../shared/middlewares/role.middleware');
+const { uploadImageMiddleware } = require('../shared/middlewares/upload.middleware');
 
 // Create church (leaders only)
 router.post('/', authMiddleware, roleMiddleware('leader', 'admin'), (req, res, next) => {
@@ -51,6 +52,21 @@ router.post('/:churchId/members', authMiddleware, (req, res, next) => {
 // Update member
 router.put('/:churchId/members/:memberId', authMiddleware, (req, res, next) => {
   ChurchController.updateMember(req, res, next);
+});
+
+// Suspend, block or reactivate a member
+router.post('/:churchId/members/:memberId/moderation', authMiddleware, roleMiddleware('leader', 'admin'), (req, res, next) => {
+  ChurchController.moderateMember(req, res, next);
+});
+
+// Leader confirms the parents' authorization (optional photo of the signed form in "image")
+router.post('/:churchId/members/:memberId/authorize', authMiddleware, roleMiddleware('leader', 'admin'), uploadImageMiddleware, (req, res, next) => {
+  ChurchController.authorizeMinor(req, res, next);
+});
+
+// Link (or create) a guardian for a minor member
+router.post('/:churchId/members/:memberId/guardians', authMiddleware, roleMiddleware('leader', 'admin'), (req, res, next) => {
+  ChurchController.addGuardian(req, res, next);
 });
 
 // Remove member from church

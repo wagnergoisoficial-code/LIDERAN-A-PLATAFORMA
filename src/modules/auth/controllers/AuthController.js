@@ -29,12 +29,14 @@ class AuthController {
     try {
       const dto = new RegisterMemberDto(req.body);
       dto.validate();
-      const member = await this.authService.registerMember(dto, req.user);
+      const result = await this.authService.registerMember(dto, req.user);
 
       res.status(201).json({
         success: true,
-        message: 'Membro cadastrado com sucesso',
-        data: { user: member },
+        message: result.pendingAuthorization
+          ? 'Membro cadastrado. A conta fica ativa depois da autorização do responsável.'
+          : 'Membro cadastrado com sucesso',
+        data: result,
       });
     } catch (error) {
       next(error);

@@ -3,6 +3,11 @@ const CreateChurchDto = require('../dtos/CreateChurchDto');
 const { isUploadUrl } = require('../../../shared/utils/url.util');
 const JwtUtil = require('../../../shared/utils/jwt.util');
 const { canManageChurch, canViewChurch, isAdmin } = require('../../../shared/utils/church.util');
+const { isMinor, ageFrom } = require('../../../shared/utils/minor.util');
+const guardianService = require('../../guardians/guardian.service');
+const { getPrismaClient } = require('../../../config/database');
+
+const SUSPENSION_DAYS = [1, 3, 7, 15, 30, 90];
 const {
   ValidationError,
   NotFoundError,
@@ -129,9 +134,112 @@ class ChurchService {
     return { church: this.format(church, updated), session: this.session(updated) };
   }
 
+  // Dados de proteção (estado da conta, menores e responsáveis) só para quem gere a comunidade
+  formatMember(member, manager) {
+    const { guardians = [], birthDate, status, suspendedUntil, statusReason, ...rest } = member;
+    const base = { ...rest, isMinor: isMinor(member) };
+    if (!manager) return base;
+    return {
+      ...base,
+      birthDate,
+      status,
+      suspendedUntil,
+      statusReason,
+      guardians: guardians.map((g) => ({
+        id: g.guardian.id,
+        name: g.guardian.name,
+        email: g.guardian.email,
+        relationship: g.relationship,
+        authorizedAt: g.authorizedAt,
+        authorizationMethod: g.authorizationMethod,
+        proofUrl: g.proofUrl,
+      })),
+    };
+  }
+
   async getChurchMembers(churchId, user) {
-    await this.getChurch(churchId, user);
-    return ChurchRepository.getMembers(churchId);
+    const church = await this.findOr404(churchId);
+    if (!canViewChurch(user, church)) throw new NotFoundError('Comunidade não encontrada');
+    const manager = canManageChurch(user, church);
+    const members = await ChurchRepository.getMembers(churchId);
+    return members.map((m) => this.formatMember(m, manager));
+  }
+
+  async findMemberToManage(memberId, churchId, user, message) {
+    const church = await this.findManageable(churchId, user, message);
+    const member = await ChurchRepository.getMemberById(memberId, churchId);
+    if (!member) throw new NotFoundError('Membro não encontrado nesta comunidade');
+    return { church, member };
+  }
+
+  // Suspender (por dias), bloquear ou reativar um membro. Fica registado para auditoria.
+  async moderateMember(memberId, churchId, { action, days, reason, reportId }, user) {
+    const { church, member } = await this.findMemberToManage(
+      memberId, churchId, user, 'Apenas os líderes desta comunidade podem suspender ou bloquear membros'
+    );
+
+    if (member.id === user.id) throw new ValidationError('Você não pode aplicar esta ação a si mesmo');
+    if (member.id === church.leaderID) throw new ForbiddenError('O criador da comunidade não pode ser suspenso nem bloqueado');
+    if (member.role === 'admin') throw new ForbiddenError('Administradores não podem ser suspensos pela comunidade');
+    if (member.role === 'leader' && church.leaderID !== user.id && !isAdmin(user)) {
+      throw new ForbiddenError('Apenas o criador da comunidade pode suspender ou bloquear outros líderes');
+    }
+
+    const note = typeof reason === 'string' ? reason.trim().slice(0, 500) || null : null;
+    let data;
+    let until = null;
+    let summary;
+
+    if (action === 'suspend') {
+      const n = parseInt(days, 10);
+      if (!SUSPENSION_DAYS.includes(n)) throw new ValidationError(`Escolha a duração da suspensão: ${SUSPENSION_DAYS.join(', ')} dias`);
+      until = new Date(Date.now() + n * 24 * 60 * 60 * 1000);
+      data = { status: 'suspended', suspendedUntil: until, statusReason: note };
+      summary = `Membro suspenso por ${n} ${n === 1 ? 'dia' : 'dias'}`;
+    } else if (action === 'block') {
+      data = { status: 'blocked', suspendedUntil: null, statusReason: note };
+      summary = 'Membro bloqueado';
+    } else if (action === 'reactivate') {
+      if (member.status === 'pending_authorization') {
+        throw new ValidationError('Este menor aguarda a autorização dos pais: use "Confirmar autorização"');
+      }
+      data = { status: 'active', suspendedUntil: null, statusReason: null };
+      summary = 'Membro reativado';
+    } else {
+      throw new ValidationError('Ação inválida');
+    }
+
+    const prisma = getPrismaClient();
+    await prisma.$transaction([
+      prisma.user.update({ where: { id: member.id }, data }),
+      prisma.moderationAction.create({
+        data: { action, reason: note, until, churchId, userId: member.id, actorId: user.id, reportId: reportId || null },
+      }),
+      ...(reportId
+        ? [prisma.report.updateMany({
+            where: { id: reportId, churchId },
+            data: { status: 'resolved', resolvedById: user.id, resolvedAt: new Date(), resolution: summary },
+          })]
+        : []),
+    ]);
+
+    return this.formatMember(await ChurchRepository.getMemberById(member.id, churchId), true);
+  }
+
+  // Autorização dos pais confirmada pelo líder (com a foto do termo assinado, opcional)
+  async authorizeMinor(memberId, churchId, proofUrl, user) {
+    const { member } = await this.findMemberToManage(
+      memberId, churchId, user, 'Apenas os líderes desta comunidade podem confirmar autorizações'
+    );
+    if (member.status !== 'pending_authorization') throw new ValidationError('Este membro não aguarda autorização');
+    await guardianService.authorize(member.id, { actor: user, method: 'leader_confirmation', proofUrl });
+    return this.formatMember(await ChurchRepository.getMemberById(member.id, churchId), true);
+  }
+
+  async addGuardian(memberId, churchId, input, user) {
+    await this.findMemberToManage(memberId, churchId, user, 'Apenas os líderes desta comunidade podem cadastrar responsáveis');
+    await guardianService.addGuardian(memberId, input, user);
+    return this.formatMember(await ChurchRepository.getMemberById(memberId, churchId), true);
   }
 
   // Adiciona um utilizador existente (sem comunidade) a esta comunidade
@@ -147,7 +255,7 @@ class ChurchService {
     if (target.churchId && !isAdmin(user)) throw new ConflictError('Este usuário já pertence a outra comunidade');
 
     await ChurchRepository.setUserChurch(userId, churchId);
-    return ChurchRepository.getMemberById(userId, churchId);
+    return this.formatMember(await ChurchRepository.getMemberById(userId, churchId), true);
   }
 
   async removeMemberFromChurch(memberId, churchId, user) {
@@ -194,6 +302,14 @@ class ChurchService {
       }
       update.age = age;
     }
+    if (data.birthDate !== undefined) {
+      const birthDate = data.birthDate ? new Date(data.birthDate) : null;
+      if (birthDate && (Number.isNaN(birthDate.getTime()) || birthDate > new Date())) {
+        throw new ValidationError('Data de nascimento inválida');
+      }
+      update.birthDate = birthDate;
+      if (birthDate) update.age = ageFrom(birthDate);
+    }
 
     const result = await ChurchRepository.updateMember(memberId, churchId, update);
 
@@ -201,7 +317,7 @@ class ChurchService {
       throw new NotFoundError('Membro não encontrado nesta comunidade');
     }
 
-    return ChurchRepository.getMemberById(memberId, churchId);
+    return this.formatMember(await ChurchRepository.getMemberById(memberId, churchId), true);
   }
 
   session(user) {

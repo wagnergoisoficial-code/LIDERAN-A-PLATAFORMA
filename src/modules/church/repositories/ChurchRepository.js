@@ -9,7 +9,22 @@ const MEMBER_SELECT = {
   title: true,
   location: true,
   age: true,
+  birthDate: true,
+  status: true,
+  suspendedUntil: true,
+  statusReason: true,
   createdAt: true,
+};
+
+// Responsáveis de um membro menor (só para os líderes)
+const GUARDIANS_SELECT = {
+  select: {
+    relationship: true,
+    authorizedAt: true,
+    authorizationMethod: true,
+    proofUrl: true,
+    guardian: { select: { id: true, name: true, email: true } },
+  },
 };
 
 class ChurchRepository {
@@ -78,7 +93,7 @@ class ChurchRepository {
   async getMembers(churchId) {
     return this.prisma.user.findMany({
       where: { churchId },
-      select: MEMBER_SELECT,
+      select: { ...MEMBER_SELECT, guardians: GUARDIANS_SELECT },
       orderBy: { createdAt: 'asc' },
       take: 1000,
     });
@@ -112,8 +127,16 @@ class ChurchRepository {
   async getMemberById(userId, churchId) {
     return this.prisma.user.findFirst({
       where: { id: userId, churchId },
-      select: MEMBER_SELECT,
+      select: { ...MEMBER_SELECT, guardians: GUARDIANS_SELECT },
     });
+  }
+
+  async setStatus(userId, data) {
+    return this.prisma.user.update({ where: { id: userId }, data });
+  }
+
+  async logModeration(data) {
+    return this.prisma.moderationAction.create({ data });
   }
 
   async getMemberStats(churchId) {

@@ -18,12 +18,16 @@ class ChatController {
   async getMessages(req, res, next) {
     try {
       const { limit = 50, lastMessageId = null } = req.query;
-      const messages = await chatService.getMessages(req.user, limit, lastMessageId);
+      const [messages, isProtected] = await Promise.all([
+        chatService.getMessages(req.user, limit, lastMessageId),
+        chatService.isProtected(req.user),
+      ]);
 
       res.status(200).json({
         success: true,
         data: messages,
         count: messages.length,
+        protected: isProtected,
       });
     } catch (err) {
       next(err);

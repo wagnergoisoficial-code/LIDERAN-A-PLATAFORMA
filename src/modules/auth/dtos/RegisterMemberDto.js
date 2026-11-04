@@ -1,5 +1,6 @@
 const ValidationUtil = require('../../../shared/utils/validation.util');
 const { ValidationError } = require('../../../shared/errors/AppError');
+const { ageFrom } = require('../../../shared/utils/minor.util');
 const { PASSWORD_RULE_MESSAGE } = require('./RegisterDto');
 
 class RegisterMemberDto {
@@ -9,9 +10,15 @@ class RegisterMemberDto {
     this.password = data.password;
     this.confirmPassword = data.confirmPassword;
     this.churchId = data.churchId;
-    this.age = data.age ? parseInt(data.age, 10) : null;
+    this.birthDate = data.birthDate ? new Date(data.birthDate) : null;
     this.title = data.title || null;
     this.location = data.location || null;
+    // Obrigatório quando o membro é menor de idade
+    this.guardian = data.guardian && typeof data.guardian === 'object' ? data.guardian : null;
+  }
+
+  get age() {
+    return this.birthDate ? ageFrom(this.birthDate) : null;
   }
 
   validate() {
@@ -31,12 +38,24 @@ class RegisterMemberDto {
       throw new ValidationError('As senhas não conferem');
     }
 
-    if (this.age !== null && (Number.isNaN(this.age) || this.age < 1 || this.age > 150)) {
-      throw new ValidationError('Idade deve ser entre 1 e 150');
+    if (!this.birthDate || Number.isNaN(this.birthDate.getTime())) {
+      throw new ValidationError('Informe a data de nascimento do membro');
+    }
+
+    if (this.birthDate > new Date() || this.age > 120) {
+      throw new ValidationError('Data de nascimento inválida');
+    }
+
+    if (this.age < 18 && !this.guardian) {
+      throw new ValidationError('Membros menores de 18 anos precisam de um responsável (pai, mãe ou tutor)');
     }
 
     if (ValidationUtil.isEmpty(this.churchId)) {
       throw new ValidationError('Selecione a comunidade do membro');
+    }
+
+    if (this.guardian && String(this.guardian.email || '').trim().toLowerCase() === String(this.email).toLowerCase()) {
+      throw new ValidationError('O e-mail do responsável tem de ser diferente do e-mail do membro');
     }
 
     return true;

@@ -80,7 +80,7 @@ test('fluxo completo: autenticação, comunidades, conteúdo, notificações e p
 
     // ── MEMBROS ─────────────────────────────────────────────────
     const m1 = await call('POST', '/auth/register-member', tokA, {
-      name: 'Membro Um', email: `m1${stamp}@t.com`, password: 'Senha1234', confirmPassword: 'Senha1234', churchId: cA, title: 'Músico',
+      name: 'Membro Um', email: `m1${stamp}@t.com`, password: 'Senha1234', confirmPassword: 'Senha1234', birthDate: '1998-04-12', churchId: cA, title: 'Músico',
     });
     check('líder cadastra membro', m1.status === 201 && m1.data.user.churchId === cA && !m1.data.token, m1);
     const l1 = await call('POST', '/auth/login', null, { email: `m1${stamp}@t.com`, password: 'Senha1234' });
@@ -88,13 +88,13 @@ test('fluxo completo: autenticação, comunidades, conteúdo, notificações e p
     const m1Id = l1.data.user.id;
 
     const m2 = await call('POST', '/auth/register-member', tokA, {
-      name: 'Membro Dois', email: `m2${stamp}@t.com`, password: 'Senha1234', confirmPassword: 'Senha1234', churchId: cA,
+      name: 'Membro Dois', email: `m2${stamp}@t.com`, password: 'Senha1234', confirmPassword: 'Senha1234', birthDate: '1998-04-12', churchId: cA,
     });
     const tokM2 = (await call('POST', '/auth/login', null, { email: `m2${stamp}@t.com`, password: 'Senha1234' })).data.token;
     const m2Id = m2.data.user.id;
 
     const memberRegisters = await call('POST', '/auth/register-member', tokM1, {
-      name: 'Intruso', email: `x${stamp}@t.com`, password: 'Senha1234', confirmPassword: 'Senha1234', churchId: cA,
+      name: 'Intruso', email: `x${stamp}@t.com`, password: 'Senha1234', confirmPassword: 'Senha1234', birthDate: '1998-04-12', churchId: cA,
     });
     check('membro não pode cadastrar membros → 403', memberRegisters.status === 403, memberRegisters);
 
@@ -104,7 +104,7 @@ test('fluxo completo: autenticação, comunidades, conteúdo, notificações e p
     const cB = churchB.data.id;
 
     const crossRegister = await call('POST', '/auth/register-member', tokB, {
-      name: 'Outro', email: `o${stamp}@t.com`, password: 'Senha1234', confirmPassword: 'Senha1234', churchId: cA,
+      name: 'Outro', email: `o${stamp}@t.com`, password: 'Senha1234', confirmPassword: 'Senha1234', birthDate: '1998-04-12', churchId: cA,
     });
     check('líder B não cadastra na comunidade A → 403', crossRegister.status === 403, crossRegister);
 

@@ -1,6 +1,9 @@
 const { getPrismaClient } = require('../../config/database');
-const { NotFoundError, ValidationError } = require('../../shared/errors/AppError');
-const { requireChurch, assertSameChurch, assertOwnerOrLeader } = require('../../shared/utils/church.util');
+const { NotFoundError, ValidationError, ForbiddenError } = require('../../shared/errors/AppError');
+const { requireChurch, assertSameChurch, isLeaderOrAdmin } = require('../../shared/utils/church.util');
+const { churchHasMinors } = require('../../shared/utils/minor.util');
+
+const PROTECTED_MESSAGE = 'Há menores de idade nesta comunidade: as mensagens do chat não podem ser apagadas.';
 
 const MAX_LENGTH = 500;
 const USER_SELECT = { id: true, name: true, profileImage: true };
@@ -33,7 +36,7 @@ class ChatService {
       select: { blockedId: true },
     });
 
-    const where = { churchId: user.churchId };
+    const where = { churchId: user.churchId, hiddenAt: null };
     if (blocked.length) where.userId = { notIn: blocked.map((b) => b.blockedId) };
 
     if (lastMessageId) {
@@ -51,17 +54,40 @@ class ChatService {
     return messages.reverse(); // mais antigas primeiro
   }
 
-  // O autor ou um líder da comunidade pode apagar
+  // Com menores na comunidade, ninguém apaga as próprias mensagens.
+  // Os líderes podem ocultar mensagens de outros (moderação); o conteúdo fica guardado.
   async deleteMessage(messageId, user) {
     const message = await this.prisma.message.findUnique({ where: { id: messageId } });
 
-    if (!message) throw new NotFoundError('Mensagem não encontrada');
+    if (!message || message.hiddenAt) throw new NotFoundError('Mensagem não encontrada');
 
     assertSameChurch(user, message.churchId, 'Mensagem não encontrada');
-    assertOwnerOrLeader(user, message.userId, 'Você só pode apagar as suas mensagens');
 
-    await this.prisma.message.delete({ where: { id: messageId } });
+    const isAuthor = message.userId === user.id;
+    if (!isAuthor && !isLeaderOrAdmin(user)) {
+      throw new ForbiddenError('Você só pode apagar as suas mensagens');
+    }
+    if (isAuthor && (await churchHasMinors(this.prisma, message.churchId))) {
+      throw new ForbiddenError(PROTECTED_MESSAGE);
+    }
+
+    await this.prisma.message.update({
+      where: { id: messageId },
+      data: { hiddenAt: new Date(), hiddenById: user.id },
+    });
+
+    if (!isAuthor) {
+      await this.prisma.moderationAction.create({
+        data: { action: 'hide_message', reason: messageId, churchId: message.churchId, userId: message.userId, actorId: user.id },
+      });
+    }
+
     return { id: messageId };
+  }
+
+  // O chat é protegido quando a comunidade tem menores (as mensagens não se apagam)
+  async isProtected(user) {
+    return user.churchId ? churchHasMinors(this.prisma, user.churchId) : false;
   }
 }
 

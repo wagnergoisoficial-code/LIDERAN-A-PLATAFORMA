@@ -2,6 +2,8 @@ const bcrypt = require('bcrypt');
 const JwtUtil = require('../../../shared/utils/jwt.util');
 const { getPrismaClient } = require('../../../config/database');
 const { canManageChurch } = require('../../../shared/utils/church.util');
+const { assertAccountActive } = require('../../../shared/utils/account-status.util');
+const guardianService = require('../../guardians/guardian.service');
 const {
   ConflictError,
   AuthenticationError,
@@ -47,7 +49,10 @@ class AuthService {
       throw new AuthenticationError('E-mail ou senha inválidos');
     }
 
-    return this.formatAuthResponse(user, this.signToken(user));
+    // Só depois da senha certa se revela que a conta está suspensa, bloqueada ou à espera dos pais
+    const activeUser = await assertAccountActive(user);
+
+    return this.formatAuthResponse(activeUser, this.signToken(activeUser));
   }
 
   // Dados atuais do utilizador com um token renovado
@@ -61,9 +66,11 @@ class AuthService {
     return this.formatAuthResponse(user, this.signToken(user));
   }
 
-  // Um líder cadastra um membro numa comunidade que gere
+  // Um líder cadastra um membro numa comunidade que gere.
+  // Menores de 18 anos ficam ligados a um responsável e à espera da autorização dos pais.
   async registerMember(registerMemberDto, requester) {
-    const church = await getPrismaClient().church.findUnique({ where: { id: registerMemberDto.churchId } });
+    const prisma = getPrismaClient();
+    const church = await prisma.church.findUnique({ where: { id: registerMemberDto.churchId } });
 
     if (!church) {
       throw new NotFoundError('Comunidade não encontrada');
@@ -79,21 +86,40 @@ class AuthService {
       throw new ConflictError('Este e-mail já está cadastrado');
     }
 
+    const minor = registerMemberDto.age < 18;
     const hashedPassword = await bcrypt.hash(registerMemberDto.password, 10);
 
-    const user = await this.userRepository.create({
-      name: registerMemberDto.name,
-      email: registerMemberDto.email,
-      password: hashedPassword,
-      churchId: church.id,
-      role: 'member',
-      leaderId: requester.id,
-      age: registerMemberDto.age,
-      title: registerMemberDto.title,
-      location: registerMemberDto.location,
-    });
+    return prisma.$transaction(async (tx) => {
+      const guardian = minor ? await guardianService.resolveGuardian(tx, registerMemberDto.guardian, requester) : null;
 
-    return this.formatUser(user);
+      const user = await tx.user.create({
+        data: {
+          name: registerMemberDto.name,
+          email: registerMemberDto.email,
+          password: hashedPassword,
+          churchId: church.id,
+          role: 'member',
+          leaderId: requester.id,
+          birthDate: registerMemberDto.birthDate,
+          age: registerMemberDto.age,
+          title: registerMemberDto.title,
+          location: registerMemberDto.location,
+          status: minor ? 'pending_authorization' : 'active',
+        },
+      });
+
+      if (guardian) {
+        await guardianService.link(tx, user.id, guardian.account.id, guardian.relationship);
+      }
+
+      return {
+        user: this.formatUser(user),
+        pendingAuthorization: minor,
+        guardian: guardian
+          ? { id: guardian.account.id, name: guardian.account.name, email: guardian.account.email, created: guardian.created }
+          : null,
+      };
+    });
   }
 
   signToken(user) {
@@ -114,6 +140,7 @@ class AuthService {
       churchId: user.churchId,
       profileImage: user.profileImage || null,
       title: user.title || null,
+      status: user.status || 'active',
     };
   }
 

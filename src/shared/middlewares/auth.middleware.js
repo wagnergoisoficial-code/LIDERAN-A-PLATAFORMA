@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const config = require('../../config/environment');
 const { getPrismaClient } = require('../../config/database');
 const { AuthenticationError } = require('../errors/AppError');
+const { assertAccountActive } = require('../utils/account-status.util');
 
 // Authentication middleware
 // O token só identifica o utilizador: comunidade e cargo são lidos da base de dados
@@ -17,14 +18,18 @@ const authMiddleware = async (req, res, next) => {
     const decoded = jwt.verify(token, config.jwt.secret);
     const user = await getPrismaClient().user.findUnique({
       where: { id: decoded.id },
-      select: { id: true, name: true, email: true, role: true, churchId: true, profileImage: true },
+      select: {
+        id: true, name: true, email: true, role: true, churchId: true, profileImage: true,
+        birthDate: true, age: true, status: true, suspendedUntil: true,
+      },
     });
 
     if (!user) {
       throw new AuthenticationError('Sessão inválida. Faça login novamente.');
     }
 
-    req.user = user;
+    // Contas suspensas, bloqueadas ou à espera da autorização dos pais deixam de ter acesso de imediato
+    req.user = await assertAccountActive(user);
     next();
   } catch (error) {
     if (error instanceof jwt.TokenExpiredError) {
