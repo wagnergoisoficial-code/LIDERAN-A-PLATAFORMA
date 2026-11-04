@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 interface AvatarProps {
   name: string;
@@ -14,6 +14,8 @@ const getInitials = (name: string): string => {
 
 const Avatar: React.FC<AvatarProps> = ({ name: nameProp, profileImage, size = 'medium', className }) => {
   const name = nameProp || '';
+  // Foto que não carregou: mostra as iniciais (volta a tentar se a foto mudar)
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
   const sizeMap = {
     small:  { width: '32px', height: '32px', fontSize: '11px' },
     medium: { width: '44px', height: '44px', fontSize: '14px' },
@@ -21,7 +23,7 @@ const Avatar: React.FC<AvatarProps> = ({ name: nameProp, profileImage, size = 'm
   };
   const s = sizeMap[size];
 
-  if (profileImage) {
+  if (profileImage && failedSrc !== profileImage) {
     return (
       <img
         src={profileImage}
@@ -34,16 +36,7 @@ const Avatar: React.FC<AvatarProps> = ({ name: nameProp, profileImage, size = 'm
           border: '1px solid var(--border)',
           flexShrink: 0,
         }}
-        onError={(e) => {
-          const target = e.target as HTMLImageElement;
-          target.style.display = 'none';
-          const parent = target.parentElement;
-          if (parent) {
-            parent.style.backgroundColor = 'var(--bg-elevated)';
-            parent.style.color = 'var(--text-muted)';
-            parent.innerHTML = getInitials(name);
-          }
-        }}
+        onError={() => setFailedSrc(profileImage)}
       />
     );
   }

@@ -23,10 +23,18 @@ const getHeadersWithoutContentType = () => {
   };
 };
 
-// Sessão expirada ou inválida: limpa os dados e volta ao login
-const endSession = () => {
+// Motivo mostrado no login quando a conta é suspensa, bloqueada ou aguarda os pais
+export const RESTRICTED_KEY = 'account_restricted';
+// Avisa a barra lateral de que o número de mensagens privadas não lidas mudou
+export const UNREAD_MESSAGES_EVENT = 'unread-messages-changed';
+
+// Sessão expirada, inválida ou conta restrita: limpa os dados e volta ao login
+const endSession = (reason?: string) => {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
+  if (reason) {
+    try { sessionStorage.setItem(RESTRICTED_KEY, reason); } catch { /* sem armazenamento */ }
+  }
   if (!window.location.pathname.startsWith('/login')) window.location.href = '/login';
 };
 
@@ -40,6 +48,7 @@ const handleResponse = async (response: Response) => {
 
   if (!response.ok) {
     if (response.status === 401 && localStorage.getItem(TOKEN_KEY)) endSession();
+    if (response.status === 403 && data?.code === 'ACCOUNT_RESTRICTED' && localStorage.getItem(TOKEN_KEY)) endSession(data.message);
     throw {
       message: data?.message || data?.error || 'Ocorreu um erro na requisição',
       statusCode: response.status,
@@ -438,6 +447,74 @@ export const api = {
     }),
 
   // Search
+  // Conversas privadas
+  getConversations: () =>
+    request('/conversations'),
+
+  getUnreadMessages: () =>
+    request('/conversations/unread'),
+
+  startConversation: (userId: string) =>
+    request('/conversations', { method: 'POST', body: JSON.stringify({ userId }) }),
+
+  getConversationMessages: (conversationId: string, after?: string) =>
+    request(`/conversations/${conversationId}/messages${after ? `?after=${encodeURIComponent(after)}` : ''}`),
+
+  sendDirectMessage: (conversationId: string, content: string) =>
+    request(`/conversations/${conversationId}/messages`, { method: 'POST', body: JSON.stringify({ content }) }),
+
+  deleteDirectMessage: (conversationId: string, messageId: string) =>
+    request(`/conversations/${conversationId}/messages/${messageId}`, { method: 'DELETE' }),
+
+  markConversationRead: (conversationId: string) =>
+    request(`/conversations/${conversationId}/read`, { method: 'POST' }).then(res => {
+      window.dispatchEvent(new Event(UNREAD_MESSAGES_EVENT));
+      return res;
+    }),
+
+  // Área do responsável
+  getGuardianChildren: () =>
+    request('/guardian/children'),
+
+  getChildConversation: (minorId: string, conversationId: string) =>
+    request(`/guardian/children/${minorId}/conversations/${conversationId}`),
+
+  authorizeChild: (minorId: string) =>
+    request(`/guardian/children/${minorId}/authorize`, { method: 'POST' }),
+
+  // Denúncias
+  createReport: (data: { targetType: 'conversation' | 'community_chat' | 'post' | 'profile'; targetId: string; details?: string }) =>
+    request('/reports', { method: 'POST', body: JSON.stringify(data) }),
+
+  getReports: (churchId: string, status?: string) =>
+    request(`/reports?churchId=${encodeURIComponent(churchId)}${status ? `&status=${status}` : ''}`),
+
+  getReport: (reportId: string) =>
+    request(`/reports/${reportId}`),
+
+  updateReport: (reportId: string, data: { status: string; resolution?: string }) =>
+    request(`/reports/${reportId}`, { method: 'PATCH', body: JSON.stringify(data) }),
+
+  // Moderação e autorizações no painel do líder
+  moderateMember: (churchId: string, memberId: string, data: { action: 'suspend' | 'block' | 'reactivate'; days?: number; reason?: string; reportId?: string }) =>
+    request(`/churches/${churchId}/members/${memberId}/moderation`, { method: 'POST', body: JSON.stringify(data) }),
+
+  authorizeMinor: (churchId: string, memberId: string, proof?: File | null) => {
+    if (proof) {
+      const formData = new FormData();
+      formData.append('image', proof);
+      return request(`/churches/${churchId}/members/${memberId}/authorize`, {
+        method: 'POST',
+        headers: getHeadersWithoutContentType(),
+        body: formData
+      });
+    }
+    return request(`/churches/${churchId}/members/${memberId}/authorize`, { method: 'POST' });
+  },
+
+  addGuardian: (churchId: string, memberId: string, data: any) =>
+    request(`/churches/${churchId}/members/${memberId}/guardians`, { method: 'POST', body: JSON.stringify(data) }),
+
   search: (q: string) =>
     request(`/search?q=${encodeURIComponent(q)}`),
 };

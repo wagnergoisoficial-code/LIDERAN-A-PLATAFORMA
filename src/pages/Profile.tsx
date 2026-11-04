@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import UIkit from 'uikit';
 import EmptyState from '../components/EmptyState';
 import PageHeader from '../components/PageHeader';
+import ReportButton from '../components/ReportButton';
 
 interface UserProfile {
   id: string;
@@ -60,6 +61,21 @@ const Profile = () => {
     socialLinks: [] as { platform: string; url: string }[],
   });
   const [blocking, setBlocking] = useState(false);
+  const [openingChat, setOpeningChat] = useState(false);
+  const navigate = useNavigate();
+
+  // Abre (ou cria) a conversa privada com esta pessoa
+  const handleMessage = async () => {
+    if (!profile) return;
+    setOpeningChat(true);
+    try {
+      const res = await api.startConversation(profile.id);
+      navigate(`/messages?c=${res.data.id}`);
+    } catch (err: any) {
+      UIkit.notification({ message: err.message || 'Não foi possível abrir a conversa', status: 'danger' });
+      setOpeningChat(false);
+    }
+  };
 
   useEffect(() => {
     const id = userId || currentUser?.id;
@@ -199,14 +215,23 @@ const Profile = () => {
             {isEditing ? 'Cancelar' : 'Editar Perfil'}
           </button>
         ) : (
-          <button
-            className={`uk-button ${profile.isBlocked ? 'uk-button-default' : 'uk-button-danger'}`}
-            onClick={handleToggleBlock}
-            disabled={blocking}
-          >
-            <span uk-icon={`icon: ${profile.isBlocked ? 'unlock' : 'ban'}; ratio: 0.8`}></span>
-            {profile.isBlocked ? 'Desbloquear' : 'Bloquear'}
-          </button>
+          <>
+            {!profile.isBlocked && currentUser?.role !== 'guardian' && (
+              <button className="uk-button uk-button-primary" onClick={handleMessage} disabled={openingChat}>
+                <span uk-icon="icon: mail; ratio: 0.8"></span>
+                Mensagem
+              </button>
+            )}
+            {currentUser?.role !== 'guardian' && <ReportButton targetType="profile" targetId={profile.id} />}
+            <button
+              className={`uk-button ${profile.isBlocked ? 'uk-button-default' : 'uk-button-danger'}`}
+              onClick={handleToggleBlock}
+              disabled={blocking}
+            >
+              <span uk-icon={`icon: ${profile.isBlocked ? 'unlock' : 'ban'}; ratio: 0.8`}></span>
+              {profile.isBlocked ? 'Desbloquear' : 'Bloquear'}
+            </button>
+          </>
         )}
       />
 

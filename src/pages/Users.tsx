@@ -6,6 +6,7 @@ import UIkit from 'uikit';
 import Avatar from '../components/Avatar';
 import PageHeader from '../components/PageHeader';
 import EmptyState from '../components/EmptyState';
+import GuardianFields, { EMPTY_GUARDIAN, GuardianDraft, guardianPayload, isMinorDate, todayInput } from '../components/GuardianFields';
 
 interface Member {
   id: string; name: string; email: string; role: string;
@@ -17,7 +18,7 @@ interface MemberStat {
   total: number; percentage: number;
 }
 
-const emptyAddForm = { name: '', email: '', password: '', confirmPassword: '', age: '', title: '', location: '' };
+const emptyAddForm = { name: '', email: '', password: '', confirmPassword: '', birthDate: '', title: '', location: '' };
 
 const engagementColor = (pct: number) => {
   if (pct >= 30) return 'var(--success)';
@@ -55,10 +56,11 @@ const Users = () => {
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [addForm, setAddForm] = useState({ ...emptyAddForm });
+  const [guardian, setGuardian] = useState<GuardianDraft>({ ...EMPTY_GUARDIAN });
   const [addLoading, setAddLoading] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingMember, setEditingMember] = useState<Member | null>(null);
-  const [editForm, setEditForm] = useState({ name: '', title: '', location: '', age: '' });
+  const [editForm, setEditForm] = useState({ name: '', title: '', location: '', birthDate: '' });
   const [editLoading, setEditLoading] = useState(false);
   const [deletingMemberId, setDeletingMemberId] = useState<string | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -103,12 +105,14 @@ const Users = () => {
       const response = await api.registerMemberInChurch({
         name: addForm.name, email: addForm.email,
         password: addForm.password, confirmPassword: addForm.confirmPassword,
-        churchId, age: addForm.age ? parseInt(addForm.age) : undefined,
+        churchId, birthDate: addForm.birthDate,
         title: addForm.title || undefined, location: addForm.location || undefined,
+        guardian: isMinorDate(addForm.birthDate) ? guardianPayload(guardian) : undefined,
       });
       if (response.success) {
-        UIkit.notification({ message: 'Membro cadastrado!', status: 'success', pos: 'top-right' });
+        UIkit.notification({ message: response.message || 'Membro cadastrado!', status: 'success', pos: 'top-right' });
         setAddForm({ ...emptyAddForm });
+        setGuardian({ ...EMPTY_GUARDIAN });
         setShowAddModal(false);
         loadAll();
       }
@@ -121,7 +125,7 @@ const Users = () => {
 
   const openEdit = (member: Member) => {
     setEditingMember(member);
-    setEditForm({ name: member.name || '', title: member.title || '', location: member.location || '', age: member.age != null ? String(member.age) : '' });
+    setEditForm({ name: member.name || '', title: member.title || '', location: member.location || '', birthDate: (member as any).birthDate ? String((member as any).birthDate).slice(0, 10) : '' });
     setShowEditModal(true);
   };
 
@@ -137,7 +141,7 @@ const Users = () => {
     try {
       const response = await api.updateChurchMember(churchId, editingMember.id, {
         name: editForm.name, title: editForm.title,
-        location: editForm.location, age: editForm.age ? parseInt(editForm.age) : null,
+        location: editForm.location, birthDate: editForm.birthDate || null,
       });
       if (response.success) {
         UIkit.notification({ message: 'Membro atualizado!', status: 'success', pos: 'top-right' });
@@ -296,17 +300,23 @@ const Users = () => {
                   { label: 'Email *', name: 'email', type: 'email', placeholder: 'email@exemplo.com' },
                   { label: 'Senha *', name: 'password', type: 'password', placeholder: '8+ caracteres, Aa e número' },
                   { label: 'Confirmar Senha *', name: 'confirmPassword', type: 'password', placeholder: 'Confirme a senha' },
-                  { label: 'Idade', name: 'age', type: 'number', placeholder: 'Ex: 25' },
+                  { label: 'Data de nascimento *', name: 'birthDate', type: 'date', placeholder: '' },
                   { label: 'Título / Função', name: 'title', type: 'text', placeholder: 'Ex: Diácono' },
                 ].map(f => (
                   <div key={f.name}>
                     <label className="form-label">{f.label}</label>
                     <input className="form-input" type={f.type} name={f.name} placeholder={f.placeholder}
                       value={(addForm as any)[f.name]} onChange={handleAddChange}
+                      max={f.type === 'date' ? todayInput() : undefined}
                       required={f.label.endsWith('*')} />
                   </div>
                 ))}
               </div>
+              {isMinorDate(addForm.birthDate) && (
+                <div style={{ marginBottom: '12px' }}>
+                  <GuardianFields value={guardian} onChange={setGuardian} />
+                </div>
+              )}
               <div style={{ marginBottom: '20px' }}>
                 <label className="form-label">Localização</label>
                 <input className="form-input" type="text" name="location" placeholder="Ex: Lisboa"
@@ -344,8 +354,8 @@ const Users = () => {
                   <input className="form-input" type="text" name="title" placeholder="Ex: Diácono" value={editForm.title} onChange={handleEditChange} />
                 </div>
                 <div>
-                  <label className="form-label">Idade</label>
-                  <input className="form-input" type="number" name="age" placeholder="Ex: 25" value={editForm.age} onChange={handleEditChange} />
+                  <label className="form-label">Data de nascimento</label>
+                  <input className="form-input" type="date" name="birthDate" max={todayInput()} value={editForm.birthDate} onChange={handleEditChange} />
                 </div>
               </div>
               <div style={{ marginBottom: '20px' }}>

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, Component } from 'react';
 import { Routes, Route, Navigate, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import { useTheme } from './context/ThemeContext';
-import { api } from './services/api';
+import { api, UNREAD_MESSAGES_EVENT } from './services/api';
 import ToastContainer from './components/ToastContainer';
 import Avatar from './components/Avatar';
 
@@ -54,6 +54,8 @@ import Prayers from './pages/Prayers';
 import Reports from './pages/Reports';
 import Sermons from './pages/Sermons';
 import Groups from './pages/Groups';
+import Messages from './pages/Messages';
+import GuardianHome from './pages/GuardianHome';
 
 const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, isLoading } = useAuth();
@@ -89,6 +91,8 @@ const NOTIFICATION_ROUTES: Record<string, string> = {
   devotional: '/devotionals',
   sermon: '/sermons',
   group: '/groups',
+  report: '/dashboard',
+  member: '/dashboard',
 };
 
 interface SearchResults {
@@ -107,6 +111,7 @@ const COMMUNITY_LINKS = [
   { to: '/sermons', icon: 'bookmark', label: 'Pregações' },
   { to: '/groups', icon: 'users', label: 'Células' },
   { to: '/chat', icon: 'commenting', label: 'Chat' },
+  { to: '/messages', icon: 'mail', label: 'Mensagens' },
   { to: '/users', icon: 'user', label: 'Membros' },
 ];
 
@@ -115,7 +120,13 @@ const LEADER_LINKS = [
   { to: '/reports', icon: 'table', label: 'Relatórios' },
 ];
 
-const roleLabel = (role?: string) => role === 'admin' ? 'Administrador' : role === 'leader' ? 'Líder' : 'Membro';
+// Responsáveis (pais) só têm a área dos filhos
+const GUARDIAN_LINKS = [
+  { to: '/', icon: 'users', label: 'Meus filhos' },
+];
+
+const roleLabel = (role?: string) =>
+  role === 'admin' ? 'Administrador' : role === 'leader' ? 'Líder' : role === 'guardian' ? 'Responsável' : 'Membro';
 
 /* ─── Barra lateral ─────────────────────────────────────────── */
 const Sidebar: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onClose }) => {
@@ -124,8 +135,23 @@ const Sidebar: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onClo
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const isLeaderOrAdmin = user?.role === 'leader' || user?.role === 'admin';
+  const isGuardian = user?.role === 'guardian';
+  const [unreadMessages, setUnreadMessages] = useState(0);
 
   useEffect(() => { setShowMenu(false); }, [location.pathname]);
+
+  // Mensagens privadas não lidas (ao mudar de página, ao ler uma conversa e a cada 30 s)
+  useEffect(() => {
+    if (isGuardian) return;
+    const load = () => api.getUnreadMessages().then(res => setUnreadMessages(res.data?.total || 0)).catch(() => {});
+    load();
+    const timer = setInterval(() => { if (document.visibilityState === 'visible') load(); }, 30000);
+    window.addEventListener(UNREAD_MESSAGES_EVENT, load);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener(UNREAD_MESSAGES_EVENT, load);
+    };
+  }, [isGuardian, location.pathname]);
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -139,6 +165,9 @@ const Sidebar: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onClo
     <Link key={link.to} to={link.to} className={`sidebar-link${location.pathname === link.to ? ' is-active' : ''}`}>
       <span uk-icon={`icon: ${link.icon}; ratio: 0.85`}></span>
       {link.label}
+      {link.to === '/messages' && unreadMessages > 0 && (
+        <span className="sidebar-badge" aria-label={`${unreadMessages} mensagens não lidas`}>{unreadMessages > 9 ? '9+' : unreadMessages}</span>
+      )}
     </Link>
   );
 
@@ -149,7 +178,7 @@ const Sidebar: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onClo
         <Link to="/" className="sidebar-brand">ICHURCH</Link>
 
         <nav className="sidebar-nav">
-          {COMMUNITY_LINKS.map(renderLink)}
+          {(isGuardian ? GUARDIAN_LINKS : COMMUNITY_LINKS).map(renderLink)}
           {isLeaderOrAdmin && (
             <>
               <div className="sidebar-section">Liderança</div>
@@ -189,6 +218,7 @@ const Sidebar: React.FC<{ open: boolean; onClose: () => void }> = ({ open, onClo
 /* ─── Barra superior ────────────────────────────────────────── */
 const Topbar: React.FC<{ onMenu: () => void }> = ({ onMenu }) => {
   const { theme, toggle: toggleTheme } = useTheme();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -290,7 +320,8 @@ const Topbar: React.FC<{ onMenu: () => void }> = ({ onMenu }) => {
         <span uk-icon="icon: menu; ratio: 0.9"></span>
       </button>
 
-      <div className="topbar-search" ref={searchRef}>
+      {/* Os responsáveis não pesquisam a comunidade: o espaço fica para manter o alinhamento */}
+      <div className="topbar-search" ref={searchRef} style={user?.role === 'guardian' ? { visibility: 'hidden' } : undefined}>
         <span className="topbar-search-icon" uk-icon="icon: search; ratio: 0.8"></span>
         <input
           value={searchQ}
@@ -425,11 +456,23 @@ const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 };
 
 export default function App() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const location = useLocation();
   const isAuthPage = location.pathname === '/login' || location.pathname === '/register';
 
-  const routes = (
+  // Conta de responsável: só a área dos filhos e o próprio perfil
+  const guardianRoutes = (
+    <Routes>
+      <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
+      <Route path="/" element={<PrivateRoute><GuardianHome /></PrivateRoute>} />
+      <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
+      <Route path="/profile/:userId" element={<PrivateRoute><Profile /></PrivateRoute>} />
+      <Route path="*" element={<Navigate to="/" />} />
+    </Routes>
+  );
+
+  const routes = user?.role === 'guardian' ? guardianRoutes : (
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
@@ -442,6 +485,7 @@ export default function App() {
       <Route path="/sermons" element={<PrivateRoute><Sermons /></PrivateRoute>} />
       <Route path="/groups" element={<PrivateRoute><Groups /></PrivateRoute>} />
       <Route path="/chat" element={<PrivateRoute><Chat /></PrivateRoute>} />
+      <Route path="/messages" element={<PrivateRoute><Messages /></PrivateRoute>} />
       <Route path="/users" element={<PrivateRoute><Users /></PrivateRoute>} />
       <Route path="/reports" element={<RoleRoute allowedRoles={['leader', 'admin']}><Reports /></RoleRoute>} />
       <Route path="/profile/:userId" element={<PrivateRoute><Profile /></PrivateRoute>} />

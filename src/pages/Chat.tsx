@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import UIkit from 'uikit';
 import Avatar from '../components/Avatar';
 import PageHeader from '../components/PageHeader';
+import ReportButton from '../components/ReportButton';
 
 interface Message {
   id: string;
@@ -28,13 +29,15 @@ const Chat = () => {
   const [sending, setSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<NodeJS.Timeout | null>(null);
+  // Com menores na comunidade, as mensagens não podem ser apagadas
+  const [isProtected, setIsProtected] = useState(false);
 
   const scrollToBottom = () => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
 
   const loadMessages = async () => {
     try {
       const result = await api.getMessages(50);
-      if (result.success) { setMessages(result.data); setLoading(false); }
+      if (result.success) { setMessages(result.data); setIsProtected(!!result.protected); setLoading(false); }
     } catch { setLoading(false); }
   };
 
@@ -72,12 +75,12 @@ const Chat = () => {
 
   const handleDelete = async (messageId: string, messageUserId: string) => {
     if (user?.id !== messageUserId && !isLeader) return;
-    if (user?.id !== messageUserId && !confirm('Apagar esta mensagem de outro membro?')) return;
+    if (user?.id !== messageUserId && !confirm('Ocultar esta mensagem de outro membro? Ela continua guardada para denúncias.')) return;
     try {
       const result = await api.deleteMessage(messageId);
       if (result.success) {
         setMessages(messages.filter(m => m.id !== messageId));
-        UIkit.notification({ message: 'Mensagem removida', status: 'success', timeout: 2000 });
+        UIkit.notification({ message: user?.id === messageUserId ? 'Mensagem apagada' : 'Mensagem ocultada', status: 'success', timeout: 2000 });
       }
     } catch (err: any) {
       UIkit.notification({ message: err.message || 'Erro ao deletar', status: 'danger', timeout: 3000 });
@@ -86,7 +89,14 @@ const Chat = () => {
 
   return (
     <div className="chat-page">
-      <PageHeader icon="commenting" title="Chat da Comunidade" subtitle="Mensagens visíveis para todos os membros" />
+      <PageHeader
+        icon="commenting"
+        title="Chat da Comunidade"
+        subtitle={isProtected
+          ? 'Mensagens visíveis para todos os membros. Há menores na comunidade: as mensagens não podem ser apagadas.'
+          : 'Mensagens visíveis para todos os membros'}
+        actions={user?.churchId && <ReportButton targetType="community_chat" targetId={user.churchId} />}
+      />
 
       <div className="card chat-panel">
 
@@ -131,10 +141,10 @@ const Chat = () => {
                       }}>
                         {msg.content}
                       </div>
-                      {(isOwn || isLeader) && (
+                      {((isOwn && !isProtected) || (!isOwn && isLeader)) && (
                         <button
                           onClick={() => handleDelete(msg.id, msg.user.id)}
-                          title="Deletar"
+                          title={isOwn ? 'Apagar mensagem' : 'Ocultar mensagem'}
                           style={{
                             background: 'none', border: 'none', cursor: 'pointer',
                             color: 'var(--text-faint)', padding: '2px',

@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import UIkit from 'uikit';
 import ChurchCreate from '../components/ChurchCreate';
 import ChurchMembers from '../components/ChurchMembers';
+import ReportsPanel from '../components/ReportsPanel';
 import PageHeader from '../components/PageHeader';
 import EmptyState from '../components/EmptyState';
 
@@ -252,6 +253,11 @@ const Dashboard = () => {
                     </button>
                   )}
                 </div>
+              </div>
+
+              {/* Denúncias */}
+              <div style={{ marginTop: '24px' }}>
+                <ReportsPanel churchId={selectedChurch.id} />
               </div>
 
               {/* Membros */}

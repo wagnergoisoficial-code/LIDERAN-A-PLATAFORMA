@@ -1214,6 +1214,180 @@ a:hover { color: var(--accent-dark); }
   border-color: var(--border) !important;
 }
 
+/* ─── MENSAGENS PRIVADAS ────────────────────────────────────── */
+.messages-layout {
+  display: grid;
+  flex: 1;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 20px;
+  min-height: 0;
+}
+
+.messages-list,
+.messages-thread {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.messages-scroll {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.conversation-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--t);
+}
+
+.conversation-item + .conversation-item { border-top: 1px solid var(--border); }
+.conversation-item:hover { background: var(--bg-surface); }
+.conversation-item.is-active { background: var(--bg-elevated); }
+
+.conversation-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.conversation-preview {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.unread-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--text);
+  color: var(--bg);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* Aviso de conversa com menor: uma faixa de superfície, sem linha extra */
+.protected-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: var(--bg-surface);
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.sidebar-badge {
+  margin-left: auto;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--nav-bg);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+}
+
+/* "Voltar" só no celular; apagar mensagem aparece ao passar o rato (sempre visível no toque) */
+.messages-back { display: none; }
+.dm-delete { opacity: 0; transition: opacity var(--t); }
+.dm-row:hover .dm-delete,
+.dm-delete:focus-visible { opacity: 1; }
+
+@media (hover: none) {
+  .dm-delete { opacity: 1; }
+}
+
+@media (max-width: 959px) {
+  .messages-back { display: inline-flex; }
+  .messages-layout { grid-template-columns: minmax(0, 1fr); }
+  .messages-layout.has-active .messages-list { display: none; }
+  .messages-layout:not(.has-active) .messages-thread { display: none; }
+}
+
+/* ─── PROTEÇÃO DE MENORES E MODERAÇÃO ──────────────────────── */
+/* Responsável de um menor: um bloco de superfície (sem linha) dentro do formulário */
+.guardian-fields {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  background: var(--bg-surface);
+  border-radius: var(--radius);
+}
+
+.guardian-mode {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.guardian-mode label {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--t), border-color var(--t), color var(--t);
+}
+
+.guardian-mode label.is-selected {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+.guardian-mode label:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.guardian-mode input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.protection-section {
+  display: grid;
+  gap: 10px;
+  padding-top: 16px;
+}
+
+.protection-section + .protection-section { margin-top: 16px; border-top: 1px solid var(--border); }
+
+.protection-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
 /* ─── MOVIMENTO ─────────────────────────────────────────────── */
 /* Regra geral: só transform, opacity e filter. Entradas com fill-mode
    "backwards" para não deixar transform/filter residuais (que quebrariam

@@ -3,13 +3,15 @@ import { api } from '../services/api';
 import UIkit from 'uikit';
 import Avatar from './Avatar';
 import EmptyState from './EmptyState';
+import GuardianFields, { EMPTY_GUARDIAN, GuardianDraft, guardianPayload, isMinorDate, todayInput } from './GuardianFields';
+import MemberProtection, { ProtectedMember, statusLabel } from './MemberProtection';
 
 interface ChurchMembersProps {
   churchId: string;
   churchName: string;
 }
 
-const emptyForm = { name: '', email: '', password: '', confirmPassword: '', age: '', title: '', location: '' };
+const emptyForm = { name: '', email: '', password: '', confirmPassword: '', birthDate: '', title: '', location: '' };
 
 const ChurchMembers: React.FC<ChurchMembersProps> = ({ churchId }) => {
   const [members, setMembers] = useState<any[]>([]);
@@ -17,8 +19,10 @@ const ChurchMembers: React.FC<ChurchMembersProps> = ({ churchId }) => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [addForm, setAddForm] = useState({ ...emptyForm });
   const [addLoading, setAddLoading] = useState(false);
+  const [guardian, setGuardian] = useState<GuardianDraft>({ ...EMPTY_GUARDIAN });
+  const [protecting, setProtecting] = useState<ProtectedMember | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editForm, setEditForm] = useState({ name: '', title: '', location: '', age: '' });
+  const [editForm, setEditForm] = useState({ name: '', title: '', location: '', birthDate: '' });
   const [editingMember, setEditingMember] = useState<any>(null);
   const [editLoading, setEditLoading] = useState(false);
   const [deletingMemberId, setDeletingMemberId] = useState<string | null>(null);
@@ -59,12 +63,14 @@ const ChurchMembers: React.FC<ChurchMembersProps> = ({ churchId }) => {
       const response = await api.registerMemberInChurch({
         name: addForm.name, email: addForm.email,
         password: addForm.password, confirmPassword: addForm.confirmPassword,
-        churchId, age: addForm.age ? parseInt(addForm.age) : undefined,
+        churchId, birthDate: addForm.birthDate,
         title: addForm.title || undefined, location: addForm.location || undefined,
+        guardian: isMinorDate(addForm.birthDate) ? guardianPayload(guardian) : undefined,
       });
       if (response.success) {
-        UIkit.notification({ message: 'Membro cadastrado!', status: 'success', pos: 'top-right' });
+        UIkit.notification({ message: response.message || 'Membro cadastrado!', status: 'success', pos: 'top-right' });
         setAddForm({ ...emptyForm });
+        setGuardian({ ...EMPTY_GUARDIAN });
         setShowAddModal(false);
         loadMembers();
       }
@@ -77,7 +83,7 @@ const ChurchMembers: React.FC<ChurchMembersProps> = ({ churchId }) => {
 
   const openEdit = (member: any) => {
     setEditingMember(member);
-    setEditForm({ name: member.name || '', title: member.title || '', location: member.location || '', age: member.age != null ? String(member.age) : '' });
+    setEditForm({ name: member.name || '', title: member.title || '', location: member.location || '', birthDate: member.birthDate ? String(member.birthDate).slice(0, 10) : '' });
     setShowEditModal(true);
   };
 
@@ -93,7 +99,7 @@ const ChurchMembers: React.FC<ChurchMembersProps> = ({ churchId }) => {
     try {
       const response = await api.updateChurchMember(churchId, editingMember.id, {
         name: editForm.name, title: editForm.title,
-        location: editForm.location, age: editForm.age ? parseInt(editForm.age) : null,
+        location: editForm.location, birthDate: editForm.birthDate || null,
       });
       if (response.success) {
         UIkit.notification({ message: 'Membro atualizado!', status: 'success', pos: 'top-right' });
@@ -124,6 +130,8 @@ const ChurchMembers: React.FC<ChurchMembersProps> = ({ churchId }) => {
     }
   };
 
+  const pendingCount = members.filter(m => m.status === 'pending_authorization').length;
+
   return (
     <div>
       {/* Header */}
@@ -138,6 +146,13 @@ const ChurchMembers: React.FC<ChurchMembersProps> = ({ churchId }) => {
         </button>
       </div>
 
+      {pendingCount > 0 && (
+        <div className="protected-note" style={{ marginBottom: '12px', borderRadius: 'var(--radius-sm)' }}>
+          <span uk-icon="icon: lock; ratio: 0.7"></span>
+          {pendingCount === 1 ? '1 menor aguarda' : `${pendingCount} menores aguardam`} a autorização dos pais. Abra “Proteção e acesso” para confirmar.
+        </div>
+      )}
+
       {loadingMembers ? (
         <div style={{ padding: '20px', textAlign: 'center' }}>
           <span uk-spinner="ratio: 0.8"></span>
@@ -147,7 +162,7 @@ const ChurchMembers: React.FC<ChurchMembersProps> = ({ churchId }) => {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--border-strong)' }}>
-                {['Nome', 'Email', 'Cargo', 'Localização', 'Ações'].map(h => (
+                {['Nome', 'Email', 'Cargo', 'Situação', 'Ações'].map(h => (
                   <th key={h} style={{ padding: '10px 12px', textAlign: h === 'Ações' ? 'center' : 'left', fontSize: '11px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
                     {h}
                   </th>
@@ -165,7 +180,14 @@ const ChurchMembers: React.FC<ChurchMembersProps> = ({ churchId }) => {
                   </td>
                   <td style={{ padding: '10px 12px', color: 'var(--text-muted)' }}>{member.email}</td>
                   <td style={{ padding: '10px 12px', color: 'var(--text-muted)' }}>{member.title || '—'}</td>
-                  <td style={{ padding: '10px 12px', color: 'var(--text-muted)' }}>{member.location || '—'}</td>
+                  <td style={{ padding: '10px 12px' }}>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px' }}>
+                      {member.status && member.status !== 'active'
+                        ? <span className="uk-label">{statusLabel(member)}</span>
+                        : <span style={{ color: 'var(--text-muted)' }}>{statusLabel(member)}</span>}
+                      {member.isMinor && <span className="uk-label">Menor</span>}
+                    </div>
+                  </td>
                   <td style={{ padding: '10px 12px', textAlign: 'center' }}>
                     {deletingMemberId === member.id ? (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center' }}>
@@ -188,6 +210,9 @@ const ChurchMembers: React.FC<ChurchMembersProps> = ({ churchId }) => {
                       <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
                         <button onClick={() => openEdit(member)} title="Editar" className="action-btn">
                           <span uk-icon="icon: pencil; ratio: 0.8"></span>
+                        </button>
+                        <button onClick={() => setProtecting(member)} title="Proteção e acesso" className="action-btn">
+                          <span uk-icon="icon: lock; ratio: 0.8"></span>
                         </button>
                         <button onClick={() => setDeletingMemberId(member.id)} title="Remover" className="action-btn danger">
                           <span uk-icon="icon: trash; ratio: 0.8"></span>
@@ -221,17 +246,23 @@ const ChurchMembers: React.FC<ChurchMembersProps> = ({ churchId }) => {
                   { label: 'Email *', name: 'email', type: 'email', placeholder: 'email@exemplo.com' },
                   { label: 'Senha *', name: 'password', type: 'password', placeholder: '8+ caracteres, Aa e número', min: 8 },
                   { label: 'Confirmar Senha *', name: 'confirmPassword', type: 'password', placeholder: 'Confirme a senha', min: 8 },
-                  { label: 'Idade', name: 'age', type: 'number', placeholder: 'Ex: 25' },
+                  { label: 'Data de nascimento *', name: 'birthDate', type: 'date', placeholder: '' },
                   { label: 'Título / Função', name: 'title', type: 'text', placeholder: 'Ex: Diácono' },
                 ].map(f => (
                   <div key={f.name}>
                     <label className="form-label">{f.label}</label>
                     <input className="form-input" type={f.type} name={f.name} placeholder={f.placeholder}
                       value={(addForm as any)[f.name]} onChange={handleAddChange} minLength={f.min}
+                      max={f.type === 'date' ? todayInput() : undefined}
                       required={f.label.endsWith('*')} />
                   </div>
                 ))}
               </div>
+              {isMinorDate(addForm.birthDate) && (
+                <div style={{ marginBottom: '12px' }}>
+                  <GuardianFields value={guardian} onChange={setGuardian} />
+                </div>
+              )}
               <div style={{ marginBottom: '20px' }}>
                 <label className="form-label">Localização</label>
                 <input className="form-input" type="text" name="location" placeholder="Ex: Lisboa"
@@ -246,6 +277,18 @@ const ChurchMembers: React.FC<ChurchMembersProps> = ({ churchId }) => {
             </form>
           </div>
         </div>
+      )}
+
+      {protecting && (
+        <MemberProtection
+          churchId={churchId}
+          member={protecting}
+          onClose={() => setProtecting(null)}
+          onChanged={(updated) => {
+            setProtecting(updated);
+            setMembers(prev => prev.map(m => m.id === updated.id ? updated : m));
+          }}
+        />
       )}
 
       {/* EDIT MODAL */}
@@ -271,9 +314,9 @@ const ChurchMembers: React.FC<ChurchMembersProps> = ({ churchId }) => {
                     value={editForm.title} onChange={handleEditChange} />
                 </div>
                 <div>
-                  <label className="form-label">Idade</label>
-                  <input className="form-input" type="number" name="age" placeholder="Ex: 25"
-                    value={editForm.age} onChange={handleEditChange} />
+                  <label className="form-label">Data de nascimento</label>
+                  <input className="form-input" type="date" name="birthDate" max={todayInput()}
+                    value={editForm.birthDate} onChange={handleEditChange} />
                 </div>
               </div>
               <div style={{ marginBottom: '20px' }}>

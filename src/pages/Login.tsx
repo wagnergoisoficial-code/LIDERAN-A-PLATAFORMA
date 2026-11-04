@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { api } from '../services/api';
+import { api, RESTRICTED_KEY } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import UIkit from 'uikit';
 import AuthLayout, { PasswordInput } from '../components/AuthLayout';
@@ -10,8 +10,20 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  // Conta suspensa, bloqueada ou à espera dos pais: o motivo fica visível acima do formulário
+  const [notice, setNotice] = useState<string | null>(null);
   const navigate = useNavigate();
   const { login } = useAuth();
+
+  useEffect(() => {
+    try {
+      const reason = sessionStorage.getItem(RESTRICTED_KEY);
+      if (reason) {
+        setNotice(reason);
+        sessionStorage.removeItem(RESTRICTED_KEY);
+      }
+    } catch { /* sem armazenamento */ }
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,7 +36,8 @@ const Login = () => {
         navigate('/');
       }
     } catch (err: any) {
-      UIkit.notification({ message: err.message || 'Erro ao fazer login', status: 'danger', pos: 'top-right' });
+      if (err.data?.code === 'ACCOUNT_RESTRICTED') setNotice(err.message);
+      else UIkit.notification({ message: err.message || 'Erro ao fazer login', status: 'danger', pos: 'top-right' });
     } finally {
       setLoading(false);
     }
@@ -36,6 +49,13 @@ const Login = () => {
       subtitle="Entre na sua conta para continuar."
       footer={<>Não tem uma conta? <Link to="/register">Criar conta</Link></>}
     >
+      {notice && (
+        <div className="protected-note" role="alert" style={{ marginBottom: '16px', borderRadius: 'var(--radius-sm)' }}>
+          <span uk-icon="icon: warning; ratio: 0.75"></span>
+          {notice}
+        </div>
+      )}
+
       <form onSubmit={handleLogin}>
         <div className="auth-field">
           <label className="auth-label" htmlFor="login-email">E-mail</label>

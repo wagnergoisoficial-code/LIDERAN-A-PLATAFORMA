@@ -5,7 +5,7 @@ interface User {
   id: string;
   name: string;
   email: string;
-  role: 'member' | 'leader' | 'admin';
+  role: 'member' | 'leader' | 'admin' | 'guardian';
   churchId: string | null;
   profileImage?: string | null;
   title?: string | null;

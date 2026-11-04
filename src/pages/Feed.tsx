@@ -5,6 +5,7 @@ import UIkit from 'uikit';
 import Avatar from '../components/Avatar';
 import PageHeader from '../components/PageHeader';
 import EmptyState from '../components/EmptyState';
+import ReportButton from '../components/ReportButton';
 import AnimatedNumber from '../components/AnimatedNumber';
 import { pop, burst } from '../lib/motion';
 
@@ -386,6 +387,7 @@ const PostCard = ({ post, currentUserId, userRole, onComment, onReact, onPin, on
             <span uk-icon="icon: trash; ratio: 0.8"></span>
           </button>
         )}
+        {post.userId !== currentUserId && <ReportButton targetType="post" targetId={post.id} compact />}
       </div>
 
       {/* Image */}
