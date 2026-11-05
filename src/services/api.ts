@@ -520,8 +520,16 @@ export const api = {
   registerByInvite: (code: string, data: any) =>
     request(`/invites/${encodeURIComponent(code)}/register`, { method: 'POST', body: JSON.stringify(data) }),
 
+  // Vídeos (links do YouTube), aprovados pelo líder
+  getVideos: () => request(`/videos`),
+  createVideo: (data: { url: string; title: string; category: string; description?: string }) =>
+    request(`/videos`, { method: 'POST', body: JSON.stringify(data) }),
+  reviewVideo: (id: string, status: 'approved' | 'rejected', reason?: string) =>
+    request(`/videos/${id}`, { method: 'PATCH', body: JSON.stringify({ status, reason }) }),
+  deleteVideo: (id: string) => request(`/videos/${id}`, { method: 'DELETE' }),
+
   // Denúncias
-  createReport: (data: { targetType: 'conversation' | 'community_chat' | 'post' | 'prayer_request' | 'profile'; targetId: string; details?: string }) =>
+  createReport: (data: { targetType: 'conversation' | 'community_chat' | 'post' | 'prayer_request' | 'video' | 'profile'; targetId: string; details?: string }) =>
     request('/reports', { method: 'POST', body: JSON.stringify(data) }),
 
   getReports: (churchId: string, status?: string) =>

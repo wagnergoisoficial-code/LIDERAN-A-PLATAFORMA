@@ -5,7 +5,7 @@ import { api } from '../services/api';
 interface Person { id: string; name: string; role?: string; isMinor?: boolean }
 interface ReportSummary {
   id: string;
-  targetType: 'conversation' | 'community_chat' | 'post' | 'prayer_request' | 'profile';
+  targetType: 'conversation' | 'community_chat' | 'post' | 'prayer_request' | 'video' | 'profile';
   status: 'open' | 'resolved' | 'dismissed';
   details?: string | null;
   createdAt: string;
@@ -21,6 +21,7 @@ const TYPE_LABELS: Record<string, string> = {
   community_chat: 'Chat da comunidade',
   post: 'Publicação',
   prayer_request: 'Pedido de oração',
+  video: 'Vídeo',
   profile: 'Perfil',
 };
 const STATUS_LABELS: Record<string, string> = { open: 'Aberta', resolved: 'Resolvida', dismissed: 'Arquivada' };
@@ -89,6 +90,20 @@ const Snapshot: React.FC<{ snapshot: any }> = ({ snapshot }) => {
             <MessageHistory messages={snapshot.comments.map((c: any) => ({ ...c, sender: c.author }))} />
           </>
         )}
+      </>
+    );
+  }
+  if (snapshot.kind === 'video') {
+    return (
+      <>
+        <div className="list-label" style={{ margin: 0 }}>Vídeo de {name(snapshot.video.author)}{snapshot.video.churchName ? ` · ${snapshot.video.churchName}` : ''}</div>
+        <a href={`https://www.youtube.com/watch?v=${snapshot.video.sourceId}`} target="_blank" rel="noreferrer" className="video-thumb" style={{ maxWidth: '320px' }}>
+          <img src={`https://i.ytimg.com/vi/${snapshot.video.sourceId}/hqdefault.jpg`} alt="" />
+        </a>
+        <div style={{ fontSize: '13px' }}>
+          <strong style={{ color: 'var(--text)' }}>{snapshot.video.title}</strong>
+          {snapshot.video.description && <div style={{ marginTop: '4px', color: 'var(--text-muted)' }}>{snapshot.video.description}</div>}
+        </div>
       </>
     );
   }

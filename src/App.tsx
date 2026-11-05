@@ -56,6 +56,7 @@ import Reports from './pages/Reports';
 import Sermons from './pages/Sermons';
 import Groups from './pages/Groups';
 import Messages from './pages/Messages';
+import Videos from './pages/Videos';
 import GuardianHome from './pages/GuardianHome';
 
 const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -95,6 +96,7 @@ const NOTIFICATION_ROUTES: Record<string, string> = {
   report: '/dashboard',
   member: '/dashboard',
   verification: '/dashboard',
+  video: '/videos',
 };
 
 interface SearchResults {
@@ -111,6 +113,7 @@ const COMMUNITY_LINKS = [
   { to: '/prayers', icon: 'heart', label: 'Oração' },
   { to: '/devotionals', icon: 'file-text', label: 'Devocionais' },
   { to: '/sermons', icon: 'bookmark', label: 'Pregações' },
+  { to: '/videos', icon: 'play-circle', label: 'Vídeos' },
   { to: '/groups', icon: 'users', label: 'Células' },
   { to: '/chat', icon: 'commenting', label: 'Chat' },
   { to: '/messages', icon: 'mail', label: 'Mensagens' },
@@ -490,6 +493,7 @@ export default function App() {
       <Route path="/groups" element={<PrivateRoute><Groups /></PrivateRoute>} />
       <Route path="/chat" element={<PrivateRoute><Chat /></PrivateRoute>} />
       <Route path="/messages" element={<PrivateRoute><Messages /></PrivateRoute>} />
+      <Route path="/videos" element={<PrivateRoute><Videos /></PrivateRoute>} />
       <Route path="/users" element={<PrivateRoute><Users /></PrivateRoute>} />
       <Route path="/reports" element={<RoleRoute allowedRoles={['leader', 'admin']}><Reports /></RoleRoute>} />
       <Route path="/profile/:userId" element={<PrivateRoute><Profile /></PrivateRoute>} />
