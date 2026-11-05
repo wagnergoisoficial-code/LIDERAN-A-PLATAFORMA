@@ -1388,6 +1388,18 @@ a:hover { color: var(--accent-dark); }
   gap: 8px;
 }
 
+/* ─── VERIFICAÇÃO DE LÍDERES ────────────────────────────────── */
+.verification-data {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 6px 12px;
+  margin: 0;
+  font-size: 13px;
+}
+
+.verification-data dt { color: var(--text-muted); }
+.verification-data dd { margin: 0; color: var(--text); word-break: break-word; }
+
 /* ─── CALENDÁRIO ────────────────────────────────────────────── */
 .calendar { padding: 16px; margin-bottom: 28px; }
 

@@ -482,6 +482,37 @@ export const api = {
   authorizeChild: (minorId: string) =>
     request(`/guardian/children/${minorId}/authorize`, { method: 'POST' }),
 
+  // Verificação de líderes
+  getMyVerification: () => request(`/leader-verification/me`),
+
+  submitVerification: (fields: Record<string, string>, identity: File, leadership: File) => {
+    const form = new FormData();
+    Object.entries(fields).forEach(([key, value]) => form.append(key, value));
+    form.append('identity', identity);
+    form.append('leadership', leadership);
+    return request(`/leader-verification`, { method: 'POST', headers: getHeadersWithoutContentType(), body: form });
+  },
+
+  getVerifications: (status?: string) =>
+    request(`/leader-verification${status ? `?status=${status}` : ''}`),
+
+  reviewVerification: (id: string, status: 'approved' | 'rejected', reason?: string) =>
+    request(`/leader-verification/${id}`, { method: 'PATCH', body: JSON.stringify({ status, reason }) }),
+
+  // Os documentos são privados: vêm com o token e abrem como ficheiro local
+  getVerificationDocument: async (id: string) => {
+    const res = await fetch(`${BASE_URL}/leader-verification/documents/${id}`, { headers: getHeadersWithoutContentType() });
+    if (!res.ok) throw new Error('Não foi possível abrir o documento');
+    return res.blob();
+  },
+
+  // Link de convite da comunidade
+  getChurchInvite: (churchId: string) => request(`/churches/${churchId}/invite`),
+  regenerateChurchInvite: (churchId: string) => request(`/churches/${churchId}/invite`, { method: 'POST' }),
+  getInvite: (code: string) => request(`/invites/${encodeURIComponent(code)}`),
+  registerByInvite: (code: string, data: any) =>
+    request(`/invites/${encodeURIComponent(code)}/register`, { method: 'POST', body: JSON.stringify(data) }),
+
   // Denúncias
   createReport: (data: { targetType: 'conversation' | 'community_chat' | 'post' | 'prayer_request' | 'profile'; targetId: string; details?: string }) =>
     request('/reports', { method: 'POST', body: JSON.stringify(data) }),

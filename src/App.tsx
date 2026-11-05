@@ -42,6 +42,7 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, { error: Er
 
 import Login from './pages/Login';
 import Register from './pages/Register';
+import InviteRegister from './pages/InviteRegister';
 import Feed from './pages/Feed';
 import Posts from './pages/Posts';
 import Devotionals from './pages/Devotionals';
@@ -93,6 +94,7 @@ const NOTIFICATION_ROUTES: Record<string, string> = {
   group: '/groups',
   report: '/dashboard',
   member: '/dashboard',
+  verification: '/dashboard',
 };
 
 interface SearchResults {
@@ -458,13 +460,14 @@ const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 export default function App() {
   const { isAuthenticated, user } = useAuth();
   const location = useLocation();
-  const isAuthPage = location.pathname === '/login' || location.pathname === '/register';
+  const isAuthPage = location.pathname === '/login' || location.pathname === '/register' || location.pathname.startsWith('/convite/');
 
   // Conta de responsável: só a área dos filhos e o próprio perfil
   const guardianRoutes = (
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/convite/:code" element={<InviteRegister />} />
       <Route path="/" element={<PrivateRoute><GuardianHome /></PrivateRoute>} />
       <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
       <Route path="/profile/:userId" element={<PrivateRoute><Profile /></PrivateRoute>} />
@@ -476,6 +479,7 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/convite/:code" element={<InviteRegister />} />
       <Route path="/dashboard" element={<RoleRoute allowedRoles={['leader', 'admin']}><Dashboard /></RoleRoute>} />
       <Route path="/" element={<PrivateRoute><Feed /></PrivateRoute>} />
       <Route path="/posts" element={<PrivateRoute><Posts /></PrivateRoute>} />

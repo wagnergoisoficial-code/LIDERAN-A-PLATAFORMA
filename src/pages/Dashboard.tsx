@@ -5,6 +5,9 @@ import UIkit from 'uikit';
 import ChurchCreate from '../components/ChurchCreate';
 import ChurchMembers from '../components/ChurchMembers';
 import ReportsPanel from '../components/ReportsPanel';
+import LeaderVerificationCard from '../components/LeaderVerificationCard';
+import VerificationsPanel from '../components/VerificationsPanel';
+import InviteLink from '../components/InviteLink';
 import PageHeader from '../components/PageHeader';
 import EmptyState from '../components/EmptyState';
 
@@ -86,6 +89,16 @@ const Dashboard = () => {
     }
   };
 
+  // Líder ainda por verificar: só o pedido de verificação (as comunidades vêm depois)
+  if (user?.role === 'leader' && user.leaderVerified === false) {
+    return (
+      <div>
+        <PageHeader icon="grid" title="Painel do Líder" subtitle="Antes de criar a comunidade, verificamos que é líder de uma igreja" />
+        <LeaderVerificationCard />
+      </div>
+    );
+  }
+
   return (
     <div>
       <PageHeader
@@ -102,6 +115,8 @@ const Dashboard = () => {
           </button>
         )}
       />
+
+      {user?.role === 'admin' && <VerificationsPanel />}
 
       <div className="dash-layout">
 
@@ -253,6 +268,11 @@ const Dashboard = () => {
                     </button>
                   )}
                 </div>
+              </div>
+
+              {/* Link de convite */}
+              <div style={{ marginTop: '24px' }}>
+                <InviteLink churchId={selectedChurch.id} />
               </div>
 
               {/* Denúncias */}

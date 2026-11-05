@@ -9,6 +9,7 @@ interface User {
   churchId: string | null;
   profileImage?: string | null;
   title?: string | null;
+  leaderVerified?: boolean;
 }
 
 export interface Session {
