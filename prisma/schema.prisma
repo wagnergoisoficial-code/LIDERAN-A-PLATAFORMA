@@ -35,6 +35,7 @@ model Church {
   groups       Group[]
   conversations Conversation[]
   reports      Report[]
+  videos       Video[]
 
   @@map("churches")
 }
@@ -99,6 +100,7 @@ model User {
   reportsMade        Report[]         @relation("ReportsMade")
   reportsReceived    Report[]         @relation("ReportsReceived")
   leaderVerification LeaderVerification?
+  videos             Video[]
 
   @@index([churchId])
   @@map("users")
@@ -630,4 +632,30 @@ model LeaderDocument {
 
   @@index([verificationId])
   @@map("leader_documents")
+}
+
+// Vídeo (pregação, hino ou de um membro): por agora um link do YouTube (provider "youtube").
+// O envio de ficheiros pode entrar depois como outro provider. Aprovado pelo líder da comunidade
+// de quem o enviou, aparece para todas as comunidades.
+model Video {
+  id           String    @id @default(cuid())
+  title        String
+  description  String?
+  category     String    // pregacao, hino, membro
+  provider     String    @default("youtube")
+  sourceId     String    // No YouTube, o identificador do vídeo
+  status       String    @default("pending") // pending, approved, rejected
+  reason       String?   // Motivo da recusa
+  reviewedById String?
+  reviewedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  churchId     String
+  church       Church    @relation(fields: [churchId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([churchId])
+  @@map("videos")
 }

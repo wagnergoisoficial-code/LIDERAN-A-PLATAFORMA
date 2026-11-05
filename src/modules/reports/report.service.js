@@ -4,13 +4,14 @@ const { requireChurch, canManageChurch } = require('../../shared/utils/church.ut
 const { isMinor } = require('../../shared/utils/minor.util');
 const { notifyUsers } = require('../../shared/utils/notifier');
 
-const TARGET_TYPES = ['conversation', 'community_chat', 'post', 'prayer_request', 'profile'];
+const TARGET_TYPES = ['conversation', 'community_chat', 'post', 'prayer_request', 'video', 'profile'];
 const STATUSES = ['open', 'resolved', 'dismissed'];
 const TYPE_LABELS = {
   conversation: 'uma conversa privada',
   community_chat: 'uma mensagem no chat da comunidade',
   post: 'uma publicação',
   prayer_request: 'um pedido de oração',
+  video: 'um vídeo',
   profile: 'um perfil',
 };
 const USER_BRIEF = { id: true, name: true, profileImage: true, role: true, birthDate: true, age: true, status: true };
@@ -109,6 +110,26 @@ class ReportService {
           kind: 'post',
           post: { id: post.id, type: post.type, author: person(post.user), content: post.content, imageUrl: post.imageUrl, location: post.location, createdAt: post.createdAt },
           comments: post.comments.map((c) => ({ id: c.id, author: person(c.user), content: c.content, createdAt: c.createdAt })),
+        },
+      };
+    }
+
+    // Vídeo aprovado aparece em todas as comunidades: denuncia-se de qualquer uma
+    if (targetType === 'video') {
+      const video = await prisma.video.findFirst({
+        where: { id: targetId, OR: [{ churchId }, { status: 'approved' }] },
+        include: { user: { select: USER_BRIEF }, church: { select: { name: true } } },
+      });
+      if (!video) throw new NotFoundError('Vídeo não encontrado');
+      return {
+        churchId: video.churchId,
+        targetUserId: video.userId,
+        snapshot: {
+          kind: 'video',
+          video: {
+            id: video.id, title: video.title, description: video.description, provider: video.provider,
+            sourceId: video.sourceId, author: person(video.user), churchName: video.church?.name, createdAt: video.createdAt,
+          },
         },
       };
     }
