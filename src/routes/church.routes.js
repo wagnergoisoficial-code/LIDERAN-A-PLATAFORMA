@@ -29,6 +29,14 @@ router.delete('/:churchId', authMiddleware, (req, res, next) => {
   ChurchController.deleteChurch(req, res, next);
 });
 
+// Invite link: GET returns it, POST replaces it (the old link stops working)
+router.get('/:churchId/invite', authMiddleware, roleMiddleware('leader', 'admin'), (req, res, next) => {
+  ChurchController.getInvite(req, res, next);
+});
+router.post('/:churchId/invite', authMiddleware, roleMiddleware('leader', 'admin'), (req, res, next) => {
+  ChurchController.getInvite(req, res, next);
+});
+
 // Set as the leader's active church
 router.post('/:churchId/activate', authMiddleware, roleMiddleware('leader', 'admin'), (req, res, next) => {
   ChurchController.activateChurch(req, res, next);

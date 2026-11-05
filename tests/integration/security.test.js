@@ -6,7 +6,7 @@ process.env.LOGIN_ATTEMPTS = '5';
 const jwt = require('jsonwebtoken');
 const sharp = require('sharp');
 const App = require('../../src/app');
-const { disconnectPrisma } = require('../../src/config/database');
+const { getPrismaClient, disconnectPrisma } = require('../../src/config/database');
 
 const ALLOWED_ORIGIN = 'https://app.lidera.test';
 const stamp = Date.now();
@@ -42,6 +42,8 @@ beforeAll(async () => {
   ORIGIN = `http://127.0.0.1:${server.address().port}`;
 
   leader = await register('Líder Segurança', `seg${stamp}@t.com`);
+  // O administrador da plataforma verifica o líder (aqui, direto na base)
+  await getPrismaClient().user.update({ where: { id: leader.user.id }, data: { leaderVerifiedAt: new Date() } });
   const church = await call('POST', '/api/churches', { token: leader.token, body: { name: 'Comunidade Segura' } });
   leader.churchId = church.json.data.id;
 });

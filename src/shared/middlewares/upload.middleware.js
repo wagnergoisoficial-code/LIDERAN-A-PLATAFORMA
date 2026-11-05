@@ -26,10 +26,10 @@ const publicBaseUrl = (req) => config.app.publicUrl || `${req.protocol}://${req.
 
 // Reprocessa a imagem: corrige a orientação, limita o tamanho, converte para WebP e
 // descarta metadados (incluindo localização GPS). Ficheiros disfarçados falham aqui.
-async function processImage(buffer) {
+async function processImage(buffer, maxDimension = MAX_DIMENSION) {
   return sharp(buffer, { animated: true, limitInputPixels: MAX_INPUT_PIXELS })
     .rotate()
-    .resize({ width: MAX_DIMENSION, height: MAX_DIMENSION, fit: 'inside', withoutEnlargement: true })
+    .resize({ width: maxDimension, height: maxDimension, fit: 'inside', withoutEnlargement: true })
     .webp({ quality: 80 })
     .toBuffer({ resolveWithObject: true });
 }
@@ -81,4 +81,6 @@ const uploadImageMiddleware = (req, res, next) => {
 module.exports = {
   uploadImageMiddleware,
   upload,
+  SIGNATURES,
+  processImage,
 };

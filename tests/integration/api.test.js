@@ -1,7 +1,7 @@
 // Fluxo completo da API (funcionalidades e permissões), contra uma base de dados temporária.
 // Cada verificação falhada aparece listada no fim.
 const App = require('../../src/app');
-const { disconnectPrisma } = require('../../src/config/database');
+const { getPrismaClient, disconnectPrisma } = require('../../src/config/database');
 
 let server;
 let BASE;
@@ -26,6 +26,9 @@ const call = async (method, path, token, body) => {
   try { json = await res.json(); } catch { /* sem corpo */ }
   return { status: res.status, ...json };
 };
+
+// O administrador da plataforma verifica o líder (aqui, direto na base)
+const verifyLeader = (userId) => getPrismaClient().user.update({ where: { id: userId }, data: { leaderVerifiedAt: new Date() } });
 
 const register = (name, email, extra = {}) =>
   call('POST', '/auth/register', null, { name, email, password: 'Senha1234', confirmPassword: 'Senha1234', ...extra });
@@ -65,6 +68,10 @@ test('fluxo completo: autenticação, comunidades, conteúdo, notificações e p
     const emptyFeed = await call('GET', '/posts', tokA);
     check('feed sem comunidade → lista vazia (sem vazar outras igrejas)', emptyFeed.status === 200 && emptyFeed.data.length === 0, emptyFeed.data?.length);
 
+    const unverified = await call('POST', '/churches', tokA, { name: 'Antes da verificação' });
+    check('líder por verificar não cria comunidade → 403', unverified.status === 403 && /verificada/.test(unverified.message), unverified);
+    await verifyLeader(leaderA.data.user.id);
+
     const churchA = await call('POST', '/churches', tokA, { name: 'Comunidade A', title: 'Igreja A', cultosDias: ['domingo', 'quarta'] });
     check('criar comunidade A', churchA.status === 201 && churchA.data.isActive && churchA.session?.token, churchA);
     const cA = churchA.data.id;
@@ -100,6 +107,7 @@ test('fluxo completo: autenticação, comunidades, conteúdo, notificações e p
 
     const leaderB = await register('Líder B', `liderb${stamp}@t.com`);
     const tokB = leaderB.data.token;
+    await verifyLeader(leaderB.data.user.id);
     const churchB = await call('POST', '/churches', tokB, { name: 'Comunidade B' });
     const cB = churchB.data.id;
 

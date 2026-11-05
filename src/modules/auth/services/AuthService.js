@@ -4,11 +4,14 @@ const { getPrismaClient } = require('../../../config/database');
 const { canManageChurch } = require('../../../shared/utils/church.util');
 const { assertAccountActive } = require('../../../shared/utils/account-status.util');
 const guardianService = require('../../guardians/guardian.service');
+const RegisterMemberDto = require('../dtos/RegisterMemberDto');
+const { notifyUser } = require('../../../shared/utils/notifier');
 const {
   ConflictError,
   AuthenticationError,
   NotFoundError,
   ForbiddenError,
+  ValidationError,
 } = require('../../../shared/errors/AppError');
 
 // Authentication service with business logic
@@ -122,6 +125,46 @@ class AuthService {
     });
   }
 
+  // Link de convite: só vale para comunidades de líderes verificados
+  async findInvite(code) {
+    const prisma = getPrismaClient();
+    const church = typeof code === 'string' && code.length >= 8
+      ? await prisma.church.findUnique({ where: { inviteCode: code } })
+      : null;
+    const leader = church?.leaderID ? await prisma.user.findUnique({ where: { id: church.leaderID } }) : null;
+    if (!church || !leader || (leader.role !== 'admin' && !leader.leaderVerifiedAt)) {
+      throw new NotFoundError('Este convite não é válido. Peça um link novo ao seu líder.');
+    }
+    return { church, leader };
+  }
+
+  async inviteInfo(code) {
+    const { church } = await this.findInvite(code);
+    return { church: { name: church.name, title: church.title || null } };
+  }
+
+  // Quem se regista pelo convite entra logo na comunidade. Menores não: o líder cadastra-os
+  // com o responsável, para a autorização dos pais não depender de uma conta criada pelo menor.
+  async registerByInvite(code, data) {
+    const { church, leader } = await this.findInvite(code);
+    const { guardian, ...rest } = data || {};
+    const dto = new RegisterMemberDto({ ...rest, churchId: church.id });
+    if (dto.birthDate && !Number.isNaN(dto.birthDate.getTime()) && dto.age < 18) {
+      throw new ValidationError('Menores de 18 anos são cadastrados pelo líder da comunidade, com a autorização dos pais. Fale com o seu líder.');
+    }
+    dto.validate();
+
+    const { user } = await this.registerMember(dto, leader);
+    await notifyUser(leader.id, {
+      type: 'member_joined',
+      title: `${user.name} entrou pelo link de convite`,
+      body: church.name,
+      linkId: user.id,
+      linkType: 'member',
+    });
+    return this.formatAuthResponse(user, this.signToken(user));
+  }
+
   signToken(user) {
     return JwtUtil.sign({
       id: user.id,
@@ -141,6 +184,7 @@ class AuthService {
       profileImage: user.profileImage || null,
       title: user.title || null,
       status: user.status || 'active',
+      leaderVerified: !!user.leaderVerifiedAt,
     };
   }
 

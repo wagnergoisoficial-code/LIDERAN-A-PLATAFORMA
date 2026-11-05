@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const ChurchRepository = require('../repositories/ChurchRepository');
 const CreateChurchDto = require('../dtos/CreateChurchDto');
 const { isUploadUrl } = require('../../../shared/utils/url.util');
@@ -8,6 +9,8 @@ const guardianService = require('../../guardians/guardian.service');
 const { getPrismaClient } = require('../../../config/database');
 
 const SUSPENSION_DAYS = [1, 3, 7, 15, 30, 90];
+// Código do link de convite: aleatório e impossível de adivinhar
+const newInviteCode = () => crypto.randomBytes(9).toString('base64url');
 const {
   ValidationError,
   NotFoundError,
@@ -49,6 +52,9 @@ class ChurchService {
   }
 
   async createChurch(data, user) {
+    if (user.role === 'leader' && !user.leaderVerifiedAt) {
+      throw new ForbiddenError('A sua conta de líder ainda não foi verificada. Envie os dados da sua igreja e os documentos no Painel do Líder.');
+    }
     const dto = new CreateChurchDto(data);
     dto.validate();
 
@@ -59,6 +65,7 @@ class ChurchService {
       imageUrl: dto.imageUrl,
       cultosDias: dto.cultosDias,
       leaderID: user.id,
+      inviteCode: newInviteCode(),
     });
 
     // Quem cria a comunidade passa a participar dela (torna-se a comunidade ativa)
@@ -66,6 +73,14 @@ class ChurchService {
 
     const fresh = await this.findOr404(church.id);
     return { church: this.format(fresh, activeUser), session: this.session(activeUser) };
+  }
+
+  // Link de convite da comunidade (as comunidades antigas recebem o código na primeira vez)
+  async getInvite(churchId, user, { regenerate = false } = {}) {
+    const church = await this.findManageable(churchId, user, 'Apenas os líderes desta comunidade podem convidar membros');
+    if (church.inviteCode && !regenerate) return { code: church.inviteCode };
+    const updated = await getPrismaClient().church.update({ where: { id: church.id }, data: { inviteCode: newInviteCode() } });
+    return { code: updated.inviteCode };
   }
 
   async getChurch(churchId, user) {
@@ -331,6 +346,7 @@ class ChurchService {
         churchId: user.churchId,
         profileImage: user.profileImage || null,
         title: user.title || null,
+        leaderVerified: !!user.leaderVerifiedAt,
       },
       token: JwtUtil.sign({ id: user.id, email: user.email, role: user.role, churchId: user.churchId }),
     };

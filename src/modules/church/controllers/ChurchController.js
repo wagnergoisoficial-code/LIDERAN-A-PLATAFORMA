@@ -71,6 +71,19 @@ class ChurchController {
     }
   }
 
+  async getInvite(req, res, next) {
+    try {
+      const invite = await ChurchService.getInvite(req.params.churchId, req.user, { regenerate: req.method === 'POST' });
+      res.status(200).json({
+        success: true,
+        message: req.method === 'POST' ? 'Novo link de convite gerado: o anterior deixou de funcionar' : undefined,
+        data: invite,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async activateChurch(req, res, next) {
     try {
       const { church, session } = await ChurchService.activateChurch(req.params.churchId, req.user);

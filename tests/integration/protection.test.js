@@ -37,6 +37,7 @@ beforeAll(async () => {
   });
   s.leader = leader.data.token;
   s.leaderId = leader.data.user.id;
+  await getPrismaClient().user.update({ where: { id: s.leaderId }, data: { leaderVerifiedAt: new Date() } });
   s.church = (await call('POST', '/churches', s.leader, { name: 'Comunidade Protegida' })).data.id;
 
   const adult = await call('POST', '/auth/register-member', s.leader, {

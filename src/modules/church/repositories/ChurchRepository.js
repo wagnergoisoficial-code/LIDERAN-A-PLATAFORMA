@@ -41,6 +41,7 @@ class ChurchRepository {
         imageUrl: data.imageUrl || null,
         cultosDias: data.cultosDias ? JSON.stringify(data.cultosDias) : null,
         leaderID: data.leaderID || null,
+        inviteCode: data.inviteCode || null,
       },
     });
   }
