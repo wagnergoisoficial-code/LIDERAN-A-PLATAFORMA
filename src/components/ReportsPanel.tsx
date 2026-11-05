@@ -5,7 +5,7 @@ import { api } from '../services/api';
 interface Person { id: string; name: string; role?: string; isMinor?: boolean }
 interface ReportSummary {
   id: string;
-  targetType: 'conversation' | 'community_chat' | 'post' | 'profile';
+  targetType: 'conversation' | 'community_chat' | 'post' | 'prayer_request' | 'profile';
   status: 'open' | 'resolved' | 'dismissed';
   details?: string | null;
   createdAt: string;
@@ -20,6 +20,7 @@ const TYPE_LABELS: Record<string, string> = {
   conversation: 'Conversa privada',
   community_chat: 'Chat da comunidade',
   post: 'Publicação',
+  prayer_request: 'Pedido de oração',
   profile: 'Perfil',
 };
 const STATUS_LABELS: Record<string, string> = { open: 'Aberta', resolved: 'Resolvida', dismissed: 'Arquivada' };
@@ -86,6 +87,17 @@ const Snapshot: React.FC<{ snapshot: any }> = ({ snapshot }) => {
             <MessageHistory messages={snapshot.comments.map((c: any) => ({ ...c, sender: c.author }))} />
           </>
         )}
+      </>
+    );
+  }
+  if (snapshot.kind === 'prayer_request') {
+    return (
+      <>
+        <div className="list-label" style={{ margin: 0 }}>Pedido de oração de {name(snapshot.prayer.author)}</div>
+        <div style={{ padding: '10px 12px', borderRadius: 'var(--radius-sm)', background: 'var(--bg-surface)', fontSize: '13px' }}>
+          <strong style={{ color: 'var(--text)' }}>{snapshot.prayer.title}</strong>
+          <div style={{ marginTop: '4px', wordBreak: 'break-word' }}>{snapshot.prayer.content}</div>
+        </div>
       </>
     );
   }

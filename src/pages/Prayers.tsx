@@ -6,11 +6,12 @@ import Avatar from '../components/Avatar';
 import PageHeader from '../components/PageHeader';
 import EmptyState from '../components/EmptyState';
 import AnimatedNumber from '../components/AnimatedNumber';
+import ReportButton from '../components/ReportButton';
 import { pop, burst, celebrate } from '../lib/motion';
 
 interface PrayerRequest {
   id: string; title: string; content: string;
-  isAnonymous: boolean; isAnswered: boolean;
+  isAnswered: boolean;
   userId: string | null; prayCount: number; hasPrayed: boolean;
   authorName?: string | null; authorProfileImage?: string | null;
   isMine?: boolean; prayingNames?: string[];
@@ -22,7 +23,7 @@ const Prayers: React.FC = () => {
   const [requests, setRequests] = useState<PrayerRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
-  const [form, setForm] = useState({ title: '', content: '', isAnonymous: false });
+  const [form, setForm] = useState({ title: '', content: '' });
   const [saving, setSaving] = useState(false);
   const [filter, setFilter] = useState<'all' | 'active' | 'answered'>('active');
 
@@ -44,7 +45,7 @@ const Prayers: React.FC = () => {
       if (res.success) {
         setRequests(prev => [res.data, ...prev]);
         setShowModal(false);
-        setForm({ title: '', content: '', isAnonymous: false });
+        setForm({ title: '', content: '' });
         UIkit.notification({ message: 'Pedido enviado!', status: 'success', pos: 'top-right' });
       }
     } catch (err: any) {
@@ -134,13 +135,11 @@ const Prayers: React.FC = () => {
                       {r.isAnswered && (
                         <span className="uk-label">Respondido</span>
                       )}
-                      {r.isAnonymous && (
-                        <span className="uk-label">Anônimo</span>
-                      )}
                     </div>
                     <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.5 }}>{r.content}</p>
                   </div>
                   <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                    {!r.isMine && <ReportButton targetType="prayer_request" targetId={r.id} compact />}
                     {canManage(r) && !r.isAnswered && (
                       <button className="uk-button uk-button-success uk-button-small" title="Marcar como respondido" onClick={e => handleMarkAnswered(r.id, e.currentTarget.getBoundingClientRect())}>
                         <span uk-icon="icon: check; ratio: 0.75"></span> Respondido
@@ -156,14 +155,8 @@ const Prayers: React.FC = () => {
 
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '12px', paddingTop: '10px', borderTop: '1px solid var(--border)' }}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--text-faint)', minWidth: 0 }}>
-                    {r.isAnonymous || !r.authorName ? (
-                      <span>{r.isMine ? 'Você (anônimo)' : 'Pedido anônimo'}</span>
-                    ) : (
-                      <>
-                        <Avatar name={r.authorName} profileImage={r.authorProfileImage || undefined} size="small" />
-                        <strong style={{ color: 'var(--text-muted)', fontWeight: 600 }}>{r.isMine ? 'Você' : r.authorName}</strong>
-                      </>
-                    )}
+                    {r.authorName && <Avatar name={r.authorName} profileImage={r.authorProfileImage || undefined} size="small" />}
+                    <strong style={{ color: 'var(--text-muted)', fontWeight: 600 }}>{r.isMine ? 'Você' : r.authorName || 'Membro'}</strong>
                     <span>· {new Date(r.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
                     {r.prayingNames && r.prayingNames.length > 0 && (
                       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -208,10 +201,6 @@ const Prayers: React.FC = () => {
                   <label className="form-label">Detalhes *</label>
                   <textarea className="form-input uk-width-1-1" placeholder="Descreva o pedido de oração..." rows={4} style={{ height: 'auto', padding: '8px' }} value={form.content} onChange={e => setForm(f => ({ ...f, content: e.target.value }))} required />
                 </div>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: 'var(--text-muted)', cursor: 'pointer' }}>
-                  <input type="checkbox" checked={form.isAnonymous} onChange={e => setForm(f => ({ ...f, isAnonymous: e.target.checked }))} />
-                  Enviar anonimamente
-                </label>
               </div>
               <div className="form-btn-row" style={{ marginTop: '20px' }}>
                 <button type="button" className="form-btn" onClick={() => setShowModal(false)}>Cancelar</button>

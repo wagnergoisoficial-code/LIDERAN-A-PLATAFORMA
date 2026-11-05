@@ -483,7 +483,7 @@ export const api = {
     request(`/guardian/children/${minorId}/authorize`, { method: 'POST' }),
 
   // Denúncias
-  createReport: (data: { targetType: 'conversation' | 'community_chat' | 'post' | 'profile'; targetId: string; details?: string }) =>
+  createReport: (data: { targetType: 'conversation' | 'community_chat' | 'post' | 'prayer_request' | 'profile'; targetId: string; details?: string }) =>
     request('/reports', { method: 'POST', body: JSON.stringify(data) }),
 
   getReports: (churchId: string, status?: string) =>

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import UIkit from 'uikit';
 import { api } from '../services/api';
 
-type TargetType = 'conversation' | 'community_chat' | 'post' | 'profile';
+type TargetType = 'conversation' | 'community_chat' | 'post' | 'prayer_request' | 'profile';
 
 interface ReportButtonProps {
   targetType: TargetType;
