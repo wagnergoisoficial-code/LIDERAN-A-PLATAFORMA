@@ -92,6 +92,31 @@ const Posts = () => {
   const [loading, setLoading] = useState(false);
   const [recentPosts, setRecentPosts] = useState<any[]>([]);
   const publishRef = useRef<HTMLButtonElement>(null);
+  // Doação: aparece no feed de todas as comunidades, com o local para buscar
+  const [kind, setKind] = useState<'post' | 'donation'>('post');
+  const [place, setPlace] = useState('');
+  const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [locating, setLocating] = useState(false);
+  const donation = kind === 'donation';
+
+  const useMyLocation = () => {
+    if (!navigator.geolocation) {
+      UIkit.notification({ message: 'Este navegador não dá a localização', status: 'danger' });
+      return;
+    }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        setCoords({ latitude: Number(pos.coords.latitude.toFixed(5)), longitude: Number(pos.coords.longitude.toFixed(5)) });
+        setLocating(false);
+      },
+      () => {
+        UIkit.notification({ message: 'Não foi possível obter a localização. Autorize o acesso no navegador.', status: 'danger' });
+        setLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 15000 },
+    );
+  };
 
   useEffect(() => { loadRecentPosts(); }, []);
 
@@ -123,14 +148,19 @@ const Posts = () => {
     }
     setLoading(true);
     try {
-      const result = await api.createPost({ content: newPostContent }, selectedImage || undefined);
+      const data = donation
+        ? { content: newPostContent, type: 'donation', location: place, ...(coords || {}) }
+        : { content: newPostContent };
+      const result = await api.createPost(data, selectedImage || undefined);
       if (result.success) {
         celebrate(publishRef.current);
         setNewPostContent('');
         setSelectedImage(null);
         setImagePreview(null);
+        setPlace('');
+        setCoords(null);
         await loadRecentPosts();
-        UIkit.notification({ message: 'Post publicado com sucesso!', status: 'success' });
+        UIkit.notification({ message: donation ? 'Doação publicada para todas as comunidades!' : 'Post publicado com sucesso!', status: 'success' });
       }
     } catch (err: any) {
       UIkit.notification({ message: err.message || 'Erro ao publicar post', status: 'danger' });
@@ -154,29 +184,64 @@ const Posts = () => {
 
             <div className="card-body">
               <form onSubmit={handleCreatePost}>
+                <div className="guardian-mode" role="radiogroup" aria-label="Tipo de publicação" style={{ marginBottom: '14px' }}>
+                  {([['post', 'Publicação'], ['donation', 'Doação']] as const).map(([value, label]) => (
+                    <label key={value} className={kind === value ? 'is-selected' : ''}>
+                      <input type="radio" name="post-kind" value={value} checked={kind === value} onChange={() => setKind(value)} />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+
                 <div className="uk-margin">
-                  <label className="uk-form-label">Mensagem</label>
+                  <label className="uk-form-label">{donation ? 'O que está a doar' : 'Mensagem'}</label>
                   <textarea
                     className="uk-textarea"
                     rows={5}
-                    placeholder="O que está acontecendo na sua caminhada com Deus?"
+                    placeholder={donation ? 'Ex.: sofá de 3 lugares em bom estado. Diga como combinar a entrega.' : 'O que está acontecendo na sua caminhada com Deus?'}
                     value={newPostContent}
                     onChange={(e) => setNewPostContent(e.target.value)}
                   ></textarea>
                 </div>
 
+                {donation && (
+                  <div className="uk-margin">
+                    <label className="uk-form-label" htmlFor="donation-place">Onde buscar *</label>
+                    <input id="donation-place" className="uk-input" type="text" maxLength={200} required
+                      placeholder="Bairro, cidade ou ponto de referência" value={place} onChange={e => setPlace(e.target.value)} />
+                    <div className="protection-row" style={{ marginTop: '8px' }}>
+                      {coords ? (
+                        <>
+                          <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                            <span uk-icon="icon: location; ratio: 0.7"></span> Localização GPS guardada
+                          </span>
+                          <a href={`https://www.google.com/maps/search/?api=1&query=${coords.latitude},${coords.longitude}`} target="_blank" rel="noreferrer" style={{ fontSize: '12px' }}>Ver no mapa</a>
+                          <button type="button" className="uk-button uk-button-default uk-button-small" onClick={() => setCoords(null)}>Remover</button>
+                        </>
+                      ) : (
+                        <button type="button" className="uk-button uk-button-default uk-button-small" onClick={useMyLocation} disabled={locating}>
+                          <span uk-icon="icon: location; ratio: 0.75"></span> {locating ? 'A obter a localização...' : 'Usar a minha localização'}
+                        </button>
+                      )}
+                    </div>
+                    <p style={{ margin: '6px 0 0', fontSize: '12px', color: 'var(--text-faint)' }}>
+                      A doação e o local ficam visíveis para todas as comunidades. Partilhe só o que se sentir confortável.
+                    </p>
+                  </div>
+                )}
+
                 <ImageUploadInput onImageSelect={handleImageSelect} imagePreview={imagePreview} />
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px' }}>
                   <span style={{ fontSize: '12px', color: 'var(--text-faint)', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    <span uk-icon="icon: users; ratio: 0.8"></span>
-                    Visível para toda a comunidade
+                    <span uk-icon={`icon: ${donation ? 'world' : 'users'}; ratio: 0.8`}></span>
+                    {donation ? 'Visível para todas as comunidades' : 'Visível para toda a comunidade'}
                   </span>
                   <button
                     ref={publishRef}
                     className="uk-button uk-button-primary"
                     type="submit"
-                    disabled={loading || (!newPostContent.trim() && !selectedImage)}
+                    disabled={loading || (!newPostContent.trim() && !selectedImage) || (donation && place.trim().length < 3)}
                     style={{ height: '36px' }}
                   >
                     {loading

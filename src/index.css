@@ -1388,6 +1388,21 @@ a:hover { color: var(--accent-dark); }
   gap: 8px;
 }
 
+/* ─── DOAÇÕES ───────────────────────────────────────────────── */
+.donation-place {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.donation-place strong { color: var(--text); font-weight: 600; }
+.donation-place a { font-weight: 600; }
+
 /* ─── VERIFICAÇÃO DE LÍDERES ────────────────────────────────── */
 .verification-data {
   display: grid;

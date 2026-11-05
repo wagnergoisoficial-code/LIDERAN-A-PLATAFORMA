@@ -152,6 +152,10 @@ export const api = {
       // Use FormData for multipart upload
       const formData = new FormData();
       formData.append('content', data.content || '');
+      // Campos da doação (tipo, local e coordenadas), quando existem
+      Object.entries(data).forEach(([key, value]) => {
+        if (key !== 'content' && value !== undefined && value !== null && value !== '') formData.append(key, String(value));
+      });
       formData.append('image', imageFile);
 
       return request(`/posts`, {
@@ -289,6 +293,9 @@ export const api = {
       method: 'DELETE',
       body: JSON.stringify({ type })
     }),
+
+  setDonated: (postId: string, donated: boolean) =>
+    request(`/posts/${postId}/donated`, { method: 'PATCH', body: JSON.stringify({ donated }) }),
 
   pinPost: (postId: string, isPinned: boolean) =>
     request(`/posts/${postId}/pin`, {

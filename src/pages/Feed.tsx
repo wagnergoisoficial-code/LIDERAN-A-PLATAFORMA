@@ -18,6 +18,8 @@ const EMPTY_REACTIONS: PostReactions = { amen: 0, praying: 0, heart: 0, fire: 0,
 interface Post {
   id: string; content: string; imageUrl?: string;
   isPinned?: boolean; type?: string;
+  churchId?: string; churchName?: string | null;
+  location?: string | null; latitude?: number | null; longitude?: number | null; donatedAt?: string | null;
   userId?: string; userName: string; userProfileImage?: string;
   createdAt: string; comments: Comment[];
   reactions?: PostReactions; myReactions?: string[];
@@ -143,6 +145,16 @@ const Feed = () => {
     }
   };
 
+  const handleDonated = async (postId: string, donated: boolean) => {
+    try {
+      const res = await api.setDonated(postId, donated);
+      setPosts(prev => prev.map(p => p.id === postId ? { ...p, donatedAt: res.data.donatedAt } : p));
+      UIkit.notification({ message: res.message, status: 'success', pos: 'top-right' });
+    } catch (err: any) {
+      UIkit.notification({ message: err.message || 'Erro', status: 'danger', pos: 'top-right' });
+    }
+  };
+
   const handleDeleteComment = async (postId: string, commentId: string) => {
     if (!confirm('Excluir este comentário?')) return;
     try {
@@ -189,7 +201,7 @@ const Feed = () => {
           <div className="stagger" style={{ marginBottom: '24px' }}>
             <div className="list-label">Fixados</div>
             {pinnedPosts.map(post => (
-              <PostCard key={post.id} post={post} currentUserId={user?.id || ''} userRole={user?.role || ''}
+              <PostCard key={post.id} post={post} currentUserId={user?.id || ''} currentChurchId={user?.churchId || null} userRole={user?.role || ''} onDonated={handleDonated}
                 onComment={handleAddComment} onReact={handleReact} onPin={handlePin} onDelete={handleDeletePost} onDeleteComment={handleDeleteComment} pinned />
             ))}
           </div>
@@ -204,7 +216,7 @@ const Feed = () => {
           <>
             <div className="stagger">
               {regularPosts.map(post => (
-                <PostCard key={post.id} post={post} currentUserId={user?.id || ''} userRole={user?.role || ''}
+                <PostCard key={post.id} post={post} currentUserId={user?.id || ''} currentChurchId={user?.churchId || null} userRole={user?.role || ''} onDonated={handleDonated}
                   onComment={handleAddComment} onReact={handleReact} onPin={handlePin} onDelete={handleDeletePost} onDeleteComment={handleDeleteComment} />
               ))}
             </div>
@@ -338,7 +350,8 @@ const SuggestionItem = ({ icon, name, subtitle }: { icon: string; name: string; 
 );
 
 interface PostCardProps {
-  post: Post; currentUserId: string; userRole: string;
+  post: Post; currentUserId: string; currentChurchId: string | null; userRole: string;
+  onDonated: (postId: string, donated: boolean) => void;
   onComment: (id: string, content: string) => void;
   onReact: (postId: string, type: string, hasReacted: boolean) => void;
   onPin: (postId: string, isPinned: boolean) => void;
@@ -347,11 +360,19 @@ interface PostCardProps {
   pinned?: boolean;
 }
 
-const PostCard = ({ post, currentUserId, userRole, onComment, onReact, onPin, onDelete, onDeleteComment, pinned }: PostCardProps) => {
+const PostCard = ({ post, currentUserId, currentChurchId, userRole, onComment, onReact, onPin, onDelete, onDeleteComment, onDonated, pinned }: PostCardProps) => {
   const [commentText, setCommentText] = useState('');
   const [showComments, setShowComments] = useState(false);
-  const canPin = userRole === 'leader' || userRole === 'admin';
-  const canDelete = post.userId === currentUserId || canPin;
+  const isManager = userRole === 'leader' || userRole === 'admin';
+  const donation = post.type === 'donation';
+  // Doação de outra comunidade: só para ver (pessoas de comunidades diferentes não conversam)
+  const outside = donation && !!post.churchId && post.churchId !== currentChurchId;
+  const canPin = isManager && !outside;
+  const canDelete = post.userId === currentUserId || (isManager && (!outside || userRole === 'admin'));
+  const canMarkDonated = donation && !outside && (post.userId === currentUserId || isManager);
+  const mapUrl = post.latitude != null && post.longitude != null
+    ? `https://www.google.com/maps/search/?api=1&query=${post.latitude},${post.longitude}`
+    : null;
   const reactions = post.reactions ?? EMPTY_REACTIONS;
   const myReactions = post.myReactions ?? [];
 
@@ -373,8 +394,11 @@ const PostCard = ({ post, currentUserId, userRole, onComment, onReact, onPin, on
         <Avatar name={post.userName} profileImage={post.userProfileImage} size="small" />
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>{post.userName}</div>
-          <div style={{ fontSize: '11px', color: 'var(--text-faint)' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-faint)', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
             {new Date(post.createdAt).toLocaleDateString('pt-BR', { day: 'numeric', month: 'short', year: 'numeric' })}
+            {outside && post.churchName && <span>· {post.churchName}</span>}
+            {donation && <span className="uk-label">Doação</span>}
+            {post.donatedAt && <span className="uk-label">Já doado</span>}
           </div>
         </div>
         {canPin && (
@@ -406,6 +430,22 @@ const PostCard = ({ post, currentUserId, userRole, onComment, onReact, onPin, on
       {!post.imageUrl && post.content && (
         <div style={{ padding: '16px', fontSize: '14px', lineHeight: 1.6, color: 'var(--text)' }}>{post.content}</div>
       )}
+
+      {/* Doação: onde buscar */}
+      {donation && (
+        <div className="donation-place">
+          <span uk-icon="icon: location; ratio: 0.8"></span>
+          <span style={{ flex: 1, minWidth: 0 }}>Buscar em <strong>{post.location}</strong></span>
+          {mapUrl && <a href={mapUrl} target="_blank" rel="noreferrer">Ver no mapa</a>}
+          {canMarkDonated && (
+            <button type="button" className={`uk-button uk-button-small ${post.donatedAt ? 'uk-button-default' : 'uk-button-success'}`}
+              onClick={() => onDonated(post.id, !post.donatedAt)}>
+              {post.donatedAt ? 'Voltar a disponível' : <><span uk-icon="icon: check; ratio: 0.7"></span> Marcar como doado</>}
+            </button>
+          )}
+        </div>
+      )}
+      {outside ? null : <>
 
       {/* Reactions summary */}
       {totalReactions > 0 && (
@@ -485,6 +525,7 @@ const PostCard = ({ post, currentUserId, userRole, onComment, onReact, onPin, on
           Enviar
         </button>
       </form>
+      </>}
     </div>
   );
 };

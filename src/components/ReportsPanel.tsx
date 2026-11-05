@@ -74,7 +74,9 @@ const Snapshot: React.FC<{ snapshot: any }> = ({ snapshot }) => {
   if (snapshot.kind === 'post') {
     return (
       <>
-        <div className="list-label" style={{ margin: 0 }}>Publicação de {name(snapshot.post.author)}</div>
+        <div className="list-label" style={{ margin: 0 }}>
+          {snapshot.post.type === 'donation' ? `Doação de ${name(snapshot.post.author)} · buscar em ${snapshot.post.location}` : `Publicação de ${name(snapshot.post.author)}`}
+        </div>
         <div style={{ padding: '10px 12px', borderRadius: 'var(--radius-sm)', background: 'var(--bg-surface)', fontSize: '13px' }}>
           {snapshot.post.content || <em style={{ color: 'var(--text-muted)' }}>Só imagem</em>}
           {snapshot.post.imageUrl && (
