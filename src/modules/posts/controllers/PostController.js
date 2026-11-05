@@ -17,6 +17,12 @@ class PostController {
       imageUrl: post.imageUrl,
       isPinned: post.isPinned || false,
       type: post.type || 'post',
+      churchId: post.churchId,
+      churchName: post.church?.name || null,
+      location: post.location || null,
+      latitude: post.latitude ?? null,
+      longitude: post.longitude ?? null,
+      donatedAt: post.donatedAt || null,
       userId: post.user?.id,
       userName: post.user?.name,
       userProfileImage: post.user?.profileImage,
@@ -45,6 +51,10 @@ class PostController {
         content: req.body.content,
         imageUrl: req.uploadedImageUrl || null,
         userId: req.user.id,
+        type: req.body.type,
+        location: req.body.location,
+        latitude: req.body.latitude,
+        longitude: req.body.longitude,
       });
 
       dto.validate();
@@ -91,6 +101,16 @@ class PostController {
     try {
       await this.postService.deletePost(req.params.id, req.user);
       res.json({ success: true, message: 'Publicação excluída' });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async setDonated(req, res, next) {
+    try {
+      const donated = req.body.donated !== false;
+      const post = await this.postService.setDonated(req.params.id, donated, req.user);
+      res.json({ success: true, message: donated ? 'Doação marcada como entregue' : 'Doação disponível de novo', data: { donatedAt: post.donatedAt } });
     } catch (error) {
       next(error);
     }

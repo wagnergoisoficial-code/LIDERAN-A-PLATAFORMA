@@ -15,6 +15,7 @@ class PostRepository {
         orderBy: { createdAt: 'asc' },
       },
       reactions: { select: { id: true, type: true, userId: true } },
+      church: { select: { id: true, name: true } },
     };
   }
 
@@ -31,20 +32,24 @@ class PostRepository {
     return this.prisma.post.create({ data, include: this.postInclude() });
   }
 
+  // O feed de uma comunidade: as publicações dela e as doações de todas as comunidades
   async findPage(churchId, hiddenUserIds = [], { cursor, limit = 20 } = {}) {
-    const visible = { churchId, ...(hiddenUserIds.length && { userId: { notIn: hiddenUserIds } }) };
+    const notHidden = hiddenUserIds.length ? { userId: { notIn: hiddenUserIds } } : {};
 
     const pinned = cursor
       ? []
       : await this.prisma.post.findMany({
-          where: { ...visible, isPinned: true },
+          where: { ...notHidden, churchId, isPinned: true },
           include: this.postInclude(hiddenUserIds),
           orderBy: { createdAt: 'desc' },
           take: 20,
         });
 
     const regular = await this.prisma.post.findMany({
-      where: { ...visible, isPinned: false },
+      where: {
+        ...notHidden,
+        OR: [{ churchId, isPinned: false }, { type: 'donation', churchId: { not: churchId } }],
+      },
       include: this.postInclude(hiddenUserIds),
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: limit + 1,

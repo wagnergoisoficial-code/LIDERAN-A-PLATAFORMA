@@ -1,4 +1,5 @@
-const { NotFoundError, ValidationError } = require('../../../shared/errors/AppError');
+const { NotFoundError, ValidationError, ForbiddenError } = require('../../../shared/errors/AppError');
+const { isMinor } = require('../../../shared/utils/minor.util');
 const {
   requireChurch,
   assertSameChurch,
@@ -18,17 +19,29 @@ class PostService {
 
   async createPost(createPostDto, user) {
     const churchId = requireChurch(user);
+    const donation = createPostDto.isDonation;
+
+    // A doação mostra o local a todas as comunidades: um menor não pode expor onde está
+    if (donation && isMinor(user)) {
+      throw new ForbiddenError('Menores de idade não podem publicar doações. Peça ajuda ao seu responsável ou ao líder.');
+    }
 
     const post = await this.postRepository.create({
       content: createPostDto.content,
       imageUrl: createPostDto.imageUrl,
       userId: user.id,
       churchId,
+      ...(donation && {
+        type: 'donation',
+        location: createPostDto.location,
+        latitude: createPostDto.latitude,
+        longitude: createPostDto.longitude,
+      }),
     });
 
     await notifyChurch(churchId, user.id, {
       type: 'new_post',
-      title: `${user.name} publicou no feed`,
+      title: donation ? `${user.name} publicou uma doação` : `${user.name} publicou no feed`,
       body: preview(post.content) || 'Nova imagem compartilhada',
       linkId: post.id,
       linkType: 'post',
@@ -96,6 +109,14 @@ class PostService {
     const post = await this.getPostById(id, user);
     assertOwnerOrLeader(user, post.userId, 'Você só pode excluir as suas publicações');
     return this.postRepository.delete(id);
+  }
+
+  // Só quem doa (ou um líder da comunidade dele) marca a doação como entregue
+  async setDonated(id, donated, user) {
+    const post = await this.getPostById(id, user);
+    if (post.type !== 'donation') throw new ValidationError('Esta publicação não é uma doação');
+    assertOwnerOrLeader(user, post.userId, 'Só quem publicou a doação a pode marcar como doada');
+    return this.postRepository.update(id, { donatedAt: donated ? new Date() : null });
   }
 
   async togglePin(id, isPinned, user) {

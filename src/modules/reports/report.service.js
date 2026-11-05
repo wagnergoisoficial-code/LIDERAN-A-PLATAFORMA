@@ -95,7 +95,7 @@ class ReportService {
 
     if (targetType === 'post') {
       const post = await prisma.post.findFirst({
-        where: { id: targetId, churchId },
+        where: { id: targetId, OR: [{ churchId }, { type: 'donation' }] },
         include: {
           user: { select: USER_BRIEF },
           comments: { include: { user: { select: USER_BRIEF } }, orderBy: { createdAt: 'asc' } },
@@ -103,10 +103,11 @@ class ReportService {
       });
       if (!post) throw new NotFoundError('Publicação não encontrada');
       return {
+        churchId: post.churchId,
         targetUserId: post.userId,
         snapshot: {
           kind: 'post',
-          post: { id: post.id, author: person(post.user), content: post.content, imageUrl: post.imageUrl, createdAt: post.createdAt },
+          post: { id: post.id, type: post.type, author: person(post.user), content: post.content, imageUrl: post.imageUrl, location: post.location, createdAt: post.createdAt },
           comments: post.comments.map((c) => ({ id: c.id, author: person(c.user), content: c.content, createdAt: c.createdAt })),
         },
       };
@@ -180,11 +181,14 @@ class ReportService {
       return { id: recent.id, status: recent.status, duplicate: true };
     }
 
-    const { targetUserId, snapshot } = await this.buildSnapshot(user, churchId, targetType, targetId, viewerIds);
+    const built = await this.buildSnapshot(user, churchId, targetType, targetId, viewerIds);
+    const { targetUserId, snapshot } = built;
+    // Conteúdo de outra comunidade (doações): a denúncia vai para quem a pode moderar
+    const reportChurchId = built.churchId || churchId;
 
     const report = await this.prisma.report.create({
       data: {
-        churchId,
+        churchId: reportChurchId,
         reporterId: user.id,
         targetType,
         targetId,
@@ -194,7 +198,7 @@ class ReportService {
       },
     });
 
-    await this.notifyLeaders(churchId, report, user, targetUserId);
+    await this.notifyLeaders(reportChurchId, report, user, targetUserId);
     return { id: report.id, status: report.status, duplicate: false };
   }
 

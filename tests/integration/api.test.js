@@ -187,7 +187,9 @@ test('fluxo completo: autenticação, comunidades, conteúdo, notificações e p
     check('líder apaga post de membro', delPostLeader.status === 200, delPostLeader);
 
     const feed = await call('GET', '/posts', tokM2);
-    check('feed da comunidade', feed.status === 200 && feed.data.length === 1 && feed.data[0].isPinned && feed.data[0].reactions.amen === 1, feed.data);
+    // O feed traz também doações de outras comunidades: conta-se só o que é desta
+    const ownFeed = feed.data.filter((p) => p.churchId === cA);
+    check('feed da comunidade', feed.status === 200 && ownFeed.length === 1 && ownFeed[0].isPinned && ownFeed[0].reactions.amen === 1, feed.data);
 
     // bloqueio esconde conteúdo
     await call('POST', '/posts', tokM1, { content: 'Post do membro um para testar bloqueio' });

@@ -158,7 +158,12 @@ model Post {
   content   String
   imageUrl  String?
   isPinned  Boolean  @default(false)
-  type      String   @default("post") // post, announcement
+  type      String   @default("post") // post, announcement, donation
+  // Doação: aparece no feed de todas as comunidades, com o local para buscar
+  location  String?
+  latitude  Float?
+  longitude Float?
+  donatedAt DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -174,6 +179,7 @@ model Post {
 
   @@index([userId])
   @@index([churchId])
+  @@index([type])
   @@map("posts")
 }
 

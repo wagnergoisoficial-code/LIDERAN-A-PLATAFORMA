@@ -15,5 +15,6 @@ const postController = new PostController(postService);
 postReactionRoute.post('/:id/react', authMiddleware, (req, res, next) => postController.react(req, res, next));
 postReactionRoute.delete('/:id/react', authMiddleware, (req, res, next) => postController.unreact(req, res, next));
 postReactionRoute.patch('/:id/pin', authMiddleware, (req, res, next) => postController.togglePin(req, res, next));
+postReactionRoute.patch('/:id/donated', authMiddleware, (req, res, next) => postController.setDonated(req, res, next));
 
 module.exports = postReactionRoute;
