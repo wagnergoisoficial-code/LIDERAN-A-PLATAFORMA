@@ -4,12 +4,13 @@ const { requireChurch, canManageChurch } = require('../../shared/utils/church.ut
 const { isMinor } = require('../../shared/utils/minor.util');
 const { notifyUsers } = require('../../shared/utils/notifier');
 
-const TARGET_TYPES = ['conversation', 'community_chat', 'post', 'profile'];
+const TARGET_TYPES = ['conversation', 'community_chat', 'post', 'prayer_request', 'profile'];
 const STATUSES = ['open', 'resolved', 'dismissed'];
 const TYPE_LABELS = {
   conversation: 'uma conversa privada',
   community_chat: 'uma mensagem no chat da comunidade',
   post: 'uma publicação',
+  prayer_request: 'um pedido de oração',
   profile: 'um perfil',
 };
 const USER_BRIEF = { id: true, name: true, profileImage: true, role: true, birthDate: true, age: true, status: true };
@@ -107,6 +108,19 @@ class ReportService {
           kind: 'post',
           post: { id: post.id, author: person(post.user), content: post.content, imageUrl: post.imageUrl, createdAt: post.createdAt },
           comments: post.comments.map((c) => ({ id: c.id, author: person(c.user), content: c.content, createdAt: c.createdAt })),
+        },
+      };
+    }
+
+    if (targetType === 'prayer_request') {
+      const request = await prisma.prayerRequest.findFirst({ where: { id: targetId, churchId } });
+      if (!request) throw new NotFoundError('Pedido de oração não encontrado');
+      const author = await prisma.user.findUnique({ where: { id: request.userId }, select: USER_BRIEF });
+      return {
+        targetUserId: request.userId,
+        snapshot: {
+          kind: 'prayer_request',
+          prayer: { id: request.id, author: person(author), title: request.title, content: request.content, createdAt: request.createdAt },
         },
       };
     }

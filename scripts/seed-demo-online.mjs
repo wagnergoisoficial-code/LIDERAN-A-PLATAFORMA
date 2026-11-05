@@ -204,12 +204,12 @@ for (const e of EVENTS) {
 // ── Pedidos de oração ──────────────────────────────────────────
 const PRAYERS = [
   { who: 'ana', title: 'Exames finais', content: 'Orem pelos meus exames de fim de curso na próxima semana.', praying: ['sara'] },
-  { who: 'lucas', anonymous: true, title: 'Decisão profissional', content: 'Estou a decidir sobre uma proposta de trabalho noutra cidade. Orem por sabedoria.', praying: ['ana', 'pedro'] },
+  { who: 'lucas', title: 'Decisão profissional', content: 'Estou a decidir sobre uma proposta de trabalho noutra cidade. Orem por sabedoria.', praying: ['ana', 'pedro'] },
 ];
 const prayerTitles = new Set(list(await must('GET', '/prayers', L)).map((p) => p.title));
 for (const p of PRAYERS) {
   if (prayerTitles.has(p.title)) continue;
-  const pr = await must('POST', '/prayers', people[p.who].token, { title: p.title, content: p.content, isAnonymous: !!p.anonymous });
+  const pr = await must('POST', '/prayers', people[p.who].token, { title: p.title, content: p.content });
   count('pedidos de oração');
   for (const who of p.praying) await must('POST', `/prayers/${pr.id}/pray`, people[who].token);
 }

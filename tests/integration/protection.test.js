@@ -263,6 +263,15 @@ describe('denúncias', () => {
     const uncle = (await login(`tio${stamp}@t.com`)).data.token;
     expect((await call('POST', '/reports', uncle, { targetType: 'conversation', targetId: s.protectedConv })).status).toBe(404);
   });
+
+  test('pedido de oração denunciado chega ao líder com o autor', async () => {
+    const prayer = await call('POST', '/prayers', s.adult, { title: 'Pedido estranho', content: 'Conteúdo impróprio num pedido.' });
+    const rp = await call('POST', '/reports', s.adult2, { targetType: 'prayer_request', targetId: prayer.data.id });
+    expect(rp.status).toBe(201);
+    const detail = await call('GET', `/reports/${rp.data.id}`, s.leader);
+    expect(detail.data.targetUser.id).toBe(s.adultId);
+    expect(detail.data.snapshot.prayer.author.name).toBe('Adulto');
+  });
 });
 
 describe('líder suspende e bloqueia pelo painel', () => {

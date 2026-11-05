@@ -3,18 +3,15 @@ class PrayerController {
     this.prayerService = prayerService;
   }
 
-  // Pedidos anónimos não revelam o autor (só o próprio sabe que é seu: isMine)
   format(pr, userId) {
-    const anonymous = pr.isAnonymous;
     return {
       id: pr.id,
       title: pr.title,
       content: pr.content,
-      isAnonymous: anonymous,
       isAnswered: pr.isAnswered,
-      userId: anonymous ? null : pr.userId,
-      authorName: anonymous ? null : pr.author?.name || null,
-      authorProfileImage: anonymous ? null : pr.author?.profileImage || null,
+      userId: pr.userId,
+      authorName: pr.author?.name || null,
+      authorProfileImage: pr.author?.profileImage || null,
       isMine: pr.userId === userId,
       prayCount: pr.prayers?.length || 0,
       hasPrayed: pr.prayers?.some(p => p.userId === userId) || false,

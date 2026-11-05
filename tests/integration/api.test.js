@@ -231,12 +231,10 @@ test('fluxo completo: autenticação, comunidades, conteúdo, notificações e p
     check('pedido inválido → 400', prBad.status === 400, prBad);
     const pr = await call('POST', '/prayers', tokM1, { title: 'Saúde da família', content: 'Orem pela recuperação da minha mãe.' });
     check('pedido com nome do autor', pr.status === 201 && pr.data.authorName === 'Membro Um' && pr.data.isMine, pr.data);
+    // Não há pedidos anónimos: o autor aparece sempre, mesmo que o pedido tente escondê-lo
     const anon = await call('POST', '/prayers', tokM1, { title: 'Pedido reservado', content: 'Orem por uma decisão importante.', isAnonymous: true });
-    const prList = await call('GET', '/prayers', tokM2);
-    const anonSeen = prList.data.find((p) => p.id === anon.data.id);
-    check('anónimo esconde o autor para os outros', anonSeen && anonSeen.authorName === null && anonSeen.userId === null && !anonSeen.isMine, anonSeen);
-    const anonMine = (await call('GET', '/prayers', tokM1)).data.find((p) => p.id === anon.data.id);
-    check('autor reconhece o pedido anónimo (isMine)', anonMine?.isMine === true, anonMine);
+    const anonSeen = (await call('GET', '/prayers', tokM2)).data.find((p) => p.id === anon.data.id);
+    check('o autor aparece sempre (sem anónimos)', anonSeen && anonSeen.authorName === 'Membro Um' && !('isAnonymous' in anonSeen), anonSeen);
     const pray = await call('POST', `/prayers/${pr.data.id}/pray`, tokM2);
     check('orar', pray.status === 200 && pray.data.prayCount === 1 && pray.data.hasPrayed, pray.data);
     const answeredByOther = await call('PATCH', `/prayers/${pr.data.id}/answered`, tokM2);

@@ -15,12 +15,11 @@ class PrayerService {
     if (title.length < 3) throw new ValidationError('O título deve ter pelo menos 3 caracteres');
     if (content.length < 5) throw new ValidationError('Descreva o pedido (mínimo 5 caracteres)');
 
-    const isAnonymous = !!dto.isAnonymous;
-    const pr = await this.prayerRepository.create({ title, content, isAnonymous, userId: user.id, churchId });
+    const pr = await this.prayerRepository.create({ title, content, userId: user.id, churchId });
 
     await notifyChurch(churchId, user.id, {
       type: 'new_prayer',
-      title: isAnonymous ? 'Novo pedido de oração' : `${user.name} pediu oração`,
+      title: `${user.name} pediu oração`,
       body: preview(title),
       linkId: pr.id,
       linkType: 'prayer_request',

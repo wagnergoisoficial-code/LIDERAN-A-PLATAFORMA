@@ -272,14 +272,14 @@ async function main() {
   // ── Pedidos de oração ────────────────────────────────────────
   const prayers = [
     { id: 'demo_prayer_1', who: 'herminio', title: 'Saúde da minha mãe', content: 'Peço oração pela recuperação da minha mãe, que fez uma cirurgia esta semana.', when: ago(1, 5), praying: ['leader', 'ana', 'sara', 'jonas'] },
-    { id: 'demo_prayer_2', who: 'lucas', anonymous: true, title: 'Decisão profissional', content: 'Estou a decidir sobre uma proposta de trabalho noutra cidade. Orem por sabedoria.', when: ago(2), praying: ['ana', 'pedro'] },
+    { id: 'demo_prayer_2', who: 'lucas', title: 'Decisão profissional', content: 'Estou a decidir sobre uma proposta de trabalho noutra cidade. Orem por sabedoria.', when: ago(2), praying: ['ana', 'pedro'] },
     { id: 'demo_prayer_3', who: 'ana', title: 'Exames finais', content: 'Orem pelos meus exames de fim de curso na próxima semana.', when: ago(3), praying: ['sara', 'teste', 'delio'] },
     { id: 'demo_prayer_4', who: 'jonas', answered: true, title: 'Viagem da família', content: 'Orem pela viagem da minha família a Inhambane.', when: ago(6), praying: ['leader', 'herminio'] },
     { id: 'demo_prayer_5', who: 'teste', title: 'Adaptação na nova cidade', content: 'Mudei-me há pouco tempo e peço oração para me adaptar e fazer boas amizades.', when: ago(0, 14), praying: ['ana'] },
   ].filter((p) => people[p.who]);
   for (const p of prayers) {
     await prisma.prayerRequest.create({
-      data: { id: p.id, title: p.title, content: p.content, isAnonymous: !!p.anonymous, isAnswered: !!p.answered, userId: people[p.who].id, churchId, createdAt: p.when },
+      data: { id: p.id, title: p.title, content: p.content, isAnswered: !!p.answered, userId: people[p.who].id, churchId, createdAt: p.when },
     });
     let n = 0;
     for (const who of p.praying) {

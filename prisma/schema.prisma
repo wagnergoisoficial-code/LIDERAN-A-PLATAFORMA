@@ -295,7 +295,6 @@ model PrayerRequest {
   id        String   @id @default(cuid())
   title     String
   content   String
-  isAnonymous Boolean @default(false)
   isAnswered Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
