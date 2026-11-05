@@ -5,6 +5,7 @@ import UIkit from 'uikit';
 import PageHeader from '../components/PageHeader';
 import EmptyState from '../components/EmptyState';
 import AnimatedNumber from '../components/AnimatedNumber';
+import MonthCalendar, { dayKey } from '../components/MonthCalendar';
 import { pop, burst } from '../lib/motion';
 
 interface Attendee { id: string; name: string; profileImage?: string; }
@@ -38,6 +39,7 @@ const Events: React.FC = () => {
   const [editing, setEditing] = useState<Event | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
   const openCreate = () => { setEditing(null); setForm(EMPTY_FORM); setShowModal(true); };
   const openEdit = (ev: Event) => {
@@ -106,6 +108,11 @@ const Events: React.FC = () => {
 
   const upcoming = events.filter(e => new Date(e.startDate) >= new Date());
   const past = events.filter(e => new Date(e.startDate) < new Date()).reverse();
+  const ofDay = selectedDay ? events.filter(e => dayKey(new Date(e.startDate)) === selectedDay) : [];
+  const card = (ev: Event) => (
+    <EventCard key={ev.id} event={ev} userId={user?.id || ''} userRole={user?.role || ''} onRsvp={handleRsvp} onDelete={handleDelete} onEdit={openEdit}
+      past={new Date(ev.startDate) < new Date()} />
+  );
 
   return (
     <div>
@@ -126,22 +133,39 @@ const Events: React.FC = () => {
           </div>
         ) : (
           <>
+            <MonthCalendar events={events} selected={selectedDay} onSelect={setSelectedDay} />
+
+            {/* Dia escolhido no calendário */}
+            {selectedDay && (
+              <div style={{ marginBottom: '32px' }}>
+                <div className="section-head">
+                  <span className="list-label">
+                    {new Date(`${selectedDay}T00:00:00`).toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
+                  </span>
+                  <button className="uk-button uk-button-default uk-button-small" onClick={() => setSelectedDay(null)}>Ver todos</button>
+                </div>
+                <div className="stagger" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {ofDay.map(card)}
+                </div>
+              </div>
+            )}
+
             {/* Upcoming */}
-            {upcoming.length > 0 && (
+            {!selectedDay && upcoming.length > 0 && (
               <div style={{ marginBottom: '32px' }}>
                 <div className="list-label">Próximos</div>
                 <div className="stagger" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {upcoming.map(ev => <EventCard key={ev.id} event={ev} userId={user?.id || ''} userRole={user?.role || ''} onRsvp={handleRsvp} onDelete={handleDelete} onEdit={openEdit} />)}
+                  {upcoming.map(card)}
                 </div>
               </div>
             )}
 
             {/* Past */}
-            {past.length > 0 && (
+            {!selectedDay && past.length > 0 && (
               <div>
                 <div className="list-label">Passados</div>
                 <div className="stagger" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {past.map(ev => <EventCard key={ev.id} event={ev} userId={user?.id || ''} userRole={user?.role || ''} onRsvp={handleRsvp} onDelete={handleDelete} onEdit={openEdit} past />)}
+                  {past.map(card)}
                 </div>
               </div>
             )}
@@ -258,7 +282,7 @@ const EventCard: React.FC<EventCardProps> = ({ event, userId, userRole, onRsvp, 
             <p style={{ margin: '8px 0', fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.5 }}>{event.description}</p>
           )}
 
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '10px' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginTop: '10px' }}>
             <div style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'flex', gap: '12px' }}>
               <span><strong style={{ color: 'var(--text)' }}><AnimatedNumber value={event.goingCount} /></strong> confirmados</span>
               {event.maybeCount > 0 && <span className="fade-in"><strong style={{ color: 'var(--text)' }}><AnimatedNumber value={event.maybeCount} /></strong> talvez</span>}
