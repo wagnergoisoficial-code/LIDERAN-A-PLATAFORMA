@@ -145,7 +145,7 @@ const Videos: React.FC = () => {
           {waiting.length > 0 && (
             <section className="video-shelf">
               <div className="list-label">{isLeader ? `Por aprovar · ${waiting.length}` : 'Os seus vídeos'}</div>
-              <div className="video-row">
+              <div className="video-grid">
                 {waiting.map(v => (
                   <VideoCard key={v.id} video={v} onOpen={setPlaying}>
                     {isLeader ? (
@@ -173,7 +173,7 @@ const Videos: React.FC = () => {
             return (
               <section key={shelf.key} className="video-shelf">
                 <div className="list-label">{shelf.title}</div>
-                <div className="video-row">
+                <div className="video-grid">
                   {list.map(v => <VideoCard key={v.id} video={v} onOpen={setPlaying} />)}
                 </div>
               </section>
