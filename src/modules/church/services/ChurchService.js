@@ -7,6 +7,7 @@ const { canManageChurch, canViewChurch, isAdmin } = require('../../../shared/uti
 const { isMinor, ageFrom } = require('../../../shared/utils/minor.util');
 const guardianService = require('../../guardians/guardian.service');
 const { getPrismaClient } = require('../../../config/database');
+const { notifyUser } = require('../../../shared/utils/notifier');
 
 const SUSPENSION_DAYS = [1, 3, 7, 15, 30, 90];
 // Código do link de convite: aleatório e impossível de adivinhar
@@ -91,7 +92,8 @@ class ChurchService {
 
   // Admins veem todas as comunidades; líderes, as que criaram
   async getChurchesByLeader(user) {
-    const churches = await ChurchRepository.findByLeaderId(isAdmin(user) ? null : user.id);
+    // As que criou e, para um colíder, a comunidade onde é líder
+    const churches = await ChurchRepository.findByLeaderId(isAdmin(user) ? null : user.id, user.role === 'leader' ? user.churchId : null);
     return churches.map((church) => this.format(church, user));
   }
 
@@ -284,13 +286,53 @@ class ChurchService {
       throw new ValidationError('Você não pode remover a si mesmo');
     }
 
+    const member = await getPrismaClient().user.findFirst({ where: { id: memberId, churchId }, select: { role: true, leaderVerifiedAt: true } });
+    if (member?.role === 'leader' && church.leaderID !== user.id && !isAdmin(user)) {
+      throw new ForbiddenError('Apenas o criador da comunidade pode remover outros líderes');
+    }
+
     const result = await ChurchRepository.removeMemberFromChurch(memberId, churchId);
 
     if (result.count === 0) {
       throw new NotFoundError('Membro não encontrado nesta comunidade');
     }
 
+    // Quem saiu deixa de ser líder desta comunidade (um líder verificado mantém o papel para as suas)
+    if (member.role === 'leader' && !member.leaderVerifiedAt) {
+      await getPrismaClient().user.update({ where: { id: memberId }, data: { role: 'member' } });
+    }
+
     return result;
+  }
+
+  // Tornar alguém líder da comunidade ou tirar a liderança: só o criador da comunidade ou um administrador
+  async setMemberRole(memberId, churchId, role, user) {
+    if (!['leader', 'member'].includes(role)) throw new ValidationError('Papel inválido');
+    const { church, member } = await this.findMemberToManage(memberId, churchId, user, 'Apenas os líderes desta comunidade podem mudar papéis');
+
+    if (church.leaderID !== user.id && !isAdmin(user)) {
+      throw new ForbiddenError('Apenas o criador da comunidade pode tornar alguém líder ou tirar a liderança');
+    }
+    if (member.id === church.leaderID) throw new ForbiddenError('O criador da comunidade é sempre líder');
+    if (member.id === user.id) throw new ValidationError('Você não pode mudar o seu próprio papel');
+    if (member.role === 'admin') throw new ForbiddenError('O papel de um administrador não muda pela comunidade');
+    // Um líder lê as conversas de todos e gere menores: não pode ser um menor
+    if (role === 'leader' && isMinor(member)) throw new ValidationError('Menores de idade não podem ser líderes');
+    if (role === 'leader' && member.status !== 'active') throw new ValidationError('Reative a conta antes de a tornar líder');
+    if (member.role === role) return this.formatMember(member, true);
+
+    const prisma = getPrismaClient();
+    await prisma.$transaction([
+      prisma.user.update({ where: { id: member.id }, data: { role } }),
+      prisma.moderationAction.create({
+        data: { action: role === 'leader' ? 'make_leader' : 'remove_leader', churchId, userId: member.id, actorId: user.id },
+      }),
+    ]);
+    await notifyUser(member.id, role === 'leader'
+      ? { type: 'role_leader', title: `Agora é líder de ${church.name}`, body: 'Pode gerir os membros e moderar a comunidade.', linkType: 'member', linkId: member.id }
+      : { type: 'role_member', title: `Deixou de ser líder de ${church.name}`, body: 'Continua a ser membro da comunidade.' });
+
+    return this.formatMember(await ChurchRepository.getMemberById(member.id, churchId), true);
   }
 
   async getMemberStats(churchId, user) {

@@ -71,6 +71,20 @@ class ChurchController {
     }
   }
 
+  async setMemberRole(req, res, next) {
+    try {
+      const { churchId, memberId } = req.params;
+      const member = await ChurchService.setMemberRole(memberId, churchId, req.body.role, req.user);
+      res.status(200).json({
+        success: true,
+        message: member.role === 'leader' ? `${member.name} agora é líder` : `${member.name} deixou de ser líder`,
+        data: member,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async getInvite(req, res, next) {
     try {
       const invite = await ChurchService.getInvite(req.params.churchId, req.user, { regenerate: req.method === 'POST' });

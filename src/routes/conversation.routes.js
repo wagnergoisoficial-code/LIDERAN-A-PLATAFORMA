@@ -1,6 +1,7 @@
 const express = require('express');
 const conversationService = require('../modules/conversations/conversation.service');
 const authMiddleware = require('../shared/middlewares/auth.middleware');
+const roleMiddleware = require('../shared/middlewares/role.middleware');
 
 // Conversas privadas entre membros da mesma comunidade
 const router = express.Router();
@@ -16,6 +17,15 @@ router.use(authMiddleware);
 
 router.get('/', handle(async (req, res) => {
   res.json({ success: true, data: await conversationService.list(req.user) });
+}));
+
+// Líderes: as conversas privadas da comunidade, só para ler
+router.get('/church/:churchId', roleMiddleware('leader', 'admin'), handle(async (req, res) => {
+  res.json({ success: true, data: await conversationService.listForChurch(req.user, req.params.churchId) });
+}));
+
+router.get('/church/:churchId/:conversationId', roleMiddleware('leader', 'admin'), handle(async (req, res) => {
+  res.json({ success: true, data: await conversationService.readForChurch(req.user, req.params.churchId, req.params.conversationId) });
 }));
 
 router.get('/unread', handle(async (req, res) => {

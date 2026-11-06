@@ -60,9 +60,9 @@ class ChurchRepository {
     return this.prisma.church.findUnique({ where: { id } });
   }
 
-  async findByLeaderId(leaderID) {
+  async findByLeaderId(leaderID, alsoChurchId = null) {
     return this.prisma.church.findMany({
-      where: leaderID ? { leaderID } : {},
+      where: leaderID ? { OR: [{ leaderID }, ...(alsoChurchId ? [{ id: alsoChurchId }] : [])] } : {},
       include: {
         users: { select: { id: true, name: true, email: true, role: true } },
         _count: { select: { users: true } },

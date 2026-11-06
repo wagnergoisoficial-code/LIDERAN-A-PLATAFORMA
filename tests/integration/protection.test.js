@@ -323,3 +323,59 @@ describe('líder suspende e bloqueia pelo painel', () => {
     expect(seen.birthDate).toBeUndefined();
   });
 });
+
+describe('o líder gere a comunidade', () => {
+  const adult = async (key) => {
+    const res = await call('POST', '/auth/register-member', s.leader, {
+      name: `Colíder ${key}`, email: `col${key}${stamp}@t.com`, password: 'Senha1234', confirmPassword: 'Senha1234',
+      birthDate: birthYears(28), churchId: s.church,
+    });
+    return { id: res.data.user.id, token: (await login(`col${key}${stamp}@t.com`)).data.token };
+  };
+
+  test('o líder lê as conversas privadas da comunidade; os membros não', async () => {
+    const list = await call('GET', `/conversations/church/${s.church}`, s.leader);
+    expect(list.status).toBe(200);
+    const conv = list.data.find((c) => c.id === s.protectedConv);
+    expect(conv).toMatchObject({ protected: true });
+    const read = await call('GET', `/conversations/church/${s.church}/${s.protectedConv}`, s.leader);
+    expect(read.data.messages.map((m) => m.content)).toContain('Olá! Ensaio amanhã às 15h.');
+
+    expect((await call('GET', `/conversations/church/${s.church}`, s.adult2)).status).toBe(403);
+  });
+
+  test('o criador torna alguém líder e tira a liderança; menores não podem ser líderes', async () => {
+    s.c1 = await adult('um');
+    const made = await call('POST', `/churches/${s.church}/members/${s.c1.id}/role`, s.leader, { role: 'leader' });
+    expect(made.status).toBe(200);
+    expect(made.data.role).toBe('leader');
+    // Já gere a comunidade: vê a lista com os dados dos menores e as conversas
+    const members = await call('GET', `/churches/${s.church}/members`, s.c1.token);
+    expect(members.data.find((m) => m.id === s.minorId).guardians).toBeDefined();
+    expect((await call('GET', `/conversations/church/${s.church}`, s.c1.token)).status).toBe(200);
+    // E vê a comunidade no Painel, sem ser o criador
+    const mine = (await call('GET', '/churches/leader/my-churches', s.c1.token)).data;
+    expect(mine.map((c) => c.id)).toEqual([s.church]);
+    expect(mine[0].isOwner).toBe(false);
+
+    expect((await call('POST', `/churches/${s.church}/members/${s.minorId}/role`, s.leader, { role: 'leader' })).status).toBe(400);
+    expect((await call('POST', `/churches/${s.church}/members/${s.adult2Id}/role`, s.c1.token, { role: 'leader' })).status).toBe(403);
+    expect((await call('POST', `/churches/${s.church}/members/${s.leaderId}/role`, s.c1.token, { role: 'member' })).status).toBe(403);
+
+    const removed = await call('POST', `/churches/${s.church}/members/${s.c1.id}/role`, s.leader, { role: 'member' });
+    expect(removed.data.role).toBe('member');
+    expect((await call('GET', `/conversations/church/${s.church}`, s.c1.token)).status).toBe(403);
+  });
+
+  test('só o criador remove outros líderes, e quem sai deixa de ser líder', async () => {
+    s.c2 = await adult('dois');
+    s.c3 = await adult('tres');
+    await call('POST', `/churches/${s.church}/members/${s.c2.id}/role`, s.leader, { role: 'leader' });
+    await call('POST', `/churches/${s.church}/members/${s.c3.id}/role`, s.leader, { role: 'leader' });
+
+    expect((await call('DELETE', `/churches/${s.church}/members/${s.c3.id}`, s.c2.token)).status).toBe(403);
+    expect((await call('DELETE', `/churches/${s.church}/members/${s.c3.id}`, s.leader)).status).toBe(200);
+    const after = await getPrismaClient().user.findUnique({ where: { id: s.c3.id }, select: { role: true, churchId: true } });
+    expect(after).toEqual({ role: 'member', churchId: null });
+  });
+});

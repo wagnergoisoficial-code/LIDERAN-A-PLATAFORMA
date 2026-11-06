@@ -1,6 +1,6 @@
 const { getPrismaClient } = require('../../config/database');
 const { NotFoundError, ValidationError, ForbiddenError } = require('../../shared/errors/AppError');
-const { requireChurch } = require('../../shared/utils/church.util');
+const { requireChurch, canManageChurch } = require('../../shared/utils/church.util');
 const { isMinor } = require('../../shared/utils/minor.util');
 
 const MAX_LENGTH = 2000;
@@ -50,6 +50,49 @@ class ConversationService {
       senderId: { not: userId },
       deletedAt: null,
       ...(lastReadAt && { createdAt: { gt: lastReadAt } }),
+    };
+  }
+
+  // Os líderes leem as conversas privadas da sua comunidade (os membros são avisados na página Mensagens)
+  async assertChurchLeader(user, churchId) {
+    const church = await this.prisma.church.findUnique({ where: { id: churchId } });
+    if (!church || !canManageChurch(user, church)) throw new ForbiddenError('Apenas os líderes desta comunidade veem as conversas privadas');
+  }
+
+  async listForChurch(user, churchId) {
+    await this.assertChurchLeader(user, churchId);
+    const conversations = await this.prisma.conversation.findMany({
+      where: { churchId, messages: { some: { deletedAt: null } } },
+      include: { ...this.includeSummary(), _count: { select: { messages: { where: { deletedAt: null } } } } },
+      orderBy: { lastMessageAt: 'desc' },
+    });
+    return conversations.map((c) => ({
+      id: c.id,
+      participants: c.participants.map((p) => ({ id: p.user.id, name: p.user.name, profileImage: p.user.profileImage, isMinor: isMinor(p.user) })),
+      lastMessage: c.messages[0] ? { content: c.messages[0].content, createdAt: c.messages[0].createdAt } : null,
+      messageCount: c._count.messages,
+      protected: this.isProtected(c.participants),
+    }));
+  }
+
+  async readForChurch(user, churchId, conversationId) {
+    await this.assertChurchLeader(user, churchId);
+    const conversation = await this.prisma.conversation.findFirst({
+      where: { id: conversationId, churchId },
+      include: { participants: { include: { user: { select: PARTICIPANT_USER } } } },
+    });
+    if (!conversation) throw new NotFoundError('Conversa não encontrada');
+    const messages = await this.prisma.directMessage.findMany({
+      where: { conversationId, deletedAt: null },
+      include: { sender: { select: SENDER } },
+      orderBy: { createdAt: 'asc' },
+      take: 500,
+    });
+    return {
+      id: conversation.id,
+      participants: conversation.participants.map((p) => ({ id: p.user.id, name: p.user.name, isMinor: isMinor(p.user) })),
+      protected: this.isProtected(conversation.participants),
+      messages: messages.map((m) => ({ id: m.id, content: m.content, createdAt: m.createdAt, sender: m.sender })),
     };
   }
 
