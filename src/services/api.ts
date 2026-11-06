@@ -542,6 +542,13 @@ export const api = {
     request(`/reports/${reportId}`, { method: 'PATCH', body: JSON.stringify(data) }),
 
   // Moderação e autorizações no painel do líder
+  setMemberRole: (churchId: string, memberId: string, role: 'leader' | 'member') =>
+    request(`/churches/${churchId}/members/${memberId}/role`, { method: 'POST', body: JSON.stringify({ role }) }),
+
+  // Conversas privadas da comunidade, para os líderes (só leitura)
+  getChurchConversations: (churchId: string) => request(`/conversations/church/${churchId}`),
+  getChurchConversation: (churchId: string, conversationId: string) => request(`/conversations/church/${churchId}/${conversationId}`),
+
   moderateMember: (churchId: string, memberId: string, data: { action: 'suspend' | 'block' | 'reactivate'; days?: number; reason?: string; reportId?: string }) =>
     request(`/churches/${churchId}/members/${memberId}/moderation`, { method: 'POST', body: JSON.stringify(data) }),
 

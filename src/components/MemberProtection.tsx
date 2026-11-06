@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import UIkit from 'uikit';
 import { api } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import GuardianFields, { EMPTY_GUARDIAN, GuardianDraft, guardianPayload, relationshipLabel } from './GuardianFields';
 
 interface Guardian {
@@ -16,6 +17,7 @@ interface Guardian {
 export interface ProtectedMember {
   id: string;
   name: string;
+  role?: string;
   isMinor?: boolean;
   status?: string;
   suspendedUntil?: string | null;
@@ -40,12 +42,14 @@ const methodLabel = (method?: string | null) =>
 interface MemberProtectionProps {
   churchId: string;
   member: ProtectedMember;
+  canChangeRole?: boolean;
   onClose: () => void;
   onChanged: (member: ProtectedMember) => void;
 }
 
 // Painel do líder: estado da conta, autorização dos pais, responsáveis e moderação de um membro
-const MemberProtection: React.FC<MemberProtectionProps> = ({ churchId, member, onClose, onChanged }) => {
+const MemberProtection: React.FC<MemberProtectionProps> = ({ churchId, member, canChangeRole, onClose, onChanged }) => {
+  const { user } = useAuth();
   const [busy, setBusy] = useState(false);
   const [proof, setProof] = useState<File | null>(null);
   const proofInput = useRef<HTMLInputElement>(null);
@@ -92,6 +96,15 @@ const MemberProtection: React.FC<MemberProtectionProps> = ({ churchId, member, o
   };
 
   const restricted = member.status === 'suspended' || member.status === 'blocked';
+  const isLeader = member.role === 'leader';
+  const showRole = canChangeRole && member.id !== user?.id && member.role !== 'admin' && !member.isMinor && member.status === 'active';
+
+  const changeRole = () => {
+    const question = isLeader
+      ? `Tirar a liderança a ${member.name}? Continua membro da comunidade.`
+      : `Tornar ${member.name} líder? Vai poder gerir os membros, ler as conversas privadas e moderar a comunidade.`;
+    if (confirm(question)) run(() => api.setMemberRole(churchId, member.id, isLeader ? 'member' : 'leader'), isLeader ? 'Deixou de ser líder' : 'Agora é líder');
+  };
 
   return (
     <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
@@ -163,6 +176,22 @@ const MemberProtection: React.FC<MemberProtectionProps> = ({ churchId, member, o
                 </button>
               </div>
             )}
+          </div>
+        )}
+
+        {showRole && (
+          <div className="protection-section">
+            <div className="list-label" style={{ margin: 0 }}>Liderança</div>
+            <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>
+              {isLeader
+                ? 'É líder desta comunidade: gere os membros, lê as conversas privadas e modera.'
+                : 'Os líderes gerem os membros, leem as conversas privadas e moderam a comunidade.'}
+            </p>
+            <div>
+              <button className={`uk-button uk-button-small ${isLeader ? 'uk-button-default' : 'uk-button-primary'}`} onClick={changeRole} disabled={busy}>
+                {isLeader ? 'Tirar de líder' : 'Tornar líder'}
+              </button>
+            </div>
           </div>
         )}
 

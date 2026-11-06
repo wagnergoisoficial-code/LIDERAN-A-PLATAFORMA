@@ -8,6 +8,7 @@ import ReportsPanel from '../components/ReportsPanel';
 import LeaderVerificationCard from '../components/LeaderVerificationCard';
 import VerificationsPanel from '../components/VerificationsPanel';
 import InviteLink from '../components/InviteLink';
+import CommunityConversations from '../components/CommunityConversations';
 import PageHeader from '../components/PageHeader';
 import EmptyState from '../components/EmptyState';
 
@@ -89,8 +90,10 @@ const Dashboard = () => {
     }
   };
 
-  // Líder ainda por verificar: só o pedido de verificação (as comunidades vêm depois)
-  if (user?.role === 'leader' && user.leaderVerified === false) {
+  // Líder ainda por verificar e sem comunidade: só o pedido de verificação.
+  // Um colíder (tornado líder por outro) gere a comunidade dele sem verificação.
+  const unverified = user?.role === 'leader' && user.leaderVerified === false;
+  if (unverified && !user?.churchId) {
     return (
       <div>
         <PageHeader icon="grid" title="Painel do Líder" subtitle="Antes de criar a comunidade, verificamos que é líder de uma igreja" />
@@ -105,7 +108,7 @@ const Dashboard = () => {
         icon="grid"
         title="Painel do Líder"
         subtitle="Gerencie suas comunidades"
-        actions={(
+        actions={!unverified && (
           <button
             className={`uk-button ${showCreateForm ? 'uk-button-default' : 'uk-button-primary'}`}
             onClick={() => { setShowCreateForm(!showCreateForm); setEditing(false); }}
@@ -280,9 +283,14 @@ const Dashboard = () => {
                 <ReportsPanel churchId={selectedChurch.id} />
               </div>
 
+              {/* Conversas privadas (só leitura) */}
+              <div style={{ marginTop: '24px' }}>
+                <CommunityConversations churchId={selectedChurch.id} />
+              </div>
+
               {/* Membros */}
               <div style={{ marginTop: '24px' }}>
-                <ChurchMembers churchId={selectedChurch.id} churchName={selectedChurch.name} />
+                <ChurchMembers churchId={selectedChurch.id} churchName={selectedChurch.name} canChangeRoles={!!selectedChurch.isOwner || user?.role === 'admin'} />
               </div>
             </div>
 
@@ -302,7 +310,7 @@ const Dashboard = () => {
                 <span uk-icon="icon: close; ratio: 0.9"></span>
               </button>
             </div>
-            <ChurchMembers churchId={selectedChurch.id} churchName={selectedChurch.name} />
+            <ChurchMembers churchId={selectedChurch.id} churchName={selectedChurch.name} canChangeRoles={!!selectedChurch.isOwner || user?.role === 'admin'} />
           </div>
         </div>
       )}

@@ -160,7 +160,7 @@ const Messages = () => {
       <PageHeader
         icon="mail"
         title="Mensagens"
-        subtitle="Conversas privadas com membros da comunidade"
+        subtitle="Conversas privadas com membros da comunidade. Os líderes da comunidade podem lê-las."
         actions={(
           <button className="uk-button uk-button-primary" onClick={openPicker}>
             <span uk-icon="icon: plus; ratio: 0.8"></span> Nova conversa

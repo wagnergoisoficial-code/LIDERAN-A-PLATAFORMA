@@ -9,11 +9,13 @@ import MemberProtection, { ProtectedMember, statusLabel } from './MemberProtecti
 interface ChurchMembersProps {
   churchId: string;
   churchName: string;
+  // Só o criador da comunidade (ou um administrador) torna alguém líder
+  canChangeRoles?: boolean;
 }
 
 const emptyForm = { name: '', email: '', password: '', confirmPassword: '', birthDate: '', title: '', location: '' };
 
-const ChurchMembers: React.FC<ChurchMembersProps> = ({ churchId }) => {
+const ChurchMembers: React.FC<ChurchMembersProps> = ({ churchId, canChangeRoles }) => {
   const [members, setMembers] = useState<any[]>([]);
   const [loadingMembers, setLoadingMembers] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -185,6 +187,7 @@ const ChurchMembers: React.FC<ChurchMembersProps> = ({ churchId }) => {
                       {member.status && member.status !== 'active'
                         ? <span className="uk-label">{statusLabel(member)}</span>
                         : <span style={{ color: 'var(--text-muted)' }}>{statusLabel(member)}</span>}
+                      {member.role === 'leader' && <span className="uk-label">Líder</span>}
                       {member.isMinor && <span className="uk-label">Menor</span>}
                     </div>
                   </td>
@@ -282,6 +285,7 @@ const ChurchMembers: React.FC<ChurchMembersProps> = ({ churchId }) => {
       {protecting && (
         <MemberProtection
           churchId={churchId}
+          canChangeRole={canChangeRoles}
           member={protecting}
           onClose={() => setProtecting(null)}
           onChanged={(updated) => {
