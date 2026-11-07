@@ -8,7 +8,8 @@ import Modal from './Modal';
 import MoreMenu from './MoreMenu';
 import EmptyState from './EmptyState';
 import GuardianFields, { EMPTY_GUARDIAN, GuardianDraft, guardianPayload, isMinorDate, todayInput } from './GuardianFields';
-import MemberProtection, { ProtectedMember, statusLabel } from './MemberProtection';
+import { statusLabel } from './MemberProtection';
+import { useMemberAdmin } from './MemberAdmin';
 
 interface ChurchMembersProps {
   churchId: string;
@@ -37,10 +38,6 @@ const ChurchMembers: React.FC<ChurchMembersProps> = ({ churchId, canChangeRoles 
   const [addForm, setAddForm] = useState({ ...emptyForm });
   const [addLoading, setAddLoading] = useState(false);
   const [guardian, setGuardian] = useState<GuardianDraft>({ ...EMPTY_GUARDIAN });
-  const [protecting, setProtecting] = useState<ProtectedMember | null>(null);
-  const [editingMember, setEditingMember] = useState<any>(null);
-  const [editForm, setEditForm] = useState({ name: '', title: '', location: '', birthDate: '' });
-  const [editLoading, setEditLoading] = useState(false);
 
   const loadMembers = async () => {
     setLoadingMembers(true);
@@ -83,44 +80,7 @@ const ChurchMembers: React.FC<ChurchMembersProps> = ({ churchId, canChangeRoles 
     }
   };
 
-  const openEdit = (member: any) => {
-    setEditingMember(member);
-    setEditForm({ name: member.name || '', title: member.title || '', location: member.location || '', birthDate: member.birthDate ? String(member.birthDate).slice(0, 10) : '' });
-  };
-
-  const handleEditSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingMember) return;
-    setEditLoading(true);
-    try {
-      const response = await api.updateChurchMember(churchId, editingMember.id, {
-        name: editForm.name, title: editForm.title,
-        location: editForm.location, birthDate: editForm.birthDate || null,
-      });
-      if (response.success) {
-        notify('Dados atualizados', 'success');
-        setEditingMember(null);
-        loadMembers();
-      }
-    } catch (err: any) {
-      notify(err.message || 'Não foi possível atualizar');
-    } finally {
-      setEditLoading(false);
-    }
-  };
-
-  const handleDelete = async (member: any) => {
-    if (!confirm(`Remover ${member.name} da comunidade?`)) return;
-    try {
-      const response = await api.removeMemberFromChurch(churchId, member.id);
-      if (response.success) {
-        notify('Membro removido', 'success');
-        loadMembers();
-      }
-    } catch (err: any) {
-      notify(err.message || 'Não foi possível remover');
-    }
-  };
+  const admin = useMemberAdmin({ churchId, canChangeRole: canChangeRoles, onChanged: loadMembers });
 
   const pendingCount = members.filter(m => m.status === 'pending_authorization').length;
 
@@ -136,7 +96,7 @@ const ChurchMembers: React.FC<ChurchMembersProps> = ({ churchId, canChangeRoles 
       {pendingCount > 0 && (
         <p className="protected-note" style={{ marginBottom: '10px', borderRadius: 'var(--radius)' }}>
           <Icon name="lock" size={16} />
-          {pendingCount === 1 ? '1 menor aguarda' : `${pendingCount} menores aguardam`} a autorização dos pais. Abra “Proteção e acesso” para confirmar.
+          {pendingCount === 1 ? '1 menor aguarda' : `${pendingCount} menores aguardam`} a autorização dos pais. Use “Gerir” → “Autorizar cadastro” para confirmar.
         </p>
       )}
 
@@ -178,13 +138,7 @@ const ChurchMembers: React.FC<ChurchMembersProps> = ({ churchId, canChangeRoles 
                     </div>
                   </td>
                   <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                    <button type="button" onClick={() => setProtecting(member)} className="action-btn" aria-label={`Proteção e acesso de ${member.name}`} title="Proteção e acesso">
-                      <Icon name="shield" size={18} />
-                    </button>
-                    <MoreMenu label={`Opções de ${member.name}`} actions={[
-                      { label: 'Editar dados', icon: 'pencil', onSelect: () => openEdit(member) },
-                      { label: 'Remover da comunidade', icon: 'trash', danger: true, onSelect: () => handleDelete(member) },
-                    ]} />
+                    <MoreMenu actions={admin.actionsFor(member)} buttonLabel="Gerir" label={`Gerir ${member.name}`} />
                   </td>
                 </tr>
               ))}
@@ -225,51 +179,7 @@ const ChurchMembers: React.FC<ChurchMembersProps> = ({ churchId, canChangeRoles 
         </Modal>
       )}
 
-      {protecting && (
-        <MemberProtection
-          churchId={churchId}
-          canChangeRole={canChangeRoles}
-          member={protecting}
-          onClose={() => setProtecting(null)}
-          onChanged={(updated) => {
-            setProtecting(updated);
-            setMembers(prev => prev.map(m => m.id === updated.id ? updated : m));
-          }}
-        />
-      )}
-
-      {editingMember && (
-        <Modal title={`Editar ${editingMember.name}`} onClose={() => setEditingMember(null)} width={480} onSubmit={handleEditSubmit}>
-          <div className="form-grid">
-            <div className="is-wide">
-              <label className="form-label" htmlFor="edit-member-name">Nome</label>
-              <input id="edit-member-name" className="form-input" type="text" value={editForm.name} data-autofocus
-                onChange={e => setEditForm(prev => ({ ...prev, name: e.target.value }))} required />
-            </div>
-            <div>
-              <label className="form-label" htmlFor="edit-member-title">Título ou função</label>
-              <input id="edit-member-title" className="form-input" type="text" placeholder="Ex.: Diácono" value={editForm.title}
-                onChange={e => setEditForm(prev => ({ ...prev, title: e.target.value }))} />
-            </div>
-            <div>
-              <label className="form-label" htmlFor="edit-member-birth">Data de nascimento</label>
-              <input id="edit-member-birth" className="form-input" type="date" max={todayInput()} value={editForm.birthDate}
-                onChange={e => setEditForm(prev => ({ ...prev, birthDate: e.target.value }))} />
-            </div>
-            <div className="is-wide">
-              <label className="form-label" htmlFor="edit-member-location">Localização</label>
-              <input id="edit-member-location" className="form-input" type="text" placeholder="Ex.: Matola" value={editForm.location}
-                onChange={e => setEditForm(prev => ({ ...prev, location: e.target.value }))} />
-            </div>
-          </div>
-          <div className="form-btn-row">
-            <button type="button" className="form-btn" onClick={() => setEditingMember(null)}>Cancelar</button>
-            <button type="submit" className="form-btn primary" disabled={editLoading}>
-              {editLoading ? <><span uk-spinner="ratio: 0.5"></span> Salvando…</> : 'Salvar'}
-            </button>
-          </div>
-        </Modal>
-      )}
+      {admin.modals}
     </section>
   );
 };

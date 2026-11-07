@@ -1,15 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link, useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import UIkit from 'uikit';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import { useTheme } from '../context/ThemeContext';
 import { roleLabel } from '../lib/format';
 import Avatar from '../components/Avatar';
 import Icon from '../components/Icon';
 import EmptyState from '../components/EmptyState';
 import MoreMenu, { MenuAction } from '../components/MoreMenu';
 import { sendReport } from '../components/ReportButton';
+import { useMemberAdmin, ManagedMember } from '../components/MemberAdmin';
+import { statusLabel } from '../components/MemberProtection';
+import { useCommunity } from '../lib/community';
 
 interface UserProfile {
   id: string;
@@ -43,8 +45,7 @@ const notify = (message: string, status: 'success' | 'danger' = 'danger') => UIk
 
 const Profile = () => {
   const { userId } = useParams<{ userId: string }>();
-  const { user: currentUser, updateUser, logout } = useAuth();
-  const { theme, toggle: toggleTheme } = useTheme();
+  const { user: currentUser, updateUser } = useAuth();
   const navigate = useNavigate();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -71,6 +72,28 @@ const Profile = () => {
   const id = userId || currentUser?.id;
   const isOwnProfile = id === currentUser?.id;
   const isLeader = currentUser?.role === 'leader' || currentUser?.role === 'admin';
+  const { community } = useCommunity();
+  // O líder vê o estado da conta de quem é da comunidade dele e pode gerir (editar, suspender, remover...)
+  const [managed, setManaged] = useState<ManagedMember | null>(null);
+  const loadManaged = () => {
+    if (!isLeader || isOwnProfile || !currentUser?.churchId || !id) { setManaged(null); return; }
+    api.getChurchMembers(currentUser.churchId)
+      .then(res => {
+        const list: ManagedMember[] = Array.isArray(res.data) ? res.data : res.data?.users || [];
+        setManaged(list.find(m => m.id === id) || null);
+      })
+      .catch(() => setManaged(null));
+  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(loadManaged, [id, isLeader, isOwnProfile, currentUser?.churchId]);
+  const admin = useMemberAdmin({
+    churchId: currentUser?.churchId || '',
+    canChangeRole: !!community?.isOwner || currentUser?.role === 'admin',
+    onChanged: () => {
+      loadManaged();
+      if (id) api.getUserProfile(id).then(res => { if (res.success) setProfile(res.data); }).catch(() => {});
+    },
+  });
 
   const fillForm = (data: UserProfile) => setEditForm({
     name: data.name,
@@ -217,6 +240,7 @@ const Profile = () => {
             {profile.title && <p className="profile-title">{profile.title}</p>}
             <div className="profile-facts">
               <span><Icon name={profile.role === 'leader' || profile.role === 'admin' ? 'shield' : 'user'} size={16} /> {roleLabel(profile.role)}</span>
+              {managed?.status && managed.status !== 'active' && <span className="tag">{statusLabel(managed)}</span>}
               {profile.churchName && <span><Icon name="users" size={16} /> {profile.churchName}</span>}
               {profile.location && <span><Icon name="location" size={16} /> {profile.location}</span>}
               <span><Icon name="calendar" size={16} /> Desde {new Date(profile.createdAt).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</span>
@@ -235,6 +259,7 @@ const Profile = () => {
                       <Icon name="messages" size={18} /> Mensagem
                     </button>
                   )}
+                  {managed && <MoreMenu actions={admin.actionsFor(managed)} buttonLabel="Gerir" label={`Gerir ${profile.name}`} />}
                   <MoreMenu actions={menuActions} label={`Mais opções sobre ${profile.name}`} />
                 </>
               )}
@@ -367,27 +392,7 @@ const Profile = () => {
         </section>
       )}
 
-      {/* Conta (no telemóvel; no computador está no menu do avatar) */}
-      {isOwnProfile && (
-        <section className="section hide-wide" aria-labelledby="account-title">
-          <h2 id="account-title" className="list-label">Conta</h2>
-          <div className="card">
-            {isLeader && (
-              <>
-                <Link to="/dashboard" className="list-row"><Icon name="dashboard" /><span className="list-row-body list-row-title">Painel do líder</span><Icon name="chevron-right" size={18} className="faint" /></Link>
-                <Link to="/reports" className="list-row"><Icon name="reports" /><span className="list-row-body list-row-title">Relatórios</span><Icon name="chevron-right" size={18} className="faint" /></Link>
-              </>
-            )}
-            <button type="button" className="list-row" role="switch" aria-checked={theme === 'dark'} onClick={toggleTheme}>
-              <Icon name="moon" /><span className="list-row-body list-row-title">Tema escuro</span>
-              <span className={`switch${theme === 'dark' ? ' is-on' : ''}`} aria-hidden="true"></span>
-            </button>
-            <button type="button" className="list-row" onClick={logout} style={{ color: 'var(--danger)' }}>
-              <Icon name="logout" /><span className="list-row-body" style={{ fontSize: '15px', fontWeight: 600 }}>Sair</span>
-            </button>
-          </div>
-        </section>
-      )}
+      {admin.modals}
     </div>
   );
 };

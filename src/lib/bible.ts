@@ -1,0 +1,63 @@
+// Bíblia: tradução João Ferreira de Almeida (domínio público), lida de bible-api.com capítulo a
+// capítulo. A lista de livros vai com a app; os capítulos já lidos ficam guardados no navegador.
+const SOURCE = 'https://bible-api.com/data/almeida';
+
+export interface BibleBook { id: string; name: string; chapters: number; testament: 'AT' | 'NT' }
+export interface Verse { verse: number; text: string }
+
+const BOOKS: [string, string, number][] = [
+  ['GEN', 'Gênesis', 50], ['EXO', 'Êxodo', 40], ['LEV', 'Levítico', 27], ['NUM', 'Números', 36], ['DEU', 'Deuteronômio', 34],
+  ['JOS', 'Josué', 24], ['JDG', 'Juízes', 21], ['RUT', 'Rute', 4], ['1SA', '1 Samuel', 31], ['2SA', '2 Samuel', 24],
+  ['1KI', '1 Reis', 22], ['2KI', '2 Reis', 25], ['1CH', '1 Crônicas', 29], ['2CH', '2 Crônicas', 36], ['EZR', 'Esdras', 10],
+  ['NEH', 'Neemias', 13], ['EST', 'Ester', 10], ['JOB', 'Jó', 42], ['PSA', 'Salmos', 150], ['PRO', 'Provérbios', 31],
+  ['ECC', 'Eclesiastes', 12], ['SNG', 'Cânticos', 8], ['ISA', 'Isaías', 66], ['JER', 'Jeremias', 52], ['LAM', 'Lamentações', 5],
+  ['EZK', 'Ezequiel', 48], ['DAN', 'Daniel', 12], ['HOS', 'Oséias', 14], ['JOL', 'Joel', 3], ['AMO', 'Amós', 9],
+  ['OBA', 'Obadias', 1], ['JON', 'Jonas', 4], ['MIC', 'Miquéias', 7], ['NAM', 'Naum', 3], ['HAB', 'Habacuque', 3],
+  ['ZEP', 'Sofonias', 3], ['HAG', 'Ageu', 2], ['ZEC', 'Zacarias', 14], ['MAL', 'Malaquias', 4],
+  ['MAT', 'Mateus', 28], ['MRK', 'Marcos', 16], ['LUK', 'Lucas', 24], ['JHN', 'João', 21], ['ACT', 'Atos', 28],
+  ['ROM', 'Romanos', 16], ['1CO', '1 Coríntios', 16], ['2CO', '2 Coríntios', 13], ['GAL', 'Gálatas', 6], ['EPH', 'Efésios', 6],
+  ['PHP', 'Filipenses', 4], ['COL', 'Colossenses', 4], ['1TH', '1 Tessalonicenses', 5], ['2TH', '2 Tessalonicenses', 3],
+  ['1TI', '1 Timóteo', 6], ['2TI', '2 Timóteo', 4], ['TIT', 'Tito', 3], ['PHM', 'Filemom', 1], ['HEB', 'Hebreus', 13],
+  ['JAS', 'Tiago', 5], ['1PE', '1 Pedro', 5], ['2PE', '2 Pedro', 3], ['1JN', '1 João', 5], ['2JN', '2 João', 1],
+  ['3JN', '3 João', 1], ['JUD', 'Judas', 1], ['REV', 'Apocalipse', 22],
+];
+
+export const BIBLE_BOOKS: BibleBook[] = BOOKS.map(([id, name, chapters], i) => ({ id, name, chapters, testament: i < 39 ? 'AT' : 'NT' }));
+export const findBook = (id?: string) => BIBLE_BOOKS.find(b => b.id === id?.toUpperCase());
+
+const cacheKey = (book: string, chapter: number) => `lidera:biblia:${book}:${chapter}`;
+const memory = new Map<string, Verse[]>();
+
+export const loadChapter = async (book: string, chapter: number): Promise<Verse[]> => {
+  const key = cacheKey(book, chapter);
+  const kept = memory.get(key) || JSON.parse(sessionStorage.getItem(key) || 'null');
+  if (kept) return kept;
+  const res = await fetch(`${SOURCE}/${book}/${chapter}`);
+  if (!res.ok) throw new Error(res.status === 429 ? 'Muitos pedidos seguidos. Espere alguns segundos.' : 'Não foi possível carregar o capítulo.');
+  const data = await res.json();
+  const verses: Verse[] = (data.verses || []).map((v: { verse: number; text: string }) => ({ verse: v.verse, text: v.text.trim() }));
+  memory.set(key, verses);
+  try { sessionStorage.setItem(key, JSON.stringify(verses)); } catch { /* sem espaço: fica só em memória */ }
+  return verses;
+};
+
+// Onde a pessoa parou de ler
+const LAST_KEY = 'lidera:biblia:onde';
+export const lastPlace = (): { book: string; chapter: number } => {
+  try {
+    const saved = JSON.parse(localStorage.getItem(LAST_KEY) || 'null');
+    if (saved && findBook(saved.book)) return saved;
+  } catch { /* começa no início */ }
+  return { book: 'JHN', chapter: 1 };
+};
+export const savePlace = (book: string, chapter: number) => {
+  try { localStorage.setItem(LAST_KEY, JSON.stringify({ book, chapter })); } catch { /* sem armazenamento */ }
+};
+
+/** "João 3:16" ou "João 3:16-18" ou "João 3:16, 18" a partir dos versículos escolhidos. */
+export const reference = (bookName: string, chapter: number, verses: number[]) => {
+  const sorted = [...verses].sort((a, b) => a - b);
+  const contiguous = sorted.every((v, i) => i === 0 || v === sorted[i - 1] + 1);
+  const range = sorted.length === 1 ? `${sorted[0]}` : contiguous ? `${sorted[0]}-${sorted[sorted.length - 1]}` : sorted.join(', ');
+  return `${bookName} ${chapter}:${range}`;
+};

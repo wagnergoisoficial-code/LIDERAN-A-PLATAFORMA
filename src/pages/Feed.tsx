@@ -4,7 +4,7 @@ import UIkit from 'uikit';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useCommunity, FEED_CHANGED_EVENT, FeedKind } from '../lib/community';
-import { timeOnly, firstName, plural } from '../lib/format';
+import { timeOnly, timeAgo, shortTime, firstName, plural } from '../lib/format';
 import { celebrate } from '../lib/motion';
 import Avatar from '../components/Avatar';
 import Icon from '../components/Icon';
@@ -34,6 +34,58 @@ type Item =
   | { kind: 'event'; key: string; at: number; event: EventItem };
 
 const time = (value: string) => new Date(value).getTime();
+
+// O feed mistura os tipos, como uma rede social: em cada 7 itens, 3 publicações e um de cada outro tipo.
+// Cada tipo segue a sua ordem (o mais atual primeiro). Com os mesmos dados, a ordem é sempre a mesma.
+type MixKind = 'post' | 'prayer' | 'video' | 'poll' | 'event';
+const MIX_ORDER: MixKind[] = ['post', 'prayer', 'video', 'poll', 'event'];
+const MIX_WEIGHT: Record<MixKind, number> = { post: 3, prayer: 1, video: 1, poll: 1, event: 1 };
+
+const mixFeed = (buckets: Record<MixKind, Item[]>, morePosts: boolean) => {
+  const result: Item[] = [];
+  const taken: Record<MixKind, number> = { post: 0, prayer: 0, video: 0, poll: 0, event: 0 };
+  const credit: Record<MixKind, number> = { post: 0, prayer: 0, video: 0, poll: 0, event: 0 };
+  for (;;) {
+    // Ainda há publicações por carregar: o resto espera por elas, para nada mudar de lugar depois
+    if (morePosts && taken.post >= buckets.post.length) break;
+    const open = MIX_ORDER.filter(k => taken[k] < buckets[k].length);
+    if (!open.length) break;
+    const total = open.reduce((sum, k) => sum + MIX_WEIGHT[k], 0);
+    let pick = open[0];
+    open.forEach(k => {
+      credit[k] += MIX_WEIGHT[k];
+      if (credit[k] > credit[pick]) pick = k;
+    });
+    credit[pick] -= total;
+    result.push(buckets[pick][taken[pick]++]);
+  }
+  return result;
+};
+
+interface ChatMessage { id: string; content: string; createdAt: string; user: { id: string; name: string; profileImage?: string } }
+
+// Últimas mensagens do chat da comunidade, atualizadas a cada 10 s (com o separador visível)
+const useChatPeek = (enabled: boolean) => {
+  const [messages, setMessages] = useState<ChatMessage[] | null>(null);
+  const [fresh, setFresh] = useState<Set<string>>(new Set());
+  const seen = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    if (!enabled) return;
+    let alive = true;
+    const load = () => api.getMessages(3).then(res => {
+      if (!alive || !res.success) return;
+      const list: ChatMessage[] = res.data || [];
+      // A primeira carga não anima; depois, cada mensagem nova entra com destaque
+      setFresh(new Set(seen.current ? list.filter(m => !seen.current!.has(m.id)).map(m => m.id) : []));
+      seen.current = new Set([...(seen.current || []), ...list.map(m => m.id)]);
+      setMessages(list);
+    }).catch(() => { if (alive) setMessages(prev => prev ?? []); });
+    load();
+    const timer = setInterval(() => { if (document.visibilityState === 'visible') load(); }, 10000);
+    return () => { alive = false; clearInterval(timer); };
+  }, [enabled]);
+  return { messages, fresh };
+};
 const notify = (message: string, status: 'success' | 'danger' = 'danger') => UIkit.notification({ message, status, pos: 'top-right' });
 
 // O feed fica guardado ao sair: ao voltar, reaparece igual e na mesma posição de leitura
@@ -193,28 +245,36 @@ const Feed = () => {
   }, [nextCursor, loadMore]);
 
   const membersById = useMemo(() => new Map(members.map(m => [m.id, m])), [members]);
+  const chat = useChatPeek(!!user?.churchId);
 
-  // Fixados e devocionais do dia no topo; o resto por data. Os itens mais antigos que a última
-  // publicação carregada só entram quando a página dessa altura chegar (a ordem não salta).
+  // Fixados e devocionais do dia no topo; o resto misturado (ver mixFeed). O que chegou depois do
+  // último instante mostrado fica de fora até a pessoa tocar em "novidades".
   const { featured, stream, pending } = useMemo(() => {
-    const regular = posts.filter(p => !isPinnedPost(p));
-    const horizon = nextCursor && regular.length ? Math.min(...regular.map(p => time(p.createdAt))) : -Infinity;
+    const now = Date.now();
+    const shown = <T extends Item>(items: T[]) => items.filter(item => item.at <= cutoff);
+    const byRecent = <T extends { createdAt: string }>(a: T, b: T) => time(b.createdAt) - time(a.createdAt);
     const videoIds = new Set<string>();
     const videos = [...extras.waiting, ...extras.videos].filter(v => (videoIds.has(v.id) ? false : (videoIds.add(v.id), true)));
-    const all: Item[] = [
-      ...regular.map(post => ({ kind: 'post' as const, key: `post:${post.id}`, at: time(post.createdAt), post })),
-      ...extras.prayers.map(prayer => ({ kind: 'prayer' as const, key: `prayer:${prayer.id}`, at: time(prayer.createdAt), prayer })),
-      ...videos.map(video => ({ kind: 'video' as const, key: `video:${video.id}`, at: time(video.createdAt), video })),
-      ...extras.polls.map(poll => ({ kind: 'poll' as const, key: `poll:${poll.id}`, at: time(poll.createdAt), poll })),
-      ...extras.events.map(event => ({ kind: 'event' as const, key: `event:${event.id}`, at: time(event.createdAt), event })),
-    ];
-    const ordered = all.filter(item => item.kind === 'post' || item.at >= horizon).sort((a, b) => b.at - a.at);
+    const upcoming = extras.events.filter(e => time(e.startDate) >= now).sort((a, b) => time(a.startDate) - time(b.startDate));
+    const past = extras.events.filter(e => time(e.startDate) < now).sort((a, b) => time(b.startDate) - time(a.startDate));
+    // Em cada tipo, primeiro o que ainda pede ação: orações por responder, enquetes abertas, encontros por vir
+    const buckets: Record<MixKind, Item[]> = {
+      post: posts.filter(p => !isPinnedPost(p)).map(post => ({ kind: 'post' as const, key: `post:${post.id}`, at: time(post.createdAt), post })),
+      prayer: [...extras.prayers.filter(p => !p.isAnswered).sort(byRecent), ...extras.prayers.filter(p => p.isAnswered).sort(byRecent)]
+        .map(prayer => ({ kind: 'prayer' as const, key: `prayer:${prayer.id}`, at: time(prayer.createdAt), prayer })),
+      video: videos.map(video => ({ kind: 'video' as const, key: `video:${video.id}`, at: time(video.createdAt), video })),
+      poll: [...extras.polls.filter(p => !p.isExpired).sort(byRecent), ...extras.polls.filter(p => p.isExpired).sort(byRecent)]
+        .map(poll => ({ kind: 'poll' as const, key: `poll:${poll.id}`, at: time(poll.createdAt), poll })),
+      event: [...upcoming, ...past].map(event => ({ kind: 'event' as const, key: `event:${event.id}`, at: time(event.createdAt), event })),
+    };
+    const hidden = MIX_ORDER.reduce((sum, k) => sum + buckets[k].length - shown(buckets[k]).length, 0);
+    MIX_ORDER.forEach(k => { buckets[k] = shown(buckets[k]); });
     const top: Item[] = [
       ...posts.filter(isPinnedPost).map(post => ({ kind: 'post' as const, key: `post:${post.id}`, at: time(post.createdAt), post })),
-      ...[...extras.devotionals].sort((a, b) => time(b.createdAt) - time(a.createdAt))
+      ...[...extras.devotionals].sort(byRecent)
         .map(devotional => ({ kind: 'devotional' as const, key: `devotional:${devotional.id}`, at: time(devotional.createdAt), devotional })),
     ];
-    return { featured: top, stream: ordered.filter(item => item.at <= cutoff), pending: ordered.filter(item => item.at > cutoff).length };
+    return { featured: top, stream: mixFeed(buckets, !!nextCursor), pending: hidden };
   }, [posts, nextCursor, extras, cutoff]);
 
   shownUntil.current = Math.max(0, ...stream.map(item => item.at));
@@ -457,6 +517,7 @@ const Feed = () => {
   }
 
   const me = { id: user.id, name: user.name, role: user.role, churchId: user.churchId, profileImage: user.profileImage };
+  const lastChat = chat.messages?.[chat.messages.length - 1];
   const person = (id: string): Person | null => membersById.get(id) || null;
   const people = members.filter(m => m.id !== user.id);
   const upcoming = extras.events
@@ -503,6 +564,18 @@ const Feed = () => {
             <button type="button" className="ghost-btn" onClick={() => openComposer('donation')}><Icon name="gift" /> Doação</button>
           </div>
         </section>
+
+        <Link to="/chat" className="chat-peek-row below-rail" aria-label={`Chat da comunidade${lastChat ? `. Última mensagem de ${lastChat.user.name}: ${lastChat.content}` : ''}`}>
+          <span className="group-avatar"><Icon name="chat" /></span>
+          <span style={{ flex: 1, minWidth: 0 }}>
+            <span className="list-row-title"><span>Chat da comunidade</span></span>
+            <span key={lastChat?.id} className={`chat-peek-text${lastChat && chat.fresh.has(lastChat.id) ? ' fade-in' : ''}`}>
+              {lastChat ? `${lastChat.user.id === user.id ? 'Você' : firstName(lastChat.user.name)}: ${lastChat.content}` : 'Ainda sem mensagens. Comece a conversa!'}
+            </span>
+          </span>
+          {lastChat && <time className="faint" style={{ fontSize: '12px', flexShrink: 0 }} dateTime={lastChat.createdAt}>{shortTime(lastChat.createdAt)}</time>}
+          <Icon name="chevron-right" size={18} className="faint" />
+        </Link>
 
         {(people.length > 0 || isLeader) && (
           <section aria-labelledby="people-title">
@@ -575,6 +648,35 @@ const Feed = () => {
             </div>
           </div>
         )}
+
+        <section className="rail-section" aria-labelledby="chat-peek-title">
+          <div className="rail-head">
+            <h2 id="chat-peek-title">Chat da comunidade</h2>
+          </div>
+          {chat.messages === null ? (
+            <p className="rail-item-meta">Carregando…</p>
+          ) : chat.messages.length === 0 ? (
+            <p className="rail-item-meta" style={{ whiteSpace: 'normal', marginBottom: '12px' }}>Ainda sem mensagens. Comece a conversa!</p>
+          ) : (
+            <div className="chat-peek-list" aria-live="polite">
+              {chat.messages.map(m => (
+                <div key={m.id} className={`chat-peek-msg${chat.fresh.has(m.id) ? ' is-new msg-in' : ''}`}>
+                  <Avatar name={m.user.name} profileImage={m.user.profileImage} size={28} />
+                  <div className="chat-peek-body">
+                    <div className="chat-peek-who">
+                      <strong>{m.user.id === user.id ? 'Você' : m.user.name}</strong>
+                      <time dateTime={m.createdAt}>{timeAgo(m.createdAt)}</time>
+                    </div>
+                    <div className="chat-peek-text">{m.content}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <Link to="/chat" className="uk-button uk-button-primary" style={{ width: '100%' }}>
+            <Icon name="chat" size={18} /> Abrir o chat
+          </Link>
+        </section>
 
         <div className="rail-section">
           <div className="rail-head">

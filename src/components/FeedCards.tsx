@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { timeAgo, fullDate, plural, timeOnly, dayLabel } from '../lib/format';
 import { youtubeThumbnail, youtubeEmbed, VIDEO_CATEGORIES } from '../lib/youtube';
+import { backgroundColor, fitsColor, textSize } from '../lib/backgrounds';
 import { pop, burst } from '../lib/motion';
 import Avatar from './Avatar';
 import Icon, { IconName } from './Icon';
@@ -16,7 +17,7 @@ export interface PostReactions { amen: number; praying: number; heart: number; f
 export const EMPTY_REACTIONS: PostReactions = { amen: 0, praying: 0, heart: 0, fire: 0, strong: 0 };
 export interface Post {
   id: string; content: string; imageUrl?: string;
-  isPinned?: boolean; type?: string;
+  isPinned?: boolean; type?: string; background?: string | null;
   churchId?: string; churchName?: string | null;
   location?: string | null; latitude?: number | null; longitude?: number | null; donatedAt?: string | null;
   userId?: string; userName: string; userProfileImage?: string;
@@ -24,7 +25,7 @@ export interface Post {
   reactions?: PostReactions; myReactions?: string[];
 }
 export interface Prayer {
-  id: string; title: string; content: string; isAnswered: boolean;
+  id: string; title: string; content: string; isAnswered: boolean; background?: string | null;
   userId: string | null; prayCount: number; hasPrayed: boolean;
   authorName?: string | null; authorProfileImage?: string | null;
   isMine?: boolean; prayingNames?: string[]; createdAt: string;
@@ -128,6 +129,14 @@ const useReport = (type: Parameters<typeof sendReport>[0], id: string): MenuActi
   return { label: sent ? 'Denúncia enviada' : 'Denunciar', icon: 'flag', disabled: sent, onSelect: async () => setSent(await sendReport(type, id)) };
 };
 
+// Texto curto sobre uma cor (como os estados do WhatsApp); sub: segunda linha mais pequena
+const TextCard: React.FC<{ color: string; text: string; sub?: string | null }> = ({ color, text, sub }) => (
+  <div className="text-card" style={{ background: color }}>
+    <p className={`text-card-main ${textSize(text)}`}>{text}</p>
+    {sub && <p className="text-card-sub">{sub}</p>}
+  </div>
+);
+
 /* ─── Publicação e doação ───────────────────────────────────── */
 const REACTIONS: { type: keyof PostReactions; icon: IconName; label: string }[] = [
   { type: 'amen', icon: 'amen', label: 'Amém' },
@@ -173,6 +182,8 @@ export const PostCard: React.FC<PostCardProps> = ({ post, me, onComment, onReact
   const reactions = post.reactions ?? EMPTY_REACTIONS;
   const myReactions = post.myReactions ?? [];
   const commentsCount = post.comments.length;
+  // Texto curto sem foto (e que não seja doação): aparece sobre a cor escolhida
+  const color = !post.imageUrl && !donation && fitsColor(post.content) ? backgroundColor(post.background, post.id) : null;
 
   useEffect(() => {
     if (showComments && focusComment.current) {
@@ -214,7 +225,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post, me, onComment, onReact
         menuLabel="Opções da publicação"
       />
 
-      <ItemText text={post.content} />
+      {color ? <TextCard color={color} text={post.content.trim()} /> : <ItemText text={post.content} />}
 
       {post.imageUrl && !imageFailed && (
         <button type="button" className="post-media" onClick={() => onOpenImage(post.imageUrl!)} aria-label="Ver a imagem em tamanho grande">
@@ -320,6 +331,9 @@ export const PrayerCard: React.FC<PrayerCardProps> = ({ prayer, me, onPray, onAn
   if (canManage) actions.push({ label: 'Excluir pedido', icon: 'trash', danger: true, onSelect: () => onDelete(prayer.id) });
 
   const names = prayer.prayingNames || [];
+  // O pedido aparece sobre a cor; o texto longo fica por baixo, como texto normal
+  const color = backgroundColor(prayer.background, prayer.id);
+  const shortContent = prayer.content.trim().length <= 200;
   const praying = names.length
     ? `${names.slice(0, 2).join(', ')}${prayer.prayCount > 2 ? ` e mais ${prayer.prayCount - 2}` : ''} ${prayer.prayCount === 1 ? 'está orando' : 'estão orando'}`
     : null;
@@ -335,8 +349,18 @@ export const PrayerCard: React.FC<PrayerCardProps> = ({ prayer, me, onPray, onAn
         actions={actions}
         menuLabel="Opções do pedido"
       />
-      <h3 className="post-title">{prayer.title}</h3>
-      <ItemText text={prayer.content} />
+      {color ? (
+        <>
+          <h3 className="visually-hidden">{prayer.title}</h3>
+          <TextCard color={color} text={prayer.title} sub={shortContent ? prayer.content.trim() : null} />
+          {!shortContent && <ItemText text={prayer.content} />}
+        </>
+      ) : (
+        <>
+          <h3 className="post-title">{prayer.title}</h3>
+          <ItemText text={prayer.content} />
+        </>
+      )}
       {praying && <p className={`post-note${prayer.isAnswered ? '' : ' is-tight'}`}>{praying}</p>}
       {!prayer.isAnswered && (
         <div className="post-actions">

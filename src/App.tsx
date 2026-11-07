@@ -23,6 +23,7 @@ import Chat from './pages/Chat';
 import Events from './pages/Events';
 import Reports from './pages/Reports';
 import Messages from './pages/Messages';
+import Bible from './pages/Bible';
 import GuardianHome from './pages/GuardianHome';
 
 class ErrorBoundary extends Component<{ children: React.ReactNode }, { error: Error | null }> {
@@ -175,7 +176,7 @@ const SearchBox: React.FC<{ open: boolean; setOpen: (open: boolean) => void; tog
             value={query}
             onChange={e => search(e.target.value)}
             onFocus={() => { if (results) setShowResults(true); }}
-            placeholder="Buscar na comunidade"
+            placeholder="Buscar"
             aria-label="Buscar pessoas, publicações e encontros"
             aria-expanded={showResults}
             aria-controls="search-results"
@@ -471,8 +472,8 @@ const BottomNav: React.FC<{ items: NavItem[]; guardian: boolean }> = ({ items, g
     return <nav className="bottom-nav" aria-label="Principal" style={{ '--nav-items': 2 } as React.CSSProperties}>{items.map(link)}{profile}</nav>;
   }
 
-  // Feed, Comunidade, Publicar, Mensagens, Perfil
-  const [feed, community, messages] = items;
+  // Feed, Comunidade, Publicar, Bíblia, Mensagens (o perfil está no avatar, no cabeçalho)
+  const [feed, community, bible, messages] = items;
   return (
     <nav className="bottom-nav" aria-label="Principal">
       {link(feed)}
@@ -481,8 +482,8 @@ const BottomNav: React.FC<{ items: NavItem[]; guardian: boolean }> = ({ items, g
         <span className="bottom-nav-icon"><span className="bottom-nav-publish"><Icon name="plus" size={22} strokeWidth={2.25} /></span></span>
         <span className="bottom-nav-label">Publicar</span>
       </button>
+      {link(bible)}
       {link(messages)}
-      {profile}
     </nav>
   );
 };
@@ -501,6 +502,7 @@ const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     : [
         { to: '/', label: 'Feed', icon: 'home', active: p => p === '/' || p === '/posts' },
         { to: '/comunidade', label: 'Comunidade', icon: 'users', active: isCommunityPath },
+        { to: '/biblia', label: 'Bíblia', icon: 'book', active: p => p.startsWith('/biblia') },
         { to: '/messages', label: 'Mensagens', icon: 'messages', active: p => p === '/messages' || p === '/chat', badge: unread },
       ];
 
@@ -549,6 +551,8 @@ export default function App() {
       <Route path="/events" element={<PrivateRoute><Events /></PrivateRoute>} />
       <Route path="/chat" element={<PrivateRoute><Chat /></PrivateRoute>} />
       <Route path="/messages" element={<PrivateRoute><Messages /></PrivateRoute>} />
+      <Route path="/biblia" element={<PrivateRoute><Bible /></PrivateRoute>} />
+      <Route path="/biblia/:book/:chapter" element={<PrivateRoute><Bible /></PrivateRoute>} />
       <Route path="/users" element={<PrivateRoute><Users /></PrivateRoute>} />
       <Route path="/reports" element={<RoleRoute allowedRoles={['leader', 'admin']}><Reports /></RoleRoute>} />
       <Route path="/profile/:userId" element={<PrivateRoute><Profile /></PrivateRoute>} />

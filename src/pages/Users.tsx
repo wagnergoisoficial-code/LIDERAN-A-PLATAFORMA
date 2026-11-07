@@ -1,21 +1,25 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import UIkit from 'uikit';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useCommunity } from '../lib/community';
 import { plural } from '../lib/format';
 import Avatar from '../components/Avatar';
 import Icon from '../components/Icon';
 import Modal from '../components/Modal';
-import MoreMenu, { MenuAction } from '../components/MoreMenu';
+import MoreMenu from '../components/MoreMenu';
 import PageHeader from '../components/PageHeader';
 import EmptyState from '../components/EmptyState';
 import { CommunityTabs } from '../components/SectionTabs';
+import { useMemberAdmin, ManagedMember } from '../components/MemberAdmin';
+import { statusLabel } from '../components/MemberProtection';
 import GuardianFields, { EMPTY_GUARDIAN, GuardianDraft, guardianPayload, isMinorDate, todayInput } from '../components/GuardianFields';
 
-interface Member {
-  id: string; name: string; email: string; role: string;
-  title?: string; location?: string; age?: number; profileImage?: string; birthDate?: string | null;
+interface Member extends ManagedMember {
+  email: string;
+  role: string;
+  profileImage?: string | null;
 }
 
 interface MemberStat {
@@ -37,6 +41,7 @@ const ADD_FIELDS = [
 
 const Users = () => {
   const { user } = useAuth();
+  const { community } = useCommunity();
   const navigate = useNavigate();
   const isLeaderOrAdmin = user?.role === 'leader' || user?.role === 'admin';
   const churchId = user?.churchId || '';
@@ -49,17 +54,18 @@ const Users = () => {
   const [addForm, setAddForm] = useState({ ...emptyAddForm });
   const [guardian, setGuardian] = useState<GuardianDraft>({ ...EMPTY_GUARDIAN });
   const [addLoading, setAddLoading] = useState(false);
-  const [editingMember, setEditingMember] = useState<Member | null>(null);
-  const [editForm, setEditForm] = useState({ name: '', title: '', location: '', birthDate: '' });
-  const [editLoading, setEditLoading] = useState(false);
 
-  const loadAll = async () => {
+  // Os líderes recebem também o estado das contas (suspensa, bloqueada, à espera dos pais)
+  const loadAll = useCallback(async () => {
     try {
       const [membersRes, statsRes] = await Promise.all([
-        api.getUsers(),
+        isLeaderOrAdmin && churchId ? api.getChurchMembers(churchId) : api.getUsers(),
         churchId && isLeaderOrAdmin ? api.getChurchMemberStats(churchId) : Promise.resolve({ success: false, data: [] }),
       ]);
-      if (membersRes.success) setMembers(membersRes.data || []);
+      if (membersRes.success) {
+        const list: Member[] = Array.isArray(membersRes.data) ? membersRes.data : membersRes.data.users || [];
+        setMembers([...list].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')));
+      }
       if (statsRes.success && Array.isArray(statsRes.data)) {
         const map: Record<string, MemberStat> = {};
         statsRes.data.forEach((s: MemberStat) => { map[s.userId] = s; });
@@ -70,10 +76,11 @@ const Users = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [isLeaderOrAdmin, churchId]);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { loadAll(); }, []);
+  useEffect(() => { loadAll(); }, [loadAll]);
+
+  const admin = useMemberAdmin({ churchId, canChangeRole: !!community?.isOwner || user?.role === 'admin', onChanged: loadAll });
 
   const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,45 +105,6 @@ const Users = () => {
       notify(err.message || 'Não foi possível cadastrar');
     } finally {
       setAddLoading(false);
-    }
-  };
-
-  const openEdit = (member: Member) => {
-    setEditingMember(member);
-    setEditForm({ name: member.name || '', title: member.title || '', location: member.location || '', birthDate: member.birthDate ? String(member.birthDate).slice(0, 10) : '' });
-  };
-
-  const handleEditSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingMember) return;
-    setEditLoading(true);
-    try {
-      const response = await api.updateChurchMember(churchId, editingMember.id, {
-        name: editForm.name, title: editForm.title,
-        location: editForm.location, birthDate: editForm.birthDate || null,
-      });
-      if (response.success) {
-        notify('Dados atualizados', 'success');
-        setEditingMember(null);
-        loadAll();
-      }
-    } catch (err: any) {
-      notify(err.message || 'Não foi possível atualizar');
-    } finally {
-      setEditLoading(false);
-    }
-  };
-
-  const handleDelete = async (member: Member) => {
-    if (!confirm(`Remover ${member.name} da comunidade?`)) return;
-    try {
-      const response = await api.removeMemberFromChurch(churchId, member.id);
-      if (response.success) {
-        notify('Membro removido', 'success');
-        loadAll();
-      }
-    } catch (err: any) {
-      notify(err.message || 'Não foi possível remover');
     }
   };
 
@@ -182,17 +150,16 @@ const Users = () => {
           {filtered.map(m => {
             const stat = stats[m.id];
             const isMe = m.id === user?.id;
-            const actions: MenuAction[] = isLeaderOrAdmin ? [
-              { label: 'Editar dados', icon: 'pencil', onSelect: () => openEdit(m) },
-              ...(!isMe ? [{ label: 'Remover da comunidade', icon: 'trash' as const, danger: true, onSelect: () => handleDelete(m) }] : []),
-            ] : [];
+            const restricted = !!m.status && m.status !== 'active';
             return (
               <div key={m.id} className="list-row">
                 <Link to={`/profile/${m.id}`} tabIndex={-1} aria-hidden="true"><Avatar name={m.name} profileImage={m.profileImage} size={44} /></Link>
                 <span className="list-row-body">
-                  <span className="list-row-title">
+                  <span className="list-row-title" style={{ flexWrap: 'wrap' }}>
                     <Link to={`/profile/${m.id}`} className="truncate" style={{ color: 'var(--text)' }}>{m.name}{isMe ? ' (você)' : ''}</Link>
                     {(m.role === 'leader' || m.role === 'admin') && <span className="tag">{m.role === 'admin' ? 'Admin' : 'Líder'}</span>}
+                    {isLeaderOrAdmin && m.isMinor && <span className="tag">Menor</span>}
+                    {isLeaderOrAdmin && restricted && <span className="tag">{statusLabel(m)}</span>}
                   </span>
                   <span className="list-row-meta" style={{ display: 'block' }}>
                     {[m.title, m.location].filter(Boolean).join(' · ') || (isLeaderOrAdmin ? m.email : 'Membro')}
@@ -210,7 +177,7 @@ const Users = () => {
                       <Icon name="messages" />
                     </button>
                   )}
-                  <MoreMenu actions={actions} label={`Opções de ${m.name}`} />
+                  {isLeaderOrAdmin && <MoreMenu actions={admin.actionsFor(m)} buttonLabel="Gerir" label={`Gerir ${m.name}`} />}
                 </span>
               </div>
             );
@@ -250,34 +217,7 @@ const Users = () => {
         </Modal>
       )}
 
-      {editingMember && (
-        <Modal title={`Editar ${editingMember.name}`} onClose={() => setEditingMember(null)} width={480} onSubmit={handleEditSubmit}>
-          <div className="form-grid">
-            <div className="is-wide">
-              <label className="form-label" htmlFor="edit-name">Nome</label>
-              <input id="edit-name" className="form-input" type="text" value={editForm.name} data-autofocus onChange={e => setEditForm(prev => ({ ...prev, name: e.target.value }))} required />
-            </div>
-            <div>
-              <label className="form-label" htmlFor="edit-title">Título ou função</label>
-              <input id="edit-title" className="form-input" type="text" placeholder="Ex.: Diácono" value={editForm.title} onChange={e => setEditForm(prev => ({ ...prev, title: e.target.value }))} />
-            </div>
-            <div>
-              <label className="form-label" htmlFor="edit-birth">Data de nascimento</label>
-              <input id="edit-birth" className="form-input" type="date" max={todayInput()} value={editForm.birthDate} onChange={e => setEditForm(prev => ({ ...prev, birthDate: e.target.value }))} />
-            </div>
-            <div className="is-wide">
-              <label className="form-label" htmlFor="edit-location">Localização</label>
-              <input id="edit-location" className="form-input" type="text" placeholder="Ex.: Matola" value={editForm.location} onChange={e => setEditForm(prev => ({ ...prev, location: e.target.value }))} />
-            </div>
-          </div>
-          <div className="form-btn-row">
-            <button type="button" className="form-btn" onClick={() => setEditingMember(null)}>Cancelar</button>
-            <button type="submit" className="form-btn primary" disabled={editLoading}>
-              {editLoading ? <><span uk-spinner="ratio: 0.5"></span> Salvando…</> : 'Salvar'}
-            </button>
-          </div>
-        </Modal>
-      )}
+      {admin.modals}
     </div>
   );
 };

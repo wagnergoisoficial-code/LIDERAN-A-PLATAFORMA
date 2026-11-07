@@ -197,12 +197,12 @@ a:hover { color: var(--accent-dark); text-decoration: underline; }
 /* Navegação principal: centrada na página, com o destino ativo sublinhado a azul */
 .main-nav {
   display: flex;
-  flex: 1;
+  /* A navegação nunca encolhe: quem cede espaço é a pesquisa */
+  flex: 1 0 auto;
   align-items: stretch;
   align-self: stretch;
   justify-content: center;
-  gap: 4px;
-  min-width: 0;
+  gap: 2px;
 }
 
 .main-nav-link {
@@ -331,7 +331,6 @@ a:hover { color: var(--accent-dark); text-decoration: underline; }
 
   .main-nav,
   .header-publish,
-  .header-account,
   .hide-compact { display: none !important; }
 
   .app-main { padding: 16px var(--gutter) calc(var(--bottom-nav-h) + var(--safe-bottom) + 24px); }
@@ -418,8 +417,8 @@ a:hover { color: var(--accent-dark); text-decoration: underline; }
 /* ─── PESQUISA ──────────────────────────────────────────────── */
 .header-search {
   position: relative;
-  flex: 0 1 260px;
-  min-width: 150px;
+  flex: 0 1 240px;
+  min-width: 140px;
 }
 
 .header-search-icon {
@@ -597,6 +596,7 @@ a:hover { color: var(--accent-dark); text-decoration: underline; }
   font-size: 14px;
   font-weight: 500;
   text-align: left;
+  white-space: nowrap;
   cursor: pointer;
 }
 
@@ -1681,6 +1681,148 @@ hr, .uk-hr { margin: 16px 0; border: 0; border-top: 1px solid var(--border); }
 .post-title + .post-text { padding-top: 4px; }
 .post .verse { margin: 10px 16px 0; }
 
+/* Texto curto sobre uma cor, como os estados do WhatsApp */
+.text-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 240px;
+  margin: 12px 16px 0;
+  padding: 36px 28px;
+  border-radius: var(--radius);
+  color: #fff;
+  text-align: center;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.text-card-main { font-weight: 600; line-height: 1.35; letter-spacing: -0.01em; }
+.text-card-main.is-large { font-size: 26px; }
+.text-card-main.is-medium { font-size: 21px; }
+.text-card-main.is-small { font-size: 18px; line-height: 1.45; }
+.text-card-sub { max-width: 46ch; font-size: 15px; line-height: 1.5; opacity: 0.92; }
+.text-card ::selection { background: rgba(255, 255, 255, 0.35); }
+
+@media (max-width: 639px) {
+  .text-card { min-height: 200px; padding: 28px 20px; }
+  .text-card-main.is-large { font-size: 23px; }
+  .text-card-main.is-medium { font-size: 19px; }
+  .text-card-main.is-small { font-size: 17px; }
+}
+
+/* Escolha da cor de fundo (círculos) */
+.swatches { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.swatches-label { margin-right: 2px; color: var(--text-muted); font-size: 14px; font-weight: 600; }
+
+.swatch {
+  position: relative;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: transform 220ms var(--spring-soft);
+}
+
+.swatch:hover { transform: scale(1.08); }
+.swatch[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--text); }
+
+.swatch.is-none { background: var(--bg); box-shadow: inset 0 0 0 1.5px var(--control-border); }
+.swatch.is-none::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 6px;
+  right: 6px;
+  height: 1.5px;
+  background: var(--control-border);
+  transform: rotate(-45deg);
+}
+.swatch.is-none[aria-pressed="true"] { box-shadow: inset 0 0 0 1.5px var(--control-border), 0 0 0 2px var(--bg), 0 0 0 4px var(--text); }
+
+@media (pointer: coarse) { .swatch { width: 36px; height: 36px; } }
+
+/* No diálogo de publicar, o texto já aparece sobre a cor escolhida */
+.composer-textarea.is-colored,
+.composer-title-colored {
+  min-height: 200px;
+  padding: 28px 20px;
+  border-radius: var(--radius);
+  color: #fff;
+  font-size: 21px;
+  font-weight: 600;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.composer-textarea.is-colored::placeholder,
+.composer-title-colored::placeholder { color: rgba(255, 255, 255, 0.75); }
+
+.composer-title-colored {
+  display: block;
+  width: 100%;
+  min-height: 160px;
+  border: 0;
+  outline: none;
+  font-family: inherit;
+  resize: none;
+}
+
+.composer-textarea.is-colored:focus-visible,
+.composer-title-colored:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+/* Chat da comunidade na coluna da direita (e no topo do feed no telemóvel) */
+.chat-peek-list { display: flex; flex-direction: column; gap: 10px; margin: 4px 0 12px; }
+.chat-peek-msg { display: flex; align-items: flex-start; gap: 8px; }
+.chat-peek-body { min-width: 0; flex: 1; }
+.chat-peek-who { display: flex; align-items: baseline; gap: 6px; font-size: 13px; }
+.chat-peek-who strong { overflow: hidden; color: var(--text); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.chat-peek-who time { flex: none; color: var(--text-faint); font-size: 12px; }
+
+.chat-peek-text {
+  display: -webkit-box;
+  overflow: hidden;
+  margin-top: 2px;
+  padding: 6px 10px;
+  border-radius: 4px 14px 14px 14px;
+  background: var(--bg-surface);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+.chat-peek-msg.is-new .chat-peek-text { animation: peek-flash 1600ms var(--ease-out); }
+@keyframes peek-flash { 0% { background: var(--accent); color: #fff; } 100% { background: var(--bg-surface); color: var(--text); } }
+
+.live-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--success);
+  vertical-align: 1px;
+}
+
+.chat-peek-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--bg);
+  border-radius: var(--radius-lg);
+  color: var(--text);
+}
+
+.chat-peek-row:hover { color: var(--text); text-decoration: none; background: var(--bg-surface); }
+.chat-peek-row .chat-peek-text { display: block; margin: 0; padding: 0; background: none; color: var(--text-muted); white-space: nowrap; text-overflow: ellipsis; }
+
 /* Vídeo do YouTube dentro da publicação: a capa vira o leitor ao tocar */
 .post-video {
   position: relative;
@@ -1831,7 +1973,18 @@ hr, .uk-hr { margin: 16px 0; border: 0; border-top: 1px solid var(--border); }
 @keyframes pill-in { from { opacity: 0; transform: translate(-50%, -8px); } }
 
 /* Coluna complementar */
-.feed-rail { padding: 4px 0; background: var(--bg); border-radius: var(--radius-lg); }
+.feed-rail {
+  position: sticky;
+  top: calc(var(--header-h) + 24px);
+  max-height: calc(100vh - var(--header-h) - 48px);
+  max-height: calc(100dvh - var(--header-h) - 48px);
+  padding: 4px 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--bg);
+  border-radius: var(--radius-lg);
+  scrollbar-width: thin;
+}
 .rail-section { padding: 14px 16px; }
 .rail-section + .rail-section { border-top: 1px solid var(--border); }
 .rail-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
@@ -2377,6 +2530,78 @@ a.thread-title:hover { color: var(--text); }
 }
 
 .video-player iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+
+/* ─── BÍBLIA ────────────────────────────────────────────────── */
+.bible-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.bible-bar .uk-select { width: auto; flex: 1 1 180px; max-width: 280px; }
+.bible-bar .bible-chapter { flex: 0 1 140px; }
+
+.bible-text { padding: 28px 32px 32px; background: var(--bg); border-radius: var(--radius-lg); }
+.bible-heading { margin-bottom: 16px; font-size: 24px; font-weight: 600; letter-spacing: -0.02em; }
+
+.bible-verses { color: var(--text); font-size: 18px; line-height: 1.8; }
+
+.bible-verse {
+  padding: 2px 1px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background var(--t);
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+.bible-verse:hover { background: var(--bg-surface); }
+.bible-verse:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.bible-verse[aria-pressed="true"] { background: var(--bg-elevated); text-decoration: underline; text-decoration-color: var(--accent); text-decoration-thickness: 2px; text-underline-offset: 5px; }
+
+.bible-num {
+  margin: 0 4px 0 2px;
+  color: var(--text-faint);
+  font-size: 12px;
+  font-weight: 600;
+  vertical-align: super;
+  line-height: 0;
+}
+
+.bible-pager { display: flex; justify-content: space-between; gap: 8px; margin-top: 24px; }
+.bible-note { margin-top: 16px; color: var(--text-faint); font-size: 13px; text-align: center; }
+
+/* Versículos escolhidos: compartilhar no feed ou copiar */
+.bible-actions {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  z-index: 950;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100vw - 24px);
+  padding: 8px 8px 8px 16px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 28px;
+  box-shadow: var(--shadow-pop);
+  transform: translateX(-50%);
+  animation: pill-in 300ms var(--spring-soft) backwards;
+}
+
+.bible-actions-ref { overflow: hidden; color: var(--text); font-size: 14px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+
+@media (max-width: 1023px) {
+  .bible-actions { bottom: calc(var(--bottom-nav-h) + var(--safe-bottom) + 12px); }
+}
+
+@media (max-width: 639px) {
+  .bible-text { padding: 20px 18px 24px; }
+  .bible-verses { font-size: 17px; }
+}
 
 /* ─── LIDERANÇA E PROTEÇÃO ──────────────────────────────────── */
 .dash-layout {

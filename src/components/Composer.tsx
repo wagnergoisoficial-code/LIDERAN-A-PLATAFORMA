@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { useCommunity, announceFeedChange } from '../lib/community';
 import { youtubeId, youtubeThumbnail, VIDEO_CATEGORIES, VideoCategory } from '../lib/youtube';
 import { celebrate } from '../lib/motion';
+import { BACKGROUNDS, BackgroundKey, fitsColor, MAX_COLORED } from '../lib/backgrounds';
 import { EventFields, EventDraft, EMPTY_EVENT, eventPayload } from './EventForm';
 import Avatar from './Avatar';
 import Icon from './Icon';
@@ -37,11 +38,13 @@ interface Draft {
   options: string[];
   expiresAt: string;
   event: EventDraft;
+  // Cor de fundo de um texto curto ou de um pedido de oração
+  background: BackgroundKey;
 }
 
 const EMPTY_DRAFT: Draft = {
   kind: 'post', content: '', title: '', verse: '', url: '', category: 'pregacao', place: '', coords: null,
-  question: '', options: ['', ''], expiresAt: '', event: EMPTY_EVENT,
+  question: '', options: ['', ''], expiresAt: '', event: EMPTY_EVENT, background: 'azul',
 };
 const MAX_CONTENT = 5000;
 const MAX_IMAGE = 5 * 1024 * 1024;
@@ -73,13 +76,28 @@ const writeDraft = (userId: string, draft: Draft) => {
 
 const Optional = () => <span className="faint" style={{ fontWeight: 400 }}> (opcional)</span>;
 
+// Círculos de cor (como no estado do WhatsApp); "Sem cor" deixa o texto normal
+const Swatches: React.FC<{ value: BackgroundKey; onChange: (key: BackgroundKey) => void }> = ({ value, onChange }) => (
+  <div className="swatches" role="group" aria-label="Cor de fundo">
+    <span className="swatches-label" aria-hidden="true">Cor</span>
+    <button type="button" aria-pressed={value === 'none'} aria-label="Sem cor" title="Sem cor"
+      className="swatch is-none" onClick={() => onChange('none')} />
+    {BACKGROUNDS.map(b => (
+      <button key={b.key} type="button" aria-pressed={value === b.key} aria-label={`Fundo ${b.label.toLowerCase()}`} title={b.label}
+        className="swatch" style={{ background: b.color }} onClick={() => onChange(b.key)} />
+    ))}
+  </div>
+);
+
 interface ComposerProps {
   start?: ComposerStart;
+  // Texto já escrito (por exemplo, um versículo da Bíblia para compartilhar)
+  initialContent?: string;
   onPublished?: () => void;
 }
 
 /** Formulário de publicar no feed: publicação, vídeo, oração, doação e, para líderes, devocional, encontro e enquete. */
-export const Composer: React.FC<ComposerProps> = ({ start, onPublished }) => {
+export const Composer: React.FC<ComposerProps> = ({ start, initialContent, onPublished }) => {
   const { user } = useAuth();
   const { community } = useCommunity();
   const userId = user?.id || '';
@@ -87,6 +105,9 @@ export const Composer: React.FC<ComposerProps> = ({ start, onPublished }) => {
   const kinds = KINDS.filter(k => !k.leader || isLeader);
   const [draft, setDraft] = useState<Draft>(() => {
     const saved = readDraft(userId);
+    if (initialContent) {
+      return { ...saved, kind: 'post', content: saved.content.trim() ? `${saved.content.trim()}\n\n${initialContent}` : initialContent };
+    }
     const kind = start === 'photo' ? 'post' : start || saved.kind;
     return { ...saved, kind: kinds.some(k => k.value === kind) ? kind : 'post' };
   });
@@ -156,6 +177,11 @@ export const Composer: React.FC<ComposerProps> = ({ start, onPublished }) => {
 
   const { kind } = draft;
   const withPhoto = kind === 'post' || kind === 'donation';
+  const colorOf = (key: BackgroundKey) => BACKGROUNDS.find(b => b.key === key)?.color || null;
+  // O texto curto sem foto aparece já sobre a cor, como vai ficar no feed
+  const postColor = kind === 'post' && !image && (!draft.content.trim() || fitsColor(draft.content)) ? colorOf(draft.background) : null;
+  const tooLongForColor = kind === 'post' && !image && draft.background !== 'none' && !!draft.content.trim() && !fitsColor(draft.content);
+  const prayerColor = kind === 'prayer' ? colorOf(draft.background) : null;
   const videoId = kind === 'video' ? youtubeId(draft.url) : null;
   const filledOptions = draft.options.map(o => o.trim()).filter(Boolean);
   const canSubmit = {
@@ -185,7 +211,7 @@ export const Composer: React.FC<ComposerProps> = ({ start, onPublished }) => {
       if (kind === 'post' || kind === 'donation') {
         const data = kind === 'donation'
           ? { content: draft.content, type: 'donation', location: draft.place.trim(), ...(draft.coords || {}) }
-          : { content: draft.content };
+          : { content: draft.content, ...(image ? {} : { background: draft.background }) };
         const res = await api.createPost(data, image || undefined);
         announceFeedChange('post', res.data);
         finish(kind === 'donation' ? 'Doação publicada para todas as comunidades' : 'Publicado no feed');
@@ -194,7 +220,7 @@ export const Composer: React.FC<ComposerProps> = ({ start, onPublished }) => {
         announceFeedChange('video', res.data);
         finish(res.data?.status === 'approved' ? 'Vídeo publicado no feed' : 'Vídeo enviado: aparece no feed depois da aprovação do líder');
       } else if (kind === 'prayer') {
-        const res = await api.createPrayerRequest({ title: draft.title.trim(), content: draft.content.trim() });
+        const res = await api.createPrayerRequest({ title: draft.title.trim(), content: draft.content.trim(), background: draft.background });
         announceFeedChange('prayer', res.data);
         finish('Pedido de oração publicado');
       } else if (kind === 'devotional') {
@@ -227,10 +253,11 @@ export const Composer: React.FC<ComposerProps> = ({ start, onPublished }) => {
     ? 'Depois da aprovação do líder, todas as comunidades veem'
     : everyone ? 'Todas as comunidades veem' : `Visível para ${community?.name || 'sua comunidade'}`;
 
-  const textField = (label: string, placeholder: string, rows = 4) => (
+  const textField = (label: string, placeholder: string, color: string | null = null) => (
     <>
       <label className="visually-hidden" htmlFor="composer-text">{label}</label>
-      <textarea id="composer-text" ref={textarea} className="composer-textarea" data-autofocus rows={rows} maxLength={MAX_CONTENT}
+      <textarea id="composer-text" ref={textarea} className={`composer-textarea${color ? ' is-colored' : ''}`} data-autofocus rows={4} maxLength={MAX_CONTENT}
+        style={color ? { background: color } : undefined}
         placeholder={placeholder} value={draft.content} onChange={e => set({ content: e.target.value })} />
     </>
   );
@@ -254,17 +281,30 @@ export const Composer: React.FC<ComposerProps> = ({ start, onPublished }) => {
         </span>
       </div>
 
-      {kind === 'post' && textField('Texto da publicação', 'O que você quer compartilhar?')}
+      {kind === 'post' && (
+        <>
+          {textField('Texto da publicação', 'O que você quer compartilhar?', postColor)}
+          {!image && <Swatches value={draft.background} onChange={background => set({ background })} />}
+          {tooLongForColor && <p className="form-hint" style={{ margin: 0 }}>Textos com mais de {MAX_COLORED} caracteres aparecem sem cor.</p>}
+        </>
+      )}
 
       {kind === 'donation' && textField('O que está doando', 'O que você está doando? Ex.: sofá de 3 lugares em bom estado.')}
 
       {kind === 'prayer' && (
         <>
           <div>
-            <label className="form-label" htmlFor="composer-title">Pedido de oração</label>
-            <input id="composer-title" className="form-input" maxLength={120} placeholder="Ex.: Entrevista de emprego" aria-required="true"
-              data-autofocus value={draft.title} onChange={e => set({ title: e.target.value })} />
+            <label className={prayerColor ? 'visually-hidden' : 'form-label'} htmlFor="composer-title">Pedido de oração</label>
+            {prayerColor ? (
+              <textarea id="composer-title" className="composer-title-colored" maxLength={120} rows={3} aria-required="true"
+                placeholder="Pelo que você quer oração?" data-autofocus style={{ background: prayerColor }}
+                value={draft.title} onChange={e => set({ title: e.target.value.replace(/\n/g, ' ') })} />
+            ) : (
+              <input id="composer-title" className="form-input" maxLength={120} placeholder="Ex.: Entrevista de emprego" aria-required="true"
+                data-autofocus value={draft.title} onChange={e => set({ title: e.target.value })} />
+            )}
           </div>
+          <Swatches value={draft.background} onChange={background => set({ background })} />
           <div>
             <label className="form-label" htmlFor="composer-text">Conte um pouco mais</label>
             <textarea id="composer-text" className="form-input" rows={4} maxLength={2000} aria-required="true"
@@ -424,19 +464,20 @@ export const Composer: React.FC<ComposerProps> = ({ start, onPublished }) => {
   );
 };
 
-const ComposerContext = createContext<{ openComposer: (start?: ComposerStart) => void }>({ openComposer: () => {} });
+type OpenComposer = (start?: ComposerStart, initialContent?: string) => void;
+const ComposerContext = createContext<{ openComposer: OpenComposer }>({ openComposer: () => {} });
 
 export const useComposer = () => useContext(ComposerContext);
 
 /** Disponibiliza "Publicar" em toda a app: abre o formulário num diálogo, por cima da página atual. */
 export const ComposerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [open, setOpen] = useState<{ start?: ComposerStart } | null>(null);
+  const [open, setOpen] = useState<{ start?: ComposerStart; initialContent?: string } | null>(null);
   return (
-    <ComposerContext.Provider value={{ openComposer: start => setOpen({ start }) }}>
+    <ComposerContext.Provider value={{ openComposer: (start, initialContent) => setOpen({ start, initialContent }) }}>
       {children}
       {open && (
         <Modal title="Publicar" onClose={() => setOpen(null)} width={600}>
-          <Composer start={open.start} onPublished={() => setOpen(null)} />
+          <Composer start={open.start} initialContent={open.initialContent} onPublished={() => setOpen(null)} />
         </Modal>
       )}
     </ComposerContext.Provider>

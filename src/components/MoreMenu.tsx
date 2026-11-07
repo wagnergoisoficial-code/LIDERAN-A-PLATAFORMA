@@ -49,8 +49,9 @@ export const moveFocus = (e: React.KeyboardEvent, container: HTMLElement | null)
   items[next].focus();
 };
 
-/** Menu "mais opções" (⋯) de uma publicação, pedido ou evento. Sem ações, não aparece. */
-const MoreMenu: React.FC<{ actions: MenuAction[]; label?: string }> = ({ actions, label = 'Mais opções' }) => {
+/** Menu "mais opções" (⋯) de uma publicação, pedido ou evento; com buttonLabel, um botão com texto
+ *  (ex.: "Gerir"). Sem ações, não aparece. */
+const MoreMenu: React.FC<{ actions: MenuAction[]; label?: string; buttonLabel?: string }> = ({ actions, label = 'Mais opções', buttonLabel }) => {
   const [open, setOpen] = useState(false);
   const button = useRef<HTMLButtonElement>(null);
   const menu = useRef<HTMLDivElement>(null);
@@ -70,10 +71,17 @@ const MoreMenu: React.FC<{ actions: MenuAction[]; label?: string }> = ({ actions
 
   return (
     <div className="menu-wrap">
-      <button ref={button} type="button" className="action-btn" aria-label={label} title={label}
-        aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(v => !v)}>
-        <Icon name="more" />
-      </button>
+      {buttonLabel ? (
+        <button ref={button} type="button" className="uk-button uk-button-default uk-button-small" aria-label={label}
+          aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(v => !v)}>
+          {buttonLabel} <Icon name="chevron-down" size={16} />
+        </button>
+      ) : (
+        <button ref={button} type="button" className="action-btn" aria-label={label} title={label}
+          aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(v => !v)}>
+          <Icon name="more" />
+        </button>
+      )}
       {open && (
         <div ref={menu} className="menu is-end scale-in" role="menu" aria-label={label}
           onKeyDown={e => { moveFocus(e, menu.current); if (e.key === 'Tab') close(false); }}>
