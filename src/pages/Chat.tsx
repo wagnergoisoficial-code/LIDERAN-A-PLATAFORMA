@@ -1,8 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
+import UIkit from 'uikit';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import UIkit from 'uikit';
+import { useCommunity } from '../lib/community';
+import { shortTime, fullDate, plural } from '../lib/format';
 import Avatar from '../components/Avatar';
+import Icon from '../components/Icon';
 import PageHeader from '../components/PageHeader';
 import ReportButton from '../components/ReportButton';
 
@@ -13,48 +17,49 @@ interface Message {
   createdAt: string;
 }
 
-const formatDate = (dateString: string) => {
-  const date = new Date(dateString);
-  const isToday = date.toDateString() === new Date().toDateString();
-  return isToday
-    ? date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-    : date.toLocaleDateString('pt-BR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-};
-
+// Conversa de grupo da comunidade (como um grupo de mensagens): só entre os membros dela
 const Chat = () => {
   const { user } = useAuth();
+  const { community } = useCommunity();
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const pollRef = useRef<NodeJS.Timeout | null>(null);
+  const endRef = useRef<HTMLDivElement>(null);
+  const lastId = useRef<string | null>(null);
   // Com menores na comunidade, as mensagens não podem ser apagadas
   const [isProtected, setIsProtected] = useState(false);
-
-  const scrollToBottom = () => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  const isLeader = user?.role === 'leader' || user?.role === 'admin';
 
   const loadMessages = async () => {
     try {
       const result = await api.getMessages(50);
-      if (result.success) { setMessages(result.data); setIsProtected(!!result.protected); setLoading(false); }
-    } catch { setLoading(false); }
+      if (result.success) {
+        setMessages(result.data);
+        setIsProtected(!!result.protected);
+      }
+    } catch { /* tenta de novo no próximo ciclo */ }
+    finally { setLoading(false); }
   };
 
-  useEffect(() => { loadMessages(); }, []);
-  useEffect(() => { scrollToBottom(); }, [messages]);
-  // Atualiza a cada 3 segundos, só com o separador visível (poupa o servidor)
   useEffect(() => {
-    pollRef.current = setInterval(() => {
-      if (document.visibilityState === 'visible') loadMessages();
-    }, 3000);
+    loadMessages();
+    // Atualiza a cada 3 segundos, só com o separador visível (poupa o servidor)
+    const timer = setInterval(() => { if (document.visibilityState === 'visible') loadMessages(); }, 3000);
     const onVisible = () => { if (document.visibilityState === 'visible') loadMessages(); };
     document.addEventListener('visibilitychange', onVisible);
     return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
+      clearInterval(timer);
       document.removeEventListener('visibilitychange', onVisible);
     };
   }, []);
+
+  // Desce até ao fim só quando chega uma mensagem nova (não a cada atualização)
+  useEffect(() => {
+    const last = messages[messages.length - 1]?.id || null;
+    if (last && last !== lastId.current) endRef.current?.scrollIntoView({ block: 'end' });
+    lastId.current = last;
+  }, [messages]);
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,16 +67,18 @@ const Chat = () => {
     setSending(true);
     try {
       const result = await api.sendMessage(newMessage.trim());
-      if (result.success) { setNewMessage(''); await loadMessages(); }
-      else UIkit.notification({ message: result.message || 'Erro ao enviar', status: 'danger', timeout: 3000 });
+      if (result.success) {
+        setNewMessage('');
+        await loadMessages();
+      } else {
+        UIkit.notification({ message: result.message || 'A mensagem não foi enviada', status: 'danger', pos: 'top-right' });
+      }
     } catch (err: any) {
-      UIkit.notification({ message: err.message || 'Erro ao enviar', status: 'danger', timeout: 3000 });
+      UIkit.notification({ message: err.message || 'A mensagem não foi enviada. Tente de novo.', status: 'danger', pos: 'top-right' });
     } finally {
       setSending(false);
     }
   };
-
-  const isLeader = user?.role === 'leader' || user?.role === 'admin';
 
   const handleDelete = async (messageId: string, messageUserId: string) => {
     if (user?.id !== messageUserId && !isLeader) return;
@@ -79,130 +86,86 @@ const Chat = () => {
     try {
       const result = await api.deleteMessage(messageId);
       if (result.success) {
-        setMessages(messages.filter(m => m.id !== messageId));
-        UIkit.notification({ message: user?.id === messageUserId ? 'Mensagem apagada' : 'Mensagem ocultada', status: 'success', timeout: 2000 });
+        setMessages(prev => prev.filter(m => m.id !== messageId));
+        UIkit.notification({ message: user?.id === messageUserId ? 'Mensagem apagada' : 'Mensagem ocultada', status: 'success', pos: 'top-right' });
       }
     } catch (err: any) {
-      UIkit.notification({ message: err.message || 'Erro ao deletar', status: 'danger', timeout: 3000 });
+      UIkit.notification({ message: err.message || 'Não foi possível apagar', status: 'danger', pos: 'top-right' });
     }
   };
 
   return (
-    <div className="chat-page">
+    <div className="page is-medium">
       <PageHeader
-        icon="commenting"
-        title="Chat da Comunidade"
+        title="Chat da comunidade"
         subtitle={isProtected
-          ? 'Mensagens visíveis para todos os membros. Há menores na comunidade: as mensagens não podem ser apagadas.'
-          : 'Mensagens visíveis para todos os membros'}
-        actions={user?.churchId && <ReportButton targetType="community_chat" targetId={user.churchId} />}
+          ? 'Todos os membros veem estas mensagens. Há menores na comunidade: as mensagens não podem ser apagadas.'
+          : 'Todos os membros da comunidade veem estas mensagens.'}
       />
 
-      <div className="card chat-panel">
+      <div className="chat-panel">
+        <div className="thread-head">
+          <Link to="/messages" className="action-btn messages-back" aria-label="Voltar às mensagens"><Icon name="arrow-left" /></Link>
+          <span className="group-avatar"><Icon name="users" /></span>
+          <div className="thread-head-text">
+            <span className="thread-title">{community?.name || 'Comunidade'}</span>
+            <span className="thread-sub">{community ? plural(community.memberCount || 0, 'membro', 'membros') : 'Chat da comunidade'}</span>
+          </div>
+          {user?.churchId && <ReportButton targetType="community_chat" targetId={user.churchId} compact />}
+        </div>
 
-        {/* Messages area */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        {isProtected && (
+          <div className="protected-note hide-wide">
+            <Icon name="lock" size={16} />
+            Há menores na comunidade: as mensagens não podem ser apagadas.
+          </div>
+        )}
+
+        <div className="thread-body" aria-live="polite">
           {loading ? (
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span uk-spinner="ratio: 1.5"></span>
-            </div>
+            <div className="loading-block" style={{ flex: 1 }}><span uk-spinner="ratio: 1"></span></div>
           ) : messages.length === 0 ? (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-faint)', gap: '10px' }}>
-              <span uk-icon="icon: commenting; ratio: 2.5" style={{ color: 'var(--border-strong)' }}></span>
-              <p style={{ margin: 0, fontSize: '13px' }}>Nenhuma mensagem ainda. Seja o primeiro a conversar!</p>
+            <div className="messages-empty">
+              <Icon name="chat" size={36} strokeWidth={1.5} className="faint" />
+              <p>Ainda não há mensagens. Comece a conversa!</p>
             </div>
           ) : (
-            messages.map((msg) => {
+            messages.map((msg, i) => {
               const isOwn = user?.id === msg.user.id;
+              // Mensagens seguidas da mesma pessoa: o nome e a foto aparecem só na primeira
+              const first = messages[i - 1]?.user.id !== msg.user.id;
+              const canDelete = (isOwn && !isProtected) || (!isOwn && isLeader);
               return (
-                <div key={msg.id} className={`msg-in${isOwn ? ' is-own' : ''}`}
-                  style={{ display: 'flex', gap: '10px', flexDirection: isOwn ? 'row-reverse' : 'row', alignItems: 'flex-end' }}
-                >
-                  <div style={{ flexShrink: 0 }}>
-                    <Avatar name={msg.user.name} profileImage={msg.user.profileImage} size="small" />
+                <div key={msg.id} className={`msg-row msg-in${isOwn ? ' is-own' : ''}`} style={{ marginTop: first && i > 0 ? '8px' : undefined }}>
+                  {!isOwn && (first
+                    ? <Link to={`/profile/${msg.user.id}`} tabIndex={-1} aria-hidden="true"><Avatar name={msg.user.name} profileImage={msg.user.profileImage} size={32} /></Link>
+                    : <span style={{ width: 32, flexShrink: 0 }} />)}
+                  <div className="msg-stack">
+                    {!isOwn && first && <span className="msg-author">{msg.user.name}</span>}
+                    <div className="bubble">{msg.content}</div>
+                    <time className="msg-time" dateTime={msg.createdAt} title={fullDate(msg.createdAt)}>{shortTime(msg.createdAt)}</time>
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', alignItems: isOwn ? 'flex-end' : 'flex-start', maxWidth: '65%' }}>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', flexDirection: isOwn ? 'row-reverse' : 'row' }}>
-                      <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text)' }}>{msg.user.name}</span>
-                      <span style={{ fontSize: '11px', color: 'var(--text-faint)' }}>{formatDate(msg.createdAt)}</span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px', flexDirection: isOwn ? 'row-reverse' : 'row' }}>
-                      <div style={{
-                        padding: '9px 13px',
-                        borderRadius: 'var(--radius-lg)',
-                        background: isOwn ? 'var(--accent)' : 'var(--bg-elevated)',
-                        color: isOwn ? '#fff' : 'var(--text)',
-                        // O fundo já desenha a bolha; a borda transparente mantém as medidas
-                        border: isOwn ? '1px solid var(--accent)' : '1px solid transparent',
-                        fontSize: '13px',
-                        lineHeight: 1.5,
-                        wordBreak: 'break-word',
-                        maxWidth: '100%'
-                      }}>
-                        {msg.content}
-                      </div>
-                      {((isOwn && !isProtected) || (!isOwn && isLeader)) && (
-                        <button
-                          onClick={() => handleDelete(msg.id, msg.user.id)}
-                          title={isOwn ? 'Apagar mensagem' : 'Ocultar mensagem'}
-                          style={{
-                            background: 'none', border: 'none', cursor: 'pointer',
-                            color: 'var(--text-faint)', padding: '2px',
-                            display: 'flex', alignItems: 'center',
-                            opacity: 0, transition: 'opacity var(--t)'
-                          }}
-                          onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.color = 'var(--text)'; }}
-                          onMouseLeave={(e) => { e.currentTarget.style.opacity = '0'; }}
-                          className="msg-delete-btn"
-                        >
-                          <span uk-icon="icon: trash; ratio: 0.75"></span>
-                        </button>
-                      )}
-                    </div>
-                  </div>
+                  {canDelete && (
+                    <button type="button" className="action-btn msg-delete" onClick={() => handleDelete(msg.id, msg.user.id)}
+                      aria-label={isOwn ? 'Apagar mensagem' : `Ocultar a mensagem de ${msg.user.name}`} title={isOwn ? 'Apagar mensagem' : 'Ocultar mensagem'}>
+                      <Icon name="trash" size={16} />
+                    </button>
+                  )}
                 </div>
               );
             })
           )}
-          <div ref={messagesEndRef} />
+          <div ref={endRef} />
         </div>
 
-        {/* Input area */}
-        <form onSubmit={handleSend} style={{
-          padding: '12px 16px',
-          borderTop: '1px solid var(--border)',
-          background: 'var(--bg)',
-          display: 'flex',
-          gap: '10px',
-          alignItems: 'center',
-          flexShrink: 0
-        }}>
-          <input
-            type="text"
-            className="uk-input"
-            placeholder="Digite sua mensagem..."
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            disabled={sending}
-            maxLength={500}
-            style={{ flex: 1 }}
-          />
-          <button
-            type="submit"
-            className="uk-button uk-button-primary"
-            disabled={sending || !newMessage.trim()}
-          >
-            {sending
-              ? <span uk-spinner="ratio: 0.5"></span>
-              : <><span uk-icon="icon: arrow-right; ratio: 0.85"></span> Enviar</>
-            }
+        <form className="thread-composer" onSubmit={handleSend}>
+          <label className="visually-hidden" htmlFor="chat-text">Mensagem para a comunidade</label>
+          <input id="chat-text" type="text" placeholder="Escreva para a comunidade" value={newMessage}
+            onChange={e => setNewMessage(e.target.value)} maxLength={500} autoComplete="off" />
+          <button type="submit" className="send-btn" aria-label="Enviar mensagem" disabled={sending || !newMessage.trim()}>
+            {sending ? <span uk-spinner="ratio: 0.5"></span> : <Icon name="send" size={18} />}
           </button>
         </form>
-
-        <style>{`
-          .msg-delete-btn { opacity: 0; }
-          div:hover > div > .msg-delete-btn { opacity: 1; }
-        `}</style>
       </div>
     </div>
   );

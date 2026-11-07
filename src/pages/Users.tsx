@@ -1,16 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import UIkit from 'uikit';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import UIkit from 'uikit';
+import { plural } from '../lib/format';
 import Avatar from '../components/Avatar';
+import Icon from '../components/Icon';
+import Modal from '../components/Modal';
+import MoreMenu, { MenuAction } from '../components/MoreMenu';
 import PageHeader from '../components/PageHeader';
 import EmptyState from '../components/EmptyState';
+import { CommunityTabs } from '../components/SectionTabs';
 import GuardianFields, { EMPTY_GUARDIAN, GuardianDraft, guardianPayload, isMinorDate, todayInput } from '../components/GuardianFields';
 
 interface Member {
   id: string; name: string; email: string; role: string;
-  title?: string; location?: string; age?: number; profileImage?: string;
+  title?: string; location?: string; age?: number; profileImage?: string; birthDate?: string | null;
 }
 
 interface MemberStat {
@@ -19,60 +24,40 @@ interface MemberStat {
 }
 
 const emptyAddForm = { name: '', email: '', password: '', confirmPassword: '', birthDate: '', title: '', location: '' };
+const notify = (message: string, status: 'success' | 'danger' = 'danger') => UIkit.notification({ message, status, pos: 'top-right' });
 
-const engagementColor = (pct: number) => {
-  if (pct >= 30) return 'var(--success)';
-  if (pct >= 15) return 'var(--accent)';
-  if (pct >= 5)  return 'var(--text-muted)';
-  return 'var(--text-faint)';
-};
-
-const EngagementBar = ({ stat }: { stat: MemberStat | undefined }) => {
-  if (!stat) return <span style={{ color: 'var(--text-faint)', fontSize: '12px' }}>—</span>;
-  const pct = stat.percentage;
-  const color = engagementColor(pct);
-  return (
-    <div title={`Posts: ${stat.posts} · Comentários: ${stat.comments} · Mensagens: ${stat.messages}`} style={{ minWidth: '100px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-        <div className="engagement-track" style={{ flex: 1 }}>
-          <div className="engagement-fill meter-fill" style={{ transform: `scaleX(${pct / 100})`, background: color }} />
-        </div>
-        <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text)', minWidth: '30px', textAlign: 'right' }}>{pct}%</span>
-      </div>
-      <div style={{ fontSize: '10px', color: 'var(--text-faint)', marginTop: '2px' }}>
-        {stat.posts}p · {stat.comments}c · {stat.messages}m
-      </div>
-    </div>
-  );
-};
+const ADD_FIELDS = [
+  { label: 'Nome', name: 'name', type: 'text', placeholder: 'Nome completo', required: true, autoComplete: 'off' },
+  { label: 'E-mail', name: 'email', type: 'email', placeholder: 'email@exemplo.com', required: true, autoComplete: 'off' },
+  { label: 'Senha', name: 'password', type: 'password', placeholder: '8+ caracteres, maiúscula e número', required: true, autoComplete: 'new-password' },
+  { label: 'Confirmar senha', name: 'confirmPassword', type: 'password', placeholder: 'Repita a senha', required: true, autoComplete: 'new-password' },
+  { label: 'Data de nascimento', name: 'birthDate', type: 'date', placeholder: '', required: true, autoComplete: 'off' },
+  { label: 'Título ou função', name: 'title', type: 'text', placeholder: 'Ex.: Diácono', required: false, autoComplete: 'off' },
+];
 
 const Users = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const isLeaderOrAdmin = user?.role === 'leader' || user?.role === 'admin';
   const churchId = user?.churchId || '';
 
   const [members, setMembers] = useState<Member[]>([]);
   const [stats, setStats] = useState<Record<string, MemberStat>>({});
   const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [addForm, setAddForm] = useState({ ...emptyAddForm });
   const [guardian, setGuardian] = useState<GuardianDraft>({ ...EMPTY_GUARDIAN });
   const [addLoading, setAddLoading] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
   const [editingMember, setEditingMember] = useState<Member | null>(null);
   const [editForm, setEditForm] = useState({ name: '', title: '', location: '', birthDate: '' });
   const [editLoading, setEditLoading] = useState(false);
-  const [deletingMemberId, setDeletingMemberId] = useState<string | null>(null);
-  const [deleteLoading, setDeleteLoading] = useState(false);
-
-  useEffect(() => { loadAll(); }, []);
 
   const loadAll = async () => {
-    setLoading(true);
     try {
       const [membersRes, statsRes] = await Promise.all([
         api.getUsers(),
-        churchId ? api.getChurchMemberStats(churchId) : Promise.resolve({ success: false, data: [] }),
+        churchId && isLeaderOrAdmin ? api.getChurchMemberStats(churchId) : Promise.resolve({ success: false, data: [] }),
       ]);
       if (membersRes.success) setMembers(membersRes.data || []);
       if (statsRes.success && Array.isArray(statsRes.data)) {
@@ -81,25 +66,18 @@ const Users = () => {
         setStats(map);
       }
     } catch {
-      UIkit.notification({ message: 'Erro ao carregar membros', status: 'danger', pos: 'top-right' });
+      notify('Não foi possível carregar os membros');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleAddChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setAddForm(prev => ({ ...prev, [name]: value }));
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { loadAll(); }, []);
 
   const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (addForm.password !== addForm.confirmPassword) {
-      UIkit.notification({ message: 'As senhas não conferem', status: 'danger', pos: 'top-right' }); return;
-    }
-    if (!addForm.name.trim() || !addForm.email.trim()) {
-      UIkit.notification({ message: 'Nome e email são obrigatórios', status: 'danger', pos: 'top-right' }); return;
-    }
+    if (addForm.password !== addForm.confirmPassword) return notify('As senhas não conferem');
     setAddLoading(true);
     try {
       const response = await api.registerMemberInChurch({
@@ -110,14 +88,14 @@ const Users = () => {
         guardian: isMinorDate(addForm.birthDate) ? guardianPayload(guardian) : undefined,
       });
       if (response.success) {
-        UIkit.notification({ message: response.message || 'Membro cadastrado!', status: 'success', pos: 'top-right' });
+        notify(response.message || 'Membro cadastrado', 'success');
         setAddForm({ ...emptyAddForm });
         setGuardian({ ...EMPTY_GUARDIAN });
         setShowAddModal(false);
         loadAll();
       }
     } catch (err: any) {
-      UIkit.notification({ message: err.message || 'Erro ao cadastrar', status: 'danger', pos: 'top-right' });
+      notify(err.message || 'Não foi possível cadastrar');
     } finally {
       setAddLoading(false);
     }
@@ -125,13 +103,7 @@ const Users = () => {
 
   const openEdit = (member: Member) => {
     setEditingMember(member);
-    setEditForm({ name: member.name || '', title: member.title || '', location: member.location || '', birthDate: (member as any).birthDate ? String((member as any).birthDate).slice(0, 10) : '' });
-    setShowEditModal(true);
-  };
-
-  const handleEditChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setEditForm(prev => ({ ...prev, [name]: value }));
+    setEditForm({ name: member.name || '', title: member.title || '', location: member.location || '', birthDate: member.birthDate ? String(member.birthDate).slice(0, 10) : '' });
   };
 
   const handleEditSubmit = async (e: React.FormEvent) => {
@@ -144,233 +116,167 @@ const Users = () => {
         location: editForm.location, birthDate: editForm.birthDate || null,
       });
       if (response.success) {
-        UIkit.notification({ message: 'Membro atualizado!', status: 'success', pos: 'top-right' });
-        setShowEditModal(false); setEditingMember(null); loadAll();
+        notify('Dados atualizados', 'success');
+        setEditingMember(null);
+        loadAll();
       }
     } catch (err: any) {
-      UIkit.notification({ message: err.message || 'Erro ao atualizar', status: 'danger', pos: 'top-right' });
+      notify(err.message || 'Não foi possível atualizar');
     } finally {
       setEditLoading(false);
     }
   };
 
-  const handleDelete = async (memberId: string) => {
-    setDeleteLoading(true);
+  const handleDelete = async (member: Member) => {
+    if (!confirm(`Remover ${member.name} da comunidade?`)) return;
     try {
-      const response = await api.removeMemberFromChurch(churchId, memberId);
+      const response = await api.removeMemberFromChurch(churchId, member.id);
       if (response.success) {
-        UIkit.notification({ message: 'Membro removido!', status: 'success', pos: 'top-right' });
-        setDeletingMemberId(null); loadAll();
+        notify('Membro removido', 'success');
+        loadAll();
       }
     } catch (err: any) {
-      UIkit.notification({ message: err.message || 'Erro ao remover', status: 'danger', pos: 'top-right' });
-    } finally {
-      setDeleteLoading(false);
+      notify(err.message || 'Não foi possível remover');
     }
   };
 
-  const getRoleBadge = (role: string) => {
-    switch (role) {
-      case 'admin': return { cls: 'uk-label-danger', label: 'Admin' };
-      case 'leader': return { cls: 'uk-label-warning', label: 'Líder' };
-      default: return { cls: 'uk-label-info', label: 'Membro' };
+  const message = async (memberId: string) => {
+    try {
+      const res = await api.startConversation(memberId);
+      navigate(`/messages?c=${res.data.id}`);
+    } catch (err: any) {
+      notify(err.message || 'Não foi possível abrir a conversa');
     }
   };
+
+  const filtered = members.filter(m => `${m.name} ${m.title || ''} ${m.location || ''}`.toLowerCase().includes(query.trim().toLowerCase()));
 
   return (
-    <div>
-      {/* Header */}
+    <div className="page is-medium">
+      <CommunityTabs />
       <PageHeader
-        icon="users"
         title="Membros"
-        subtitle="Conheça os irmãos que fazem parte desta comunidade"
+        subtitle={loading ? 'Pessoas da comunidade' : `${plural(members.length, 'pessoa', 'pessoas')} na comunidade`}
         actions={isLeaderOrAdmin && (
-          <button className="uk-button uk-button-primary" onClick={() => setShowAddModal(true)}>
-            <span uk-icon="icon: plus; ratio: 0.85"></span>
-            Novo Membro
+          <button type="button" className="uk-button uk-button-primary" onClick={() => setShowAddModal(true)}>
+            <Icon name="user-plus" size={18} /> Novo membro
           </button>
         )}
       />
 
-      {/* Engagement legend */}
-      {isLeaderOrAdmin && !loading && members.length > 0 && (
-        <div style={{ display: 'flex', gap: '16px', marginBottom: '16px', padding: '10px 0', fontSize: '11px', color: 'var(--text-muted)', flexWrap: 'wrap', alignItems: 'center' }}>
-          <span style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Engajamento:</span>
-          {[{ color: 'var(--success)', label: 'Alto ≥30%' }, { color: 'var(--accent)', label: 'Médio ≥15%' }, { color: 'var(--text-muted)', label: 'Baixo ≥5%' }, { color: 'var(--text-faint)', label: 'Inativo <5%' }].map(({ color, label }) => (
-            <span key={label} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: color, display: 'inline-block' }}></span>
-              {label}
-            </span>
-          ))}
-          <span style={{ marginLeft: 'auto', color: 'var(--text-faint)' }}>p = posts · c = comentários · m = mensagens</span>
-        </div>
-      )}
+      <div style={{ marginBottom: '12px' }}>
+        <label className="visually-hidden" htmlFor="member-search">Buscar membro</label>
+        <input id="member-search" className="form-input" type="search" placeholder="Buscar por nome, função ou cidade" value={query} onChange={e => setQuery(e.target.value)} />
+      </div>
 
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '60px 0' }}>
-          <span uk-spinner="ratio: 2"></span>
-        </div>
+        <div className="loading-block" role="status" aria-label="Carregando membros"><span uk-spinner="ratio: 1"></span></div>
       ) : members.length === 0 ? (
-        <EmptyState icon="users" title="Nenhum membro cadastrado" text={isLeaderOrAdmin ? 'Clique em "Novo Membro" para começar' : undefined} />
+        <div className="card">
+          <EmptyState icon="users" title="Ainda não há membros" text={isLeaderOrAdmin ? 'Cadastre os jovens ou envie o link de convite que está no Painel do líder.' : undefined} />
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="card"><p className="list-empty">Ninguém encontrado com “{query.trim()}”.</p></div>
       ) : (
-        <div className="card" style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid var(--border-strong)' }}>
-                {['', 'Nome', 'E-mail', 'Cargo', 'Função', ...(isLeaderOrAdmin ? ['Engajamento'] : []), 'Ações'].map(h => (
-                  <th key={h} style={{ padding: '10px 12px', textAlign: h === 'Ações' || h === '' ? 'center' : 'left', fontSize: '11px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="stagger">
-              {members.map((m, i) => {
-                const badge = getRoleBadge(m.role);
-                return (
-                  <tr key={m.id} style={{ borderBottom: i < members.length - 1 ? '1px solid var(--border)' : undefined }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-surface)')}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-                  >
-                    <td style={{ padding: '10px 12px' }}>
-                      <Avatar name={m.name} profileImage={m.profileImage} size="small" />
-                    </td>
-                    <td style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--text)', fontSize: '13px' }}>{m.name}</td>
-                    <td style={{ padding: '10px 12px', color: 'var(--text-muted)', fontSize: '13px' }}>{m.email}</td>
-                    <td style={{ padding: '10px 12px', color: 'var(--text-muted)', fontSize: '13px' }}>{m.title || '—'}</td>
-                    <td style={{ padding: '10px 12px' }}>
-                      <span className={`uk-label ${badge.cls}`}>{badge.label}</span>
-                    </td>
-                    {isLeaderOrAdmin && (
-                      <td style={{ padding: '10px 12px' }}>
-                        <EngagementBar stat={stats[m.id]} />
-                      </td>
-                    )}
-                    <td style={{ padding: '10px 12px', textAlign: 'center' }}>
-                      {isLeaderOrAdmin && deletingMemberId === m.id ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center' }}>
-                          <span style={{ fontSize: '11px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Confirmar?</span>
-                          <button className="uk-button uk-button-danger uk-button-small" onClick={() => handleDelete(m.id)} disabled={deleteLoading}>
-                            {deleteLoading ? '...' : 'Sim'}
-                          </button>
-                          <button className="uk-button uk-button-default uk-button-small" onClick={() => setDeletingMemberId(null)}>
-                            Não
-                          </button>
-                        </div>
-                      ) : (
-                        <div style={{ display: 'flex', gap: '5px', justifyContent: 'center', alignItems: 'center' }}>
-                          <Link to={`/profile/${m.id}`} title="Ver perfil" className="action-btn">
-                            <span uk-icon="icon: search; ratio: 0.75"></span>
-                          </Link>
-                          {isLeaderOrAdmin && (
-                            <button onClick={() => openEdit(m)} title="Editar" className="action-btn">
-                              <span uk-icon="icon: pencil; ratio: 0.75"></span>
-                            </button>
-                          )}
-                          {isLeaderOrAdmin && m.id !== user?.id && (
-                            <button onClick={() => setDeletingMemberId(m.id)} title="Remover" className="action-btn danger">
-                              <span uk-icon="icon: trash; ratio: 0.75"></span>
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        <div className="card stagger">
+          {filtered.map(m => {
+            const stat = stats[m.id];
+            const isMe = m.id === user?.id;
+            const actions: MenuAction[] = isLeaderOrAdmin ? [
+              { label: 'Editar dados', icon: 'pencil', onSelect: () => openEdit(m) },
+              ...(!isMe ? [{ label: 'Remover da comunidade', icon: 'trash' as const, danger: true, onSelect: () => handleDelete(m) }] : []),
+            ] : [];
+            return (
+              <div key={m.id} className="list-row">
+                <Link to={`/profile/${m.id}`} tabIndex={-1} aria-hidden="true"><Avatar name={m.name} profileImage={m.profileImage} size={44} /></Link>
+                <span className="list-row-body">
+                  <span className="list-row-title">
+                    <Link to={`/profile/${m.id}`} className="truncate" style={{ color: 'var(--text)' }}>{m.name}{isMe ? ' (você)' : ''}</Link>
+                    {(m.role === 'leader' || m.role === 'admin') && <span className="tag">{m.role === 'admin' ? 'Admin' : 'Líder'}</span>}
+                  </span>
+                  <span className="list-row-meta" style={{ display: 'block' }}>
+                    {[m.title, m.location].filter(Boolean).join(' · ') || (isLeaderOrAdmin ? m.email : 'Membro')}
+                  </span>
+                  {isLeaderOrAdmin && (
+                    <span className="list-row-meta" style={{ display: 'block', color: 'var(--text-faint)' }}>
+                      {(m.title || m.location) ? `${m.email} · ` : ''}
+                      {stat ? `${plural(stat.posts, 'publicação', 'publicações')}, ${plural(stat.comments, 'comentário', 'comentários')}, ${plural(stat.messages, 'mensagem', 'mensagens')}` : 'Sem participação ainda'}
+                    </span>
+                  )}
+                </span>
+                <span className="list-row-aside">
+                  {!isMe && (
+                    <button type="button" className="action-btn" aria-label={`Enviar mensagem para ${m.name}`} title="Enviar mensagem" onClick={() => message(m.id)}>
+                      <Icon name="messages" />
+                    </button>
+                  )}
+                  <MoreMenu actions={actions} label={`Opções de ${m.name}`} />
+                </span>
+              </div>
+            );
+          })}
         </div>
       )}
 
-      {/* ADD MODAL */}
       {showAddModal && (
-        <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowAddModal(false); }}>
-          <div className="modal-box" style={{ maxWidth: '600px' }}>
-            <div className="modal-header">
-              <h4>Novo Membro</h4>
-              <button className="modal-close-btn" onClick={() => setShowAddModal(false)}>
-                <span uk-icon="icon: close; ratio: 0.9"></span>
-              </button>
+        <Modal title="Novo membro" onClose={() => setShowAddModal(false)} width={600} onSubmit={handleAddSubmit}>
+          <div className="form-grid">
+            {ADD_FIELDS.map((f, i) => (
+              <div key={f.name}>
+                <label className="form-label" htmlFor={`add-${f.name}`}>{f.label}{!f.required && <span className="faint" style={{ fontWeight: 400 }}> (opcional)</span>}</label>
+                <input id={`add-${f.name}`} className="form-input" type={f.type} name={f.name} placeholder={f.placeholder} autoComplete={f.autoComplete}
+                  value={(addForm as any)[f.name]} onChange={e => setAddForm(prev => ({ ...prev, [f.name]: e.target.value }))}
+                  max={f.type === 'date' ? todayInput() : undefined} minLength={f.type === 'password' ? 8 : undefined}
+                  required={f.required} {...(i === 0 ? { 'data-autofocus': true } : {})} />
+              </div>
+            ))}
+            <div className="is-wide">
+              <label className="form-label" htmlFor="add-location">Localização <span className="faint" style={{ fontWeight: 400 }}>(opcional)</span></label>
+              <input id="add-location" className="form-input" type="text" placeholder="Ex.: Matola" value={addForm.location}
+                onChange={e => setAddForm(prev => ({ ...prev, location: e.target.value }))} />
             </div>
-            <form onSubmit={handleAddSubmit}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
-                {[
-                  { label: 'Nome *', name: 'name', type: 'text', placeholder: 'Nome completo' },
-                  { label: 'Email *', name: 'email', type: 'email', placeholder: 'email@exemplo.com' },
-                  { label: 'Senha *', name: 'password', type: 'password', placeholder: '8+ caracteres, Aa e número' },
-                  { label: 'Confirmar Senha *', name: 'confirmPassword', type: 'password', placeholder: 'Confirme a senha' },
-                  { label: 'Data de nascimento *', name: 'birthDate', type: 'date', placeholder: '' },
-                  { label: 'Título / Função', name: 'title', type: 'text', placeholder: 'Ex: Diácono' },
-                ].map(f => (
-                  <div key={f.name}>
-                    <label className="form-label">{f.label}</label>
-                    <input className="form-input" type={f.type} name={f.name} placeholder={f.placeholder}
-                      value={(addForm as any)[f.name]} onChange={handleAddChange}
-                      max={f.type === 'date' ? todayInput() : undefined}
-                      required={f.label.endsWith('*')} />
-                  </div>
-                ))}
-              </div>
-              {isMinorDate(addForm.birthDate) && (
-                <div style={{ marginBottom: '12px' }}>
-                  <GuardianFields value={guardian} onChange={setGuardian} />
-                </div>
-              )}
-              <div style={{ marginBottom: '20px' }}>
-                <label className="form-label">Localização</label>
-                <input className="form-input" type="text" name="location" placeholder="Ex: Lisboa"
-                  value={addForm.location} onChange={handleAddChange} />
-              </div>
-              <div className="form-btn-row">
-                <button type="button" className="form-btn" onClick={() => setShowAddModal(false)}>Cancelar</button>
-                <button type="submit" className="form-btn primary" disabled={addLoading}>
-                  {addLoading ? 'Cadastrando...' : <><span uk-icon="icon: check; ratio: 0.8"></span> Cadastrar</>}
-                </button>
-              </div>
-            </form>
           </div>
-        </div>
+          {isMinorDate(addForm.birthDate) && (
+            <div style={{ marginTop: '16px' }}>
+              <GuardianFields value={guardian} onChange={setGuardian} />
+            </div>
+          )}
+          <div className="form-btn-row">
+            <button type="button" className="form-btn" onClick={() => setShowAddModal(false)}>Cancelar</button>
+            <button type="submit" className="form-btn primary" disabled={addLoading}>
+              {addLoading ? <><span uk-spinner="ratio: 0.5"></span> Cadastrando…</> : 'Cadastrar'}
+            </button>
+          </div>
+        </Modal>
       )}
 
-      {/* EDIT MODAL */}
-      {showEditModal && editingMember && (
-        <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) { setShowEditModal(false); setEditingMember(null); } }}>
-          <div className="modal-box" style={{ maxWidth: '460px' }}>
-            <div className="modal-header">
-              <h4>Editar — {editingMember.name}</h4>
-              <button className="modal-close-btn" onClick={() => { setShowEditModal(false); setEditingMember(null); }}>
-                <span uk-icon="icon: close; ratio: 0.9"></span>
-              </button>
+      {editingMember && (
+        <Modal title={`Editar ${editingMember.name}`} onClose={() => setEditingMember(null)} width={480} onSubmit={handleEditSubmit}>
+          <div className="form-grid">
+            <div className="is-wide">
+              <label className="form-label" htmlFor="edit-name">Nome</label>
+              <input id="edit-name" className="form-input" type="text" value={editForm.name} data-autofocus onChange={e => setEditForm(prev => ({ ...prev, name: e.target.value }))} required />
             </div>
-            <form onSubmit={handleEditSubmit}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
-                <div style={{ gridColumn: '1 / -1' }}>
-                  <label className="form-label">Nome</label>
-                  <input className="form-input" type="text" name="name" value={editForm.name} onChange={handleEditChange} required />
-                </div>
-                <div>
-                  <label className="form-label">Título / Função</label>
-                  <input className="form-input" type="text" name="title" placeholder="Ex: Diácono" value={editForm.title} onChange={handleEditChange} />
-                </div>
-                <div>
-                  <label className="form-label">Data de nascimento</label>
-                  <input className="form-input" type="date" name="birthDate" max={todayInput()} value={editForm.birthDate} onChange={handleEditChange} />
-                </div>
-              </div>
-              <div style={{ marginBottom: '20px' }}>
-                <label className="form-label">Localização</label>
-                <input className="form-input" type="text" name="location" placeholder="Ex: Lisboa" value={editForm.location} onChange={handleEditChange} />
-              </div>
-              <div className="form-btn-row">
-                <button type="button" className="form-btn" onClick={() => { setShowEditModal(false); setEditingMember(null); }}>Cancelar</button>
-                <button type="submit" className="form-btn primary" disabled={editLoading}>
-                  {editLoading ? 'Salvando...' : <><span uk-icon="icon: check; ratio: 0.8"></span> Guardar</>}
-                </button>
-              </div>
-            </form>
+            <div>
+              <label className="form-label" htmlFor="edit-title">Título ou função</label>
+              <input id="edit-title" className="form-input" type="text" placeholder="Ex.: Diácono" value={editForm.title} onChange={e => setEditForm(prev => ({ ...prev, title: e.target.value }))} />
+            </div>
+            <div>
+              <label className="form-label" htmlFor="edit-birth">Data de nascimento</label>
+              <input id="edit-birth" className="form-input" type="date" max={todayInput()} value={editForm.birthDate} onChange={e => setEditForm(prev => ({ ...prev, birthDate: e.target.value }))} />
+            </div>
+            <div className="is-wide">
+              <label className="form-label" htmlFor="edit-location">Localização</label>
+              <input id="edit-location" className="form-input" type="text" placeholder="Ex.: Matola" value={editForm.location} onChange={e => setEditForm(prev => ({ ...prev, location: e.target.value }))} />
+            </div>
           </div>
-        </div>
+          <div className="form-btn-row">
+            <button type="button" className="form-btn" onClick={() => setEditingMember(null)}>Cancelar</button>
+            <button type="submit" className="form-btn primary" disabled={editLoading}>
+              {editLoading ? <><span uk-spinner="ratio: 0.5"></span> Salvando…</> : 'Salvar'}
+            </button>
+          </div>
+        </Modal>
       )}
     </div>
   );

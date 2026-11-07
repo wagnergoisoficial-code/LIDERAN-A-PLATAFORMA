@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import UIkit from 'uikit';
 import { api } from '../services/api';
+import Icon from './Icon';
+import Modal from './Modal';
 
 interface Person { id: string; name: string; role?: string; isMinor?: boolean }
 interface ReportSummary {
@@ -36,19 +38,15 @@ const name = (p?: Person | null) =>
 // Histórico de mensagens guardado na denúncia
 const MessageHistory: React.FC<{ messages: SnapshotMessage[]; highlightId?: string | null }> = ({ messages, highlightId }) => (
   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-    {messages.length === 0 && <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>Sem mensagens.</p>}
+    {messages.length === 0 && <p className="muted" style={{ fontSize: '14px' }}>Sem mensagens.</p>}
     {messages.map(m => (
-      <div key={m.id} style={{
-        padding: '8px 10px',
-        borderRadius: 'var(--radius-sm)',
-        background: m.id === highlightId ? 'var(--bg-elevated)' : 'var(--bg-surface)',
-      }}>
-        <div style={{ fontSize: '11px', color: 'var(--text-faint)', marginBottom: '2px' }}>
-          <strong style={{ color: 'var(--text-muted)' }}>{name(m.sender)}</strong> · {formatDateTime(m.createdAt)}
-          {(m.deletedAt || m.hiddenAt) && ' · apagada/ocultada depois'}
+      <div key={m.id} className={`history-msg${m.id === highlightId ? ' is-highlight' : ''}`}>
+        <div className="history-msg-meta">
+          <strong>{name(m.sender)}</strong> · {formatDateTime(m.createdAt)}
+          {(m.deletedAt || m.hiddenAt) && ' · apagada ou ocultada depois'}
           {m.id === highlightId && ' · mensagem denunciada'}
         </div>
-        <div style={{ fontSize: '13px', color: 'var(--text)', wordBreak: 'break-word' }}>{m.content}</div>
+        <div className="history-msg-text">{m.content}</div>
       </div>
     ))}
   </div>
@@ -78,8 +76,8 @@ const Snapshot: React.FC<{ snapshot: any }> = ({ snapshot }) => {
         <div className="list-label" style={{ margin: 0 }}>
           {snapshot.post.type === 'donation' ? `Doação de ${name(snapshot.post.author)} · buscar em ${snapshot.post.location}` : `Publicação de ${name(snapshot.post.author)}`}
         </div>
-        <div style={{ padding: '10px 12px', borderRadius: 'var(--radius-sm)', background: 'var(--bg-surface)', fontSize: '13px' }}>
-          {snapshot.post.content || <em style={{ color: 'var(--text-muted)' }}>Só imagem</em>}
+        <div className="history-msg" style={{ fontSize: '14px' }}>
+          {snapshot.post.content || <span className="muted">Só imagem</span>}
           {snapshot.post.imageUrl && (
             <img src={snapshot.post.imageUrl} alt="" style={{ display: 'block', maxWidth: '100%', maxHeight: '220px', marginTop: '8px', borderRadius: 'var(--radius-sm)' }} />
           )}
@@ -100,7 +98,7 @@ const Snapshot: React.FC<{ snapshot: any }> = ({ snapshot }) => {
         <a href={`https://www.youtube.com/watch?v=${snapshot.video.sourceId}`} target="_blank" rel="noreferrer" className="video-thumb" style={{ maxWidth: '320px' }}>
           <img src={`https://i.ytimg.com/vi/${snapshot.video.sourceId}/hqdefault.jpg`} alt="" />
         </a>
-        <div style={{ fontSize: '13px' }}>
+        <div style={{ fontSize: '14px' }}>
           <strong style={{ color: 'var(--text)' }}>{snapshot.video.title}</strong>
           {snapshot.video.description && <div style={{ marginTop: '4px', color: 'var(--text-muted)' }}>{snapshot.video.description}</div>}
         </div>
@@ -111,7 +109,7 @@ const Snapshot: React.FC<{ snapshot: any }> = ({ snapshot }) => {
     return (
       <>
         <div className="list-label" style={{ margin: 0 }}>Pedido de oração de {name(snapshot.prayer.author)}</div>
-        <div style={{ padding: '10px 12px', borderRadius: 'var(--radius-sm)', background: 'var(--bg-surface)', fontSize: '13px' }}>
+        <div className="history-msg" style={{ fontSize: '14px' }}>
           <strong style={{ color: 'var(--text)' }}>{snapshot.prayer.title}</strong>
           <div style={{ marginTop: '4px', wordBreak: 'break-word' }}>{snapshot.prayer.content}</div>
         </div>
@@ -121,14 +119,14 @@ const Snapshot: React.FC<{ snapshot: any }> = ({ snapshot }) => {
   // Perfil
   return (
     <>
-      <div style={{ fontSize: '13px' }}>
+      <div style={{ fontSize: '14px' }}>
         <strong style={{ color: 'var(--text)' }}>{name(snapshot.user)}</strong>
         {snapshot.user.title && <span style={{ color: 'var(--text-muted)' }}> · {snapshot.user.title}</span>}
       </div>
       <div className="list-label" style={{ margin: 0 }}>Conversa privada com quem denunciou</div>
       {snapshot.conversation
         ? <MessageHistory messages={snapshot.conversation.messages} />
-        : <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>Não há conversa privada entre os dois.</p>}
+        : <p className="muted" style={{ fontSize: '14px' }}>Não há conversa privada entre os dois.</p>}
       {snapshot.recentChatMessages.length > 0 && (
         <>
           <div className="list-label" style={{ margin: 0 }}>Mensagens recentes no chat da comunidade</div>
@@ -199,12 +197,12 @@ const ReportsPanel: React.FC<{ churchId: string }> = ({ churchId }) => {
   const openCount = reports.filter(r => r.status === 'open').length;
 
   return (
-    <div>
+    <section aria-labelledby="reports-title">
       <div className="section-head">
-        <span className="list-label">Denúncias{filter === 'open' && openCount > 0 ? ` · ${openCount} ${openCount === 1 ? 'aberta' : 'abertas'}` : ''}</span>
-        <div style={{ display: 'flex', gap: '6px' }}>
+        <h2 id="reports-title" className="list-label">Denúncias{filter === 'open' && openCount > 0 ? ` · ${openCount} ${openCount === 1 ? 'aberta' : 'abertas'}` : ''}</h2>
+        <div className="segmented" role="group" aria-label="Mostrar denúncias">
           {(['open', 'all'] as const).map(f => (
-            <button key={f} type="button" className={`uk-button uk-button-small ${filter === f ? 'uk-button-primary' : 'uk-button-default'}`} onClick={() => setFilter(f)}>
+            <button key={f} type="button" aria-pressed={filter === f} onClick={() => setFilter(f)}>
               {f === 'open' ? 'Abertas' : 'Todas'}
             </button>
           ))}
@@ -213,45 +211,37 @@ const ReportsPanel: React.FC<{ churchId: string }> = ({ churchId }) => {
 
       <div className="card">
         {loading ? (
-          <div style={{ padding: '20px', textAlign: 'center' }}><span uk-spinner="ratio: 0.7"></span></div>
+          <div className="loading-block" style={{ padding: '24px' }}><span uk-spinner="ratio: 0.7"></span></div>
         ) : reports.length === 0 ? (
-          <p style={{ margin: 0, padding: '16px', fontSize: '13px', color: 'var(--text-muted)' }}>
+          <p className="list-empty">
             {filter === 'open' ? 'Nenhuma denúncia em aberto.' : 'Ainda não houve denúncias nesta comunidade.'}
           </p>
         ) : (
           reports.map(r => (
             <button key={r.id} type="button" className="conversation-item" onClick={() => open(r.id)}>
-              <span uk-icon="icon: warning; ratio: 0.8"></span>
+              <span className="group-avatar" style={{ width: 40, height: 40 }}><Icon name="flag" size={18} /></span>
               <span style={{ flex: 1, minWidth: 0 }}>
                 <span className="conversation-name">
-                  {TYPE_LABELS[r.targetType]}{r.targetUser ? ` · ${name(r.targetUser)}` : ''}
+                  <span className="truncate">{TYPE_LABELS[r.targetType]}{r.targetUser ? ` · ${name(r.targetUser)}` : ''}</span>
                 </span>
                 <span className="conversation-preview" style={{ display: 'block' }}>
                   Enviada por {name(r.reporter)} · {formatDateTime(r.createdAt)}
                 </span>
               </span>
-              <span className="uk-label">{STATUS_LABELS[r.status]}</span>
+              <span className="tag">{STATUS_LABELS[r.status]}</span>
             </button>
           ))
         )}
       </div>
 
       {detail && (
-        <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setDetail(null); }}>
-          <div className="modal-box" style={{ maxWidth: '640px' }}>
-            <div className="modal-header">
-              <h4>Denúncia — {TYPE_LABELS[detail.targetType]}</h4>
-              <button className="modal-close-btn" onClick={() => setDetail(null)} aria-label="Fechar">
-                <span uk-icon="icon: close; ratio: 0.9"></span>
-              </button>
-            </div>
-
-            <div className="protection-row" style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-              <span className="uk-label">{STATUS_LABELS[detail.status]}</span>
+        <Modal title={`Denúncia: ${TYPE_LABELS[detail.targetType]}`} onClose={() => setDetail(null)} width={640}>
+            <div className="protection-row" style={{ fontSize: '14px', color: 'var(--text-muted)' }}>
+              <span className="tag">{STATUS_LABELS[detail.status]}</span>
               <span>Enviada por <strong style={{ color: 'var(--text)' }}>{name(detail.reporter)}</strong> em {formatDateTime(detail.createdAt)}</span>
             </div>
-            {detail.details && <p style={{ margin: '10px 0 0', fontSize: '13px' }}>“{detail.details}”</p>}
-            {detail.resolution && <p style={{ margin: '10px 0 0', fontSize: '13px', color: 'var(--text-muted)' }}>Resultado: {detail.resolution}</p>}
+            {detail.details && <p style={{ margin: '10px 0 0', fontSize: '14px' }}>“{detail.details}”</p>}
+            {detail.resolution && <p className="muted" style={{ margin: '10px 0 0', fontSize: '14px' }}>Resultado: {detail.resolution}</p>}
 
             <div className="protection-section" style={{ maxHeight: '46vh', overflowY: 'auto' }}>
               <Snapshot snapshot={detail.snapshot} />
@@ -262,7 +252,7 @@ const ReportsPanel: React.FC<{ churchId: string }> = ({ churchId }) => {
                 <>
                   {detail.targetUser && (
                     <div className="protection-row">
-                      <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{name(detail.targetUser)}:</span>
+                      <span className="muted" style={{ fontSize: '14px' }}>{name(detail.targetUser)}:</span>
                       <select className="uk-select" value={days} onChange={e => setDays(Number(e.target.value))} style={{ width: 'auto' }} aria-label="Duração da suspensão">
                         {SUSPENSION_DAYS.map(d => <option key={d} value={d}>{d} {d === 1 ? 'dia' : 'dias'}</option>)}
                       </select>
@@ -272,7 +262,7 @@ const ReportsPanel: React.FC<{ churchId: string }> = ({ churchId }) => {
                   )}
                   <div className="protection-row">
                     <button className="uk-button uk-button-success uk-button-small" onClick={() => setStatus('resolved')} disabled={busy}>
-                      <span uk-icon="icon: check; ratio: 0.75"></span> Marcar como resolvida
+                      <Icon name="check" size={16} /> Marcar como resolvida
                     </button>
                     <button className="uk-button uk-button-default uk-button-small" onClick={() => setStatus('dismissed')} disabled={busy}>Arquivar sem ação</button>
                   </div>
@@ -283,10 +273,9 @@ const ReportsPanel: React.FC<{ churchId: string }> = ({ churchId }) => {
                 </div>
               )}
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
-    </div>
+    </section>
   );
 };
 

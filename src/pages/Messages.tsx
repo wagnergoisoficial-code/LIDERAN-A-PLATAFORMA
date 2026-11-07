@@ -3,7 +3,11 @@ import { Link, useSearchParams } from 'react-router-dom';
 import UIkit from 'uikit';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useCommunity } from '../lib/community';
+import { shortTime, fullDate } from '../lib/format';
 import Avatar from '../components/Avatar';
+import Icon from '../components/Icon';
+import Modal from '../components/Modal';
 import PageHeader from '../components/PageHeader';
 import ReportButton from '../components/ReportButton';
 
@@ -18,20 +22,15 @@ interface ConversationItem {
 }
 interface DirectMessage { id: string; content: string; createdAt: string; sender: Person; fromMe: boolean }
 
-const formatTime = (value: string) => {
-  const date = new Date(value);
-  return date.toDateString() === new Date().toDateString()
-    ? date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-    : date.toLocaleDateString('pt-BR', { day: 'numeric', month: 'short' });
-};
-
 const Messages = () => {
   const { user } = useAuth();
+  const { community } = useCommunity();
   const [params, setParams] = useSearchParams();
   const activeId = params.get('c');
 
   const [conversations, setConversations] = useState<ConversationItem[]>([]);
   const [loadingList, setLoadingList] = useState(true);
+  const [filter, setFilter] = useState('');
   const [active, setActive] = useState<ConversationItem | null>(null);
   const [messages, setMessages] = useState<DirectMessage[]>([]);
   const [loadingThread, setLoadingThread] = useState(false);
@@ -47,7 +46,7 @@ const Messages = () => {
     try {
       const res = await api.getConversations();
       if (res.success) setConversations(res.data);
-    } catch { /* lista mantém-se */ }
+    } catch { /* a lista mantém-se */ }
     finally { setLoadingList(false); }
   }, []);
 
@@ -100,7 +99,7 @@ const Messages = () => {
     return () => clearInterval(timer);
   }, [activeId]);
 
-  useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+  useEffect(() => { endRef.current?.scrollIntoView({ block: 'end' }); }, [messages]);
 
   const send = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -110,10 +109,11 @@ const Messages = () => {
       const res = await api.sendDirectMessage(activeId, text.trim());
       setMessages(prev => [...prev, res.data]);
       lastAt.current = res.data.createdAt;
+      // O texto só sai do campo depois de a mensagem ser enviada
       setText('');
       loadList();
     } catch (err: any) {
-      UIkit.notification({ message: err.message || 'Erro ao enviar', status: 'danger', pos: 'top-right' });
+      UIkit.notification({ message: err.message || 'A mensagem não foi enviada. Tente de novo.', status: 'danger', pos: 'top-right' });
     } finally {
       setSending(false);
     }
@@ -126,7 +126,7 @@ const Messages = () => {
       setMessages(prev => prev.filter(m => m.id !== messageId));
       loadList();
     } catch (err: any) {
-      UIkit.notification({ message: err.message || 'Erro ao apagar', status: 'danger', pos: 'top-right' });
+      UIkit.notification({ message: err.message || 'Não foi possível apagar', status: 'danger', pos: 'top-right' });
     }
   };
 
@@ -154,46 +154,61 @@ const Messages = () => {
   };
 
   const filteredMembers = (members || []).filter(m => m.name.toLowerCase().includes(query.trim().toLowerCase()));
+  const filteredConversations = conversations.filter(c => (c.with?.name || 'Membro').toLowerCase().includes(filter.trim().toLowerCase()));
 
   return (
-    <div className="chat-page">
+    <div>
       <PageHeader
-        icon="mail"
         title="Mensagens"
-        subtitle="Conversas privadas com membros da comunidade. Os líderes da comunidade podem lê-las."
+        subtitle="Conversas privadas com pessoas da sua comunidade. Os líderes da comunidade podem lê-las."
         actions={(
-          <button className="uk-button uk-button-primary" onClick={openPicker}>
-            <span uk-icon="icon: plus; ratio: 0.8"></span> Nova conversa
+          <button type="button" className="uk-button uk-button-primary" onClick={openPicker}>
+            <Icon name="plus" size={18} /> Nova conversa
           </button>
         )}
       />
 
-      <div className={`messages-layout${activeId ? ' has-active' : ''}`}>
+      <div className={`messages${activeId ? ' has-active' : ''}`}>
         {/* Lista de conversas */}
-        <div className="card messages-list">
+        <div className="messages-list">
+          <div className="messages-list-head">
+            <label className="visually-hidden" htmlFor="conversation-filter">Buscar conversa</label>
+            <input id="conversation-filter" className="form-input" type="search" placeholder="Buscar conversa" value={filter} onChange={e => setFilter(e.target.value)}
+              style={{ height: '40px', borderRadius: '20px' }} />
+          </div>
           <div className="messages-scroll">
+            {community && !filter && (
+              <Link to="/chat" className="conversation-item">
+                <span className="group-avatar"><Icon name="users" /></span>
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span className="conversation-name"><span className="truncate">Chat da comunidade</span></span>
+                  <span className="conversation-preview" style={{ display: 'block' }}>Grupo com todos de {community.name}</span>
+                </span>
+              </Link>
+            )}
             {loadingList ? (
-              <div style={{ padding: '32px', textAlign: 'center' }}><span uk-spinner="ratio: 0.8"></span></div>
-            ) : conversations.length === 0 ? (
-              <div style={{ padding: '32px 20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
-                Ainda não tem conversas. Toque em “Nova conversa” para falar com alguém da comunidade.
-              </div>
+              <div className="loading-block" role="status" aria-label="Carregando conversas"><span uk-spinner="ratio: 0.8"></span></div>
+            ) : filteredConversations.length === 0 ? (
+              <p className="list-empty">
+                {filter ? 'Nenhuma conversa com esse nome.' : 'Ainda não tem conversas privadas. Toque em “Nova conversa” para falar com alguém da comunidade.'}
+              </p>
             ) : (
-              conversations.map(c => (
-                <button key={c.id} type="button" className={`conversation-item${c.id === activeId ? ' is-active' : ''}`} onClick={() => setParams({ c: c.id })}>
-                  <Avatar name={c.with?.name || '?'} profileImage={c.with?.profileImage || undefined} size="small" />
+              filteredConversations.map(c => (
+                <button key={c.id} type="button" className={`conversation-item${c.id === activeId ? ' is-active' : ''}`}
+                  aria-current={c.id === activeId ? 'true' : undefined} onClick={() => setParams({ c: c.id })}>
+                  <Avatar name={c.with?.name || '?'} profileImage={c.with?.profileImage} size={44} />
                   <span style={{ flex: 1, minWidth: 0 }}>
                     <span className="conversation-name">
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.with?.name || 'Membro'}</span>
-                      {c.protected && <span uk-icon="icon: lock; ratio: 0.6" title="Conversa protegida"></span>}
+                      <span className="truncate">{c.with?.name || 'Membro'}</span>
+                      {c.protected && <Icon name="lock" size={14} className="faint" />}
                     </span>
-                    <span className="conversation-preview" style={{ display: 'block' }}>
+                    <span className="conversation-preview" style={{ display: 'block', fontWeight: c.unread && c.id !== activeId ? 600 : undefined, color: c.unread && c.id !== activeId ? 'var(--text)' : undefined }}>
                       {c.lastMessage ? `${c.lastMessage.fromMe ? 'Você: ' : ''}${c.lastMessage.content}` : 'Sem mensagens'}
                     </span>
                   </span>
                   <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px', flexShrink: 0 }}>
-                    <span style={{ fontSize: '11px', color: 'var(--text-faint)' }}>{formatTime(c.lastMessageAt)}</span>
-                    {!!c.unread && c.id !== activeId && <span className="unread-badge">{c.unread > 9 ? '9+' : c.unread}</span>}
+                    <span className="faint" style={{ fontSize: '12px' }}>{shortTime(c.lastMessageAt)}</span>
+                    {!!c.unread && c.id !== activeId && <span className="unread-badge" aria-label={`${c.unread} não lidas`}>{c.unread > 9 ? '9+' : c.unread}</span>}
                   </span>
                 </button>
               ))
@@ -202,64 +217,50 @@ const Messages = () => {
         </div>
 
         {/* Conversa aberta */}
-        <div className="card messages-thread">
+        <div className="messages-thread">
           {!activeId ? (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '10px', color: 'var(--text-faint)', padding: '24px', textAlign: 'center' }}>
-              <span uk-icon="icon: mail; ratio: 2.2" style={{ color: 'var(--border-strong)' }}></span>
-              <p style={{ margin: 0, fontSize: '13px' }}>Escolha uma conversa ou comece uma nova.</p>
+            <div className="messages-empty">
+              <Icon name="messages" size={36} strokeWidth={1.5} className="faint" />
+              <p>Escolha uma conversa ou comece uma nova.</p>
             </div>
           ) : (
             <>
-              <div className="card-header">
-                <span style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
-                  <button type="button" className="action-btn messages-back" title="Voltar às conversas" onClick={() => setParams({})}>
-                    <span uk-icon="icon: chevron-left; ratio: 0.9"></span>
-                  </button>
-                  {active?.with && (
-                    <>
-                      <Avatar name={active.with.name} profileImage={active.with.profileImage || undefined} size="small" />
-                      <Link to={`/profile/${active.with.id}`} style={{ color: 'var(--text)', fontWeight: 600, fontSize: '14px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {active.with.name}
-                      </Link>
-                    </>
-                  )}
-                </span>
-                {activeId && <ReportButton targetType="conversation" targetId={activeId} compact />}
+              <div className="thread-head">
+                <button type="button" className="action-btn messages-back" aria-label="Voltar às conversas" onClick={() => setParams({})}>
+                  <Icon name="arrow-left" />
+                </button>
+                {active?.with && <Avatar name={active.with.name} profileImage={active.with.profileImage} size={40} />}
+                <div className="thread-head-text">
+                  {active?.with ? (
+                    <Link to={`/profile/${active.with.id}`} className="thread-title">{active.with.name}</Link>
+                  ) : <span className="thread-title">{loadingThread ? 'Carregando…' : 'Conversa'}</span>}
+                  {active?.with?.title && <span className="thread-sub">{active.with.title}</span>}
+                </div>
+                <ReportButton targetType="conversation" targetId={activeId} compact />
               </div>
 
               {active?.protected && (
                 <div className="protected-note">
-                  <span uk-icon="icon: lock; ratio: 0.7"></span>
+                  <Icon name="lock" size={16} />
                   Conversa com menor de idade: as mensagens não podem ser apagadas e o responsável pode lê-las.
                 </div>
               )}
 
-              <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div className="thread-body" aria-live="polite">
                 {loadingThread ? (
-                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span uk-spinner="ratio: 1"></span></div>
+                  <div className="loading-block" style={{ flex: 1 }}><span uk-spinner="ratio: 1"></span></div>
                 ) : messages.length === 0 ? (
-                  <p style={{ margin: 'auto', fontSize: '13px', color: 'var(--text-faint)' }}>Diga olá a {active?.with?.name || 'este membro'}.</p>
+                  <p style={{ margin: 'auto', color: 'var(--text-muted)', fontSize: '14px' }}>Diga olá para {active?.with?.name || 'este membro'}.</p>
                 ) : (
                   messages.map(m => (
-                    <div key={m.id} className={`msg-in dm-row${m.fromMe ? ' is-own' : ''}`}
-                      style={{ display: 'flex', alignItems: 'flex-end', gap: '6px', flexDirection: m.fromMe ? 'row-reverse' : 'row' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: m.fromMe ? 'flex-end' : 'flex-start', maxWidth: '70%' }}>
-                        <div style={{
-                          padding: '9px 13px',
-                          borderRadius: 'var(--radius-lg)',
-                          background: m.fromMe ? 'var(--accent)' : 'var(--bg-elevated)',
-                          color: m.fromMe ? '#fff' : 'var(--text)',
-                          fontSize: '13px',
-                          lineHeight: 1.5,
-                          wordBreak: 'break-word',
-                        }}>
-                          {m.content}
-                        </div>
-                        <span style={{ fontSize: '11px', color: 'var(--text-faint)', marginTop: '3px' }}>{formatTime(m.createdAt)}</span>
+                    <div key={m.id} className={`msg-row msg-in${m.fromMe ? ' is-own' : ''}`}>
+                      <div className="msg-stack">
+                        <div className="bubble">{m.content}</div>
+                        <time className="msg-time" dateTime={m.createdAt} title={fullDate(m.createdAt)}>{shortTime(m.createdAt)}</time>
                       </div>
                       {m.fromMe && !active?.protected && (
-                        <button type="button" className="action-btn dm-delete" title="Apagar mensagem" onClick={() => remove(m.id)}>
-                          <span uk-icon="icon: trash; ratio: 0.7"></span>
+                        <button type="button" className="action-btn msg-delete" aria-label="Apagar mensagem" title="Apagar mensagem" onClick={() => remove(m.id)}>
+                          <Icon name="trash" size={16} />
                         </button>
                       )}
                     </div>
@@ -268,19 +269,12 @@ const Messages = () => {
                 <div ref={endRef} />
               </div>
 
-              <form onSubmit={send} style={{ padding: '12px 16px', borderTop: '1px solid var(--border)', display: 'flex', gap: '10px', alignItems: 'center', flexShrink: 0 }}>
-                <input
-                  type="text"
-                  className="uk-input"
-                  placeholder="Escreva uma mensagem..."
-                  value={text}
-                  onChange={e => setText(e.target.value)}
-                  disabled={sending}
-                  maxLength={2000}
-                  style={{ flex: 1 }}
-                />
-                <button type="submit" className="uk-button uk-button-primary" disabled={sending || !text.trim()}>
-                  {sending ? <span uk-spinner="ratio: 0.5"></span> : <><span uk-icon="icon: arrow-right; ratio: 0.85"></span> Enviar</>}
+              <form className="thread-composer" onSubmit={send}>
+                <label className="visually-hidden" htmlFor="dm-text">Mensagem</label>
+                <input id="dm-text" type="text" placeholder="Escreva uma mensagem" value={text}
+                  onChange={e => setText(e.target.value)} maxLength={2000} autoComplete="off" />
+                <button type="submit" className="send-btn" aria-label="Enviar mensagem" disabled={sending || !text.trim()}>
+                  {sending ? <span uk-spinner="ratio: 0.5"></span> : <Icon name="send" size={18} />}
                 </button>
               </form>
             </>
@@ -290,34 +284,27 @@ const Messages = () => {
 
       {/* Escolher com quem conversar */}
       {picker && (
-        <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setPicker(false); }}>
-          <div className="modal-box" style={{ maxWidth: '440px' }}>
-            <div className="modal-header">
-              <h4>Nova conversa</h4>
-              <button className="modal-close-btn" onClick={() => setPicker(false)} aria-label="Fechar">
-                <span uk-icon="icon: close; ratio: 0.9"></span>
-              </button>
-            </div>
-            <input className="uk-input" placeholder="Procurar membro" value={query} onChange={e => setQuery(e.target.value)} autoFocus />
-            <div style={{ marginTop: '12px', maxHeight: '360px', overflowY: 'auto' }}>
-              {members === null ? (
-                <div style={{ padding: '24px', textAlign: 'center' }}><span uk-spinner="ratio: 0.8"></span></div>
-              ) : filteredMembers.length === 0 ? (
-                <p style={{ margin: '16px 0', fontSize: '13px', color: 'var(--text-muted)', textAlign: 'center' }}>Nenhum membro encontrado.</p>
-              ) : (
-                filteredMembers.map(m => (
-                  <button key={m.id} type="button" className="conversation-item" onClick={() => startWith(m.id)}>
-                    <Avatar name={m.name} profileImage={m.profileImage || undefined} size="small" />
-                    <span style={{ flex: 1, minWidth: 0 }}>
-                      <span className="conversation-name">{m.name}</span>
-                      {m.title && <span className="conversation-preview" style={{ display: 'block' }}>{m.title}</span>}
-                    </span>
-                  </button>
-                ))
-              )}
-            </div>
+        <Modal title="Nova conversa" onClose={() => setPicker(false)} width={440}>
+          <label className="visually-hidden" htmlFor="picker-search">Buscar pessoa</label>
+          <input id="picker-search" className="form-input" type="search" placeholder="Buscar pessoa" value={query} onChange={e => setQuery(e.target.value)} data-autofocus />
+          <div style={{ margin: '12px -24px 0', maxHeight: '50vh', overflowY: 'auto' }}>
+            {members === null ? (
+              <div className="loading-block"><span uk-spinner="ratio: 0.8"></span></div>
+            ) : filteredMembers.length === 0 ? (
+              <p className="list-empty" style={{ textAlign: 'center' }}>Ninguém encontrado.</p>
+            ) : (
+              filteredMembers.map(m => (
+                <button key={m.id} type="button" className="conversation-item" style={{ paddingLeft: '24px', paddingRight: '24px' }} onClick={() => startWith(m.id)}>
+                  <Avatar name={m.name} profileImage={m.profileImage} size={40} />
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <span className="conversation-name"><span className="truncate">{m.name}</span></span>
+                    {m.title && <span className="conversation-preview" style={{ display: 'block' }}>{m.title}</span>}
+                  </span>
+                </button>
+              ))
+            )}
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

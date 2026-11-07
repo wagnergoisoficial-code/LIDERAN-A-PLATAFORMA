@@ -1,13 +1,26 @@
 import React, { useState } from 'react';
 import UIkit from 'uikit';
 import { api } from '../services/api';
+import Icon from './Icon';
 
-type TargetType = 'conversation' | 'community_chat' | 'post' | 'prayer_request' | 'video' | 'profile';
+export type ReportTarget = 'conversation' | 'community_chat' | 'post' | 'prayer_request' | 'video' | 'profile';
+
+/** Envia a denúncia ao líder da comunidade (com o histórico); devolve false se falhar. */
+export const sendReport = async (targetType: ReportTarget, targetId: string) => {
+  try {
+    await api.createReport({ targetType, targetId });
+    UIkit.notification({ message: 'Denúncia enviada ao líder da comunidade', status: 'success', pos: 'top-right' });
+    return true;
+  } catch (err: any) {
+    UIkit.notification({ message: err.message || 'Não foi possível enviar a denúncia', status: 'danger', pos: 'top-right' });
+    return false;
+  }
+};
 
 interface ReportButtonProps {
-  targetType: TargetType;
+  targetType: ReportTarget;
   targetId: string;
-  // compact: só o ícone (cartões e cabeçalhos de conversa); senão, botão com texto
+  // compact: só o ícone (cabeçalhos de conversa); senão, botão com texto
   compact?: boolean;
 }
 
@@ -21,30 +34,24 @@ const ReportButton: React.FC<ReportButtonProps> = ({ targetType, targetId, compa
   const report = async () => {
     if (state !== 'idle') return;
     setCurrent({ target, state: 'sending' });
-    try {
-      await api.createReport({ targetType, targetId });
-      setCurrent({ target, state: 'sent' });
-      UIkit.notification({ message: 'Denúncia enviada ao líder da comunidade', status: 'success', pos: 'top-right' });
-    } catch (err: any) {
-      setCurrent({ target, state: 'idle' });
-      UIkit.notification({ message: err.message || 'Não foi possível enviar a denúncia', status: 'danger', pos: 'top-right' });
-    }
+    const ok = await sendReport(targetType, targetId);
+    setCurrent({ target, state: ok ? 'sent' : 'idle' });
   };
 
-  const title = state === 'sent' ? 'Denúncia enviada' : 'Denunciar';
+  const label = state === 'sent' ? 'Denúncia enviada' : 'Denunciar';
 
   if (compact) {
     return (
-      <button type="button" className="action-btn" title={title} aria-label={title} onClick={report} disabled={state !== 'idle'}>
-        <span uk-icon={`icon: ${state === 'sent' ? 'check' : 'warning'}; ratio: 0.8`}></span>
+      <button type="button" className="action-btn" title={label} aria-label={label} onClick={report} disabled={state !== 'idle'}>
+        <Icon name={state === 'sent' ? 'check' : 'flag'} />
       </button>
     );
   }
 
   return (
     <button type="button" className="uk-button uk-button-default" onClick={report} disabled={state !== 'idle'}>
-      <span uk-icon={`icon: ${state === 'sent' ? 'check' : 'warning'}; ratio: 0.8`}></span>
-      {state === 'sent' ? 'Denúncia enviada' : 'Denunciar'}
+      <Icon name={state === 'sent' ? 'check' : 'flag'} size={18} />
+      {label}
     </button>
   );
 };

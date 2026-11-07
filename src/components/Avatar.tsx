@@ -2,65 +2,62 @@ import React, { useState } from 'react';
 
 interface AvatarProps {
   name: string;
-  profileImage?: string;
-  size?: 'small' | 'medium' | 'large';
+  profileImage?: string | null;
+  // Em píxeis, ou um dos tamanhos antigos
+  size?: 'small' | 'medium' | 'large' | number;
   className?: string;
 }
 
+const NAMED_SIZES = { small: 32, medium: 44, large: 64 };
+
 const getInitials = (name: string): string => {
   if (!name) return '?';
-  return name.split(' ').map(p => p[0]).filter(Boolean).join('').toUpperCase().slice(0, 2) || '?';
+  const parts = name.trim().split(/\s+/);
+  const letters = parts.length > 1 ? parts[0][0] + parts[parts.length - 1][0] : parts[0].slice(0, 1);
+  return letters.toUpperCase() || '?';
 };
 
 const Avatar: React.FC<AvatarProps> = ({ name: nameProp, profileImage, size = 'medium', className }) => {
   const name = nameProp || '';
   // Foto que não carregou: mostra as iniciais (volta a tentar se a foto mudar)
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
-  const sizeMap = {
-    small:  { width: '32px', height: '32px', fontSize: '11px' },
-    medium: { width: '44px', height: '44px', fontSize: '14px' },
-    large:  { width: '64px', height: '64px', fontSize: '18px' },
-  };
-  const s = sizeMap[size];
+  const px = typeof size === 'number' ? size : NAMED_SIZES[size];
+  const style: React.CSSProperties = { width: px, height: px, flexShrink: 0, borderRadius: '50%' };
+  const classes = `avatar-circle${className ? ` ${className}` : ''}`;
 
   if (profileImage && failedSrc !== profileImage) {
     return (
       <img
         src={profileImage}
-        alt={name}
-        className={`avatar-circle${className ? ` ${className}` : ''}`}
-        style={{
-          width: s.width, height: s.height,
-          objectFit: 'cover',
-          display: 'block',
-          border: '1px solid var(--border)',
-          flexShrink: 0,
-        }}
+        alt=""
+        className={classes}
+        style={{ ...style, display: 'block', objectFit: 'cover', background: 'var(--bg-elevated)' }}
         onError={() => setFailedSrc(profileImage)}
+        loading="lazy"
+        decoding="async"
       />
     );
   }
 
   return (
-    <div
-      className={`avatar-circle${className ? ` ${className}` : ''}`}
+    <span
+      className={classes}
+      aria-hidden="true"
       style={{
-        width: s.width, height: s.height,
-        backgroundColor: 'var(--bg-elevated)',
-        color: 'var(--text-muted)',
-        display: 'flex',
+        ...style,
+        display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
+        background: 'var(--bg-elevated)',
+        color: 'var(--text-muted)',
+        fontSize: Math.max(11, Math.round(px * 0.36)),
         fontWeight: 600,
-        fontSize: s.fontSize,
-        border: '1px solid var(--border)',
-        flexShrink: 0,
         letterSpacing: '0.02em',
+        userSelect: 'none',
       }}
-      title={name}
     >
       {getInitials(name)}
-    </div>
+    </span>
   );
 };
 

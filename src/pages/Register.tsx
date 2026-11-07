@@ -47,8 +47,8 @@ const Register = () => {
   return (
     <AuthLayout
       title="Criar conta"
-      subtitle="Crie sua conta de líder. Para abrir a comunidade, vai enviar os dados da sua igreja e documentos para verificação."
-      footer={<>Já tem uma conta? <Link to="/login">Entrar</Link>. Foi convidado por um líder? Use o link que ele lhe enviou.</>}
+      subtitle="Crie sua conta de líder. Para abrir a comunidade, você vai enviar os dados da sua igreja e documentos para verificação."
+      footer={<>Já tem uma conta? <Link to="/login">Entrar</Link>. Recebeu um convite de um líder? Use o link que ele enviou.</>}
     >
       <form onSubmit={handleRegister}>
         <div className="auth-field">

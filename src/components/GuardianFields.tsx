@@ -75,12 +75,12 @@ const GuardianFields: React.FC<GuardianFieldsProps> = ({ value, onChange, intro 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
         {value.mode === 'new' && (
           <div style={{ gridColumn: '1 / -1' }}>
-            <label className="form-label" htmlFor="guardian-name">Nome do responsável *</label>
+            <label className="form-label" htmlFor="guardian-name">Nome do responsável</label>
             <input id="guardian-name" className="form-input" type="text" value={value.name} onChange={e => set({ name: e.target.value })} required />
           </div>
         )}
         <div>
-          <label className="form-label" htmlFor="guardian-email">Email do responsável *</label>
+          <label className="form-label" htmlFor="guardian-email">E-mail do responsável</label>
           <input id="guardian-email" className="form-input" type="email" value={value.email} onChange={e => set({ email: e.target.value })} required />
         </div>
         <div>
@@ -91,7 +91,7 @@ const GuardianFields: React.FC<GuardianFieldsProps> = ({ value, onChange, intro 
         </div>
         {value.mode === 'new' && (
           <div style={{ gridColumn: '1 / -1' }}>
-            <label className="form-label" htmlFor="guardian-password">Senha inicial do responsável *</label>
+            <label className="form-label" htmlFor="guardian-password">Senha inicial do responsável</label>
             <input id="guardian-password" className="form-input" type="password" placeholder="8+ caracteres, Aa e número" minLength={8}
               value={value.password} onChange={e => set({ password: e.target.value })} required />
           </div>

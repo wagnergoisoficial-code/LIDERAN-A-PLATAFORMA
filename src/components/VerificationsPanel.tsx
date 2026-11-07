@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import UIkit from 'uikit';
 import { api } from '../services/api';
+import Icon from './Icon';
+import Modal from './Modal';
 
 interface VerificationDocument { id: string; kind: 'identity' | 'leadership'; mimeType: string; size: number }
 interface Verification {
@@ -19,8 +21,8 @@ interface Verification {
   documents: VerificationDocument[];
 }
 
-const STATUS_LABELS: Record<string, string> = { pending: 'Por analisar', approved: 'Aprovado', rejected: 'Recusado' };
-const DOCUMENT_LABELS: Record<string, string> = { identity: 'Documento de identificação', leadership: 'Comprovativo de liderança' };
+const STATUS_LABELS: Record<string, string> = { pending: 'Para analisar', approved: 'Aprovado', rejected: 'Recusado' };
+const DOCUMENT_LABELS: Record<string, string> = { identity: 'Documento de identificação', leadership: 'Comprovante de liderança' };
 const formatDate = (value: string) => new Date(value).toLocaleDateString('pt-BR', { day: 'numeric', month: 'short', year: 'numeric' });
 
 // Painel do administrador: pedidos de verificação de líderes, com os documentos e a decisão
@@ -81,13 +83,13 @@ const VerificationsPanel: React.FC = () => {
   const pendingCount = list.filter(v => v.status === 'pending').length;
 
   return (
-    <div style={{ marginBottom: '24px' }}>
+    <section style={{ marginBottom: '28px' }} aria-labelledby="verifications-title">
       <div className="section-head">
-        <span className="list-label">Verificações de líderes{filter === 'pending' && pendingCount > 0 ? ` · ${pendingCount} por analisar` : ''}</span>
-        <div style={{ display: 'flex', gap: '6px' }}>
+        <h2 id="verifications-title" className="list-label">Verificações de líderes{filter === 'pending' && pendingCount > 0 ? ` · ${pendingCount} para analisar` : ''}</h2>
+        <div className="segmented" role="group" aria-label="Mostrar pedidos">
           {(['pending', 'all'] as const).map(f => (
-            <button key={f} type="button" className={`uk-button uk-button-small ${filter === f ? 'uk-button-primary' : 'uk-button-default'}`} onClick={() => setFilter(f)}>
-              {f === 'pending' ? 'Por analisar' : 'Todas'}
+            <button key={f} type="button" aria-pressed={filter === f} onClick={() => setFilter(f)}>
+              {f === 'pending' ? 'Para analisar' : 'Todas'}
             </button>
           ))}
         </div>
@@ -95,41 +97,33 @@ const VerificationsPanel: React.FC = () => {
 
       <div className="card">
         {loading ? (
-          <div style={{ padding: '20px', textAlign: 'center' }}><span uk-spinner="ratio: 0.7"></span></div>
+          <div className="loading-block" style={{ padding: '24px' }}><span uk-spinner="ratio: 0.7"></span></div>
         ) : list.length === 0 ? (
-          <p style={{ margin: 0, padding: '16px', fontSize: '13px', color: 'var(--text-muted)' }}>
-            {filter === 'pending' ? 'Nenhum pedido por analisar.' : 'Ainda não houve pedidos de verificação.'}
+          <p className="list-empty">
+            {filter === 'pending' ? 'Nenhum pedido para analisar.' : 'Ainda não houve pedidos de verificação.'}
           </p>
         ) : list.map(v => (
           <button key={v.id} type="button" className="conversation-item" onClick={() => { setOpen(v); setReason(''); }}>
-            <span uk-icon="icon: user; ratio: 0.8"></span>
+            <span className="group-avatar" style={{ width: 40, height: 40 }}><Icon name="shield" size={18} /></span>
             <span style={{ flex: 1, minWidth: 0 }}>
-              <span className="conversation-name">{v.user.name} · {v.churchName}</span>
+              <span className="conversation-name"><span className="truncate">{v.user.name} · {v.churchName}</span></span>
               <span className="conversation-preview" style={{ display: 'block' }}>
                 {v.position} · {v.city}, {v.region} · enviado em {formatDate(v.submittedAt)}
               </span>
             </span>
-            <span className="uk-label">{STATUS_LABELS[v.status]}</span>
+            <span className="tag">{STATUS_LABELS[v.status]}</span>
           </button>
         ))}
       </div>
 
       {open && (
-        <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setOpen(null); }}>
-          <div className="modal-box" style={{ maxWidth: '560px' }}>
-            <div className="modal-header">
-              <h4>Verificação — {open.user.name}</h4>
-              <button className="modal-close-btn" onClick={() => setOpen(null)} aria-label="Fechar">
-                <span uk-icon="icon: close; ratio: 0.9"></span>
-              </button>
-            </div>
-
-            <div className="protection-row" style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-              <span className="uk-label">{STATUS_LABELS[open.status]}</span>
+        <Modal title={`Verificação de ${open.user.name}`} onClose={() => setOpen(null)} width={560}>
+            <div className="protection-row" style={{ fontSize: '14px', color: 'var(--text-muted)' }}>
+              <span className="tag">{STATUS_LABELS[open.status]}</span>
               <span>{open.user.email} · enviado em {formatDate(open.submittedAt)}</span>
             </div>
             {open.status === 'rejected' && open.reason && (
-              <p style={{ margin: '10px 0 0', fontSize: '13px', color: 'var(--text-muted)' }}>Motivo da recusa: {open.reason}</p>
+              <p className="muted" style={{ margin: '10px 0 0', fontSize: '14px' }}>Motivo da recusa: {open.reason}</p>
             )}
 
             <div className="protection-section">
@@ -147,7 +141,7 @@ const VerificationsPanel: React.FC = () => {
               <div className="protection-row">
                 {open.documents.map(doc => (
                   <button key={doc.id} type="button" className="uk-button uk-button-default uk-button-small" onClick={() => openDocument(doc)}>
-                    <span uk-icon={`icon: ${doc.mimeType === 'application/pdf' ? 'file-pdf' : 'image'}; ratio: 0.75`}></span> {DOCUMENT_LABELS[doc.kind]}
+                    <Icon name={doc.mimeType === 'application/pdf' ? 'file-pdf' : 'image'} size={16} /> {DOCUMENT_LABELS[doc.kind]}
                   </button>
                 ))}
               </div>
@@ -155,20 +149,19 @@ const VerificationsPanel: React.FC = () => {
 
             {open.status === 'pending' && (
               <div className="protection-section">
-                <textarea className="form-input" rows={2} style={{ height: 'auto', padding: '8px' }} maxLength={500}
+                <textarea className="form-input" rows={2} maxLength={500} aria-label="Motivo da recusa"
                   placeholder="Motivo, se recusar (o líder vai vê-lo)" value={reason} onChange={e => setReason(e.target.value)} />
                 <div className="protection-row">
                   <button className="uk-button uk-button-success uk-button-small" onClick={() => decide('approved')} disabled={busy}>
-                    <span uk-icon="icon: check; ratio: 0.75"></span> Aprovar líder
+                    <Icon name="check" size={16} /> Aprovar líder
                   </button>
                   <button className="uk-button uk-button-danger uk-button-small" onClick={() => decide('rejected')} disabled={busy}>Recusar</button>
                 </div>
               </div>
             )}
-          </div>
-        </div>
+        </Modal>
       )}
-    </div>
+    </section>
   );
 };
 

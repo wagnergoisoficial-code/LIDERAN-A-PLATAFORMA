@@ -1,136 +1,274 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useLayoutEffect, useMemo, useRef } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import UIkit from 'uikit';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import UIkit from 'uikit';
+import { useCommunity, FEED_CHANGED_EVENT, FeedKind } from '../lib/community';
+import { timeOnly, firstName, plural } from '../lib/format';
+import { celebrate } from '../lib/motion';
 import Avatar from '../components/Avatar';
-import PageHeader from '../components/PageHeader';
+import Icon from '../components/Icon';
+import Modal from '../components/Modal';
 import EmptyState from '../components/EmptyState';
-import ReportButton from '../components/ReportButton';
-import AnimatedNumber from '../components/AnimatedNumber';
-import { pop, burst } from '../lib/motion';
+import DateChip from '../components/DateChip';
+import { useComposer } from '../components/Composer';
+import { EventFormModal } from '../components/EventForm';
+import {
+  Post, Prayer, Devotional, Video, Poll, EventItem, Person, PostReactions, EMPTY_REACTIONS, isPinnedPost,
+  PostCard, PrayerCard, DevotionalCard, VideoCard, PollCard, EventCard,
+} from '../components/FeedCards';
 
-interface Comment {
-  id: string; content: string; userId: string;
-  userName: string; userProfileImage?: string; createdAt: string;
-}
-interface PostReactions { amen: number; praying: number; heart: number; fire: number; strong: number; }
-const EMPTY_REACTIONS: PostReactions = { amen: 0, praying: 0, heart: 0, fire: 0, strong: 0 };
-interface Post {
-  id: string; content: string; imageUrl?: string;
-  isPinned?: boolean; type?: string;
-  churchId?: string; churchName?: string | null;
-  location?: string | null; latitude?: number | null; longitude?: number | null; donatedAt?: string | null;
-  userId?: string; userName: string; userProfileImage?: string;
-  createdAt: string; comments: Comment[];
-  reactions?: PostReactions; myReactions?: string[];
-}
-interface PollOption { id: string; text: string; votes: number; percentage: number; hasVoted: boolean; }
-interface Poll { id: string; question: string; expiresAt?: string; createdBy: string; totalVotes: number; options: PollOption[]; myVoteOptionId: string | null; isExpired?: boolean; }
-interface RankMember { userId: string; name: string; posts: number; comments: number; messages: number; total: number; percentage: number; }
+interface Member extends Person { title?: string | null; role?: string }
+interface MemberStat { userId: string; name: string; profileImage?: string; posts: number; comments: number; total: number }
 
-const REACTION_CONFIG = [
-  { type: 'amen',    icon: 'star',           label: 'Amém'    },
-  { type: 'praying', icon: 'settings',       label: 'Orando'  },
-  { type: 'heart',   icon: 'heart',          label: 'Amor'    },
-  { type: 'fire',    icon: 'bolt',           label: 'Fogo'    },
-  { type: 'strong',  icon: 'happy',          label: 'Forte'   },
-];
+// Tudo o que a comunidade partilha, num só sítio
+interface Extras { prayers: Prayer[]; devotionals: Devotional[]; videos: Video[]; waiting: Video[]; polls: Poll[]; events: EventItem[] }
+const EMPTY_EXTRAS: Extras = { prayers: [], devotionals: [], videos: [], waiting: [], polls: [], events: [] };
+
+type Item =
+  | { kind: 'post'; key: string; at: number; post: Post }
+  | { kind: 'prayer'; key: string; at: number; prayer: Prayer }
+  | { kind: 'devotional'; key: string; at: number; devotional: Devotional }
+  | { kind: 'video'; key: string; at: number; video: Video }
+  | { kind: 'poll'; key: string; at: number; poll: Poll }
+  | { kind: 'event'; key: string; at: number; event: EventItem };
+
+const time = (value: string) => new Date(value).getTime();
+const notify = (message: string, status: 'success' | 'danger' = 'danger') => UIkit.notification({ message, status, pos: 'top-right' });
+
+// O feed fica guardado ao sair: ao voltar, reaparece igual e na mesma posição de leitura
+interface FeedCache { key: string; posts: Post[]; nextCursor: string | null; extras: Extras; members: Member[]; scrollY: number }
+let feedCache: FeedCache | null = null;
 
 const Feed = () => {
   const { user } = useAuth();
-  const [posts, setPosts] = useState<Post[]>([]);
-  const [polls, setPolls] = useState<Poll[]>([]);
-  const [ranking, setRanking] = useState<RankMember[]>([]);
-  const [loadingPosts, setLoadingPosts] = useState(true);
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const { community } = useCommunity();
+  const { openComposer } = useComposer();
+  const navigate = useNavigate();
+  const isLeader = user?.role === 'leader' || user?.role === 'admin';
+  const cacheKey = `${user?.id}:${user?.churchId}`;
+  const restored = useRef(feedCache?.key === cacheKey ? feedCache : null).current;
+  const restoreY = useRef(restored?.scrollY || 0);
+
+  const [posts, setPosts] = useState<Post[]>(restored?.posts || []);
+  const [nextCursor, setNextCursor] = useState<string | null>(restored?.nextCursor ?? null);
+  const [extras, setExtras] = useState<Extras>(restored?.extras || EMPTY_EXTRAS);
+  const [members, setMembers] = useState<Member[]>(restored?.members || []);
+  const [active, setActive] = useState<MemberStat[]>([]);
+  const [loading, setLoading] = useState(!restored);
+  const [loadError, setLoadError] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  // O que chegou depois deste instante só aparece quando a pessoa pede (a leitura não salta)
+  const [cutoff, setCutoff] = useState(Infinity);
+  const [viewer, setViewer] = useState<string | null>(null);
+  const [editingEvent, setEditingEvent] = useState<EventItem | null>(null);
+  const loadingMoreRef = useRef(false);
+  const shownUntil = useRef(0);
+  const sentinel = useRef<HTMLDivElement>(null);
 
-  const loadPosts = useCallback(async () => {
-    try {
-      const result = await api.getPosts();
-      if (result.success) {
-        setPosts(result.data);
-        setNextCursor(result.nextCursor || null);
-      }
-    } catch { setPosts([]); }
-    finally { setLoadingPosts(false); }
+  useEffect(() => {
+    feedCache = { key: cacheKey, posts, nextCursor, extras, members, scrollY: feedCache?.key === cacheKey ? feedCache.scrollY : 0 };
+  }, [cacheKey, posts, nextCursor, extras, members]);
+
+  // Guarda a posição enquanto se lê (o listener sai antes de a página seguinte voltar ao topo)
+  useLayoutEffect(() => {
+    const onScroll = () => { if (feedCache?.key === cacheKey) feedCache.scrollY = window.scrollY; };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, [cacheKey]);
+
+  // Repõe a posição; as imagens podem ainda estar a ocupar espaço, por isso tenta durante 1 s
+  useEffect(() => {
+    const target = restoreY.current;
+    if (!target) return;
+    let tries = 0;
+    let stopped = false;
+    const stop = () => { stopped = true; };
+    window.addEventListener('wheel', stop, { once: true, passive: true });
+    window.addEventListener('touchstart', stop, { once: true, passive: true });
+    const attempt = () => {
+      if (stopped) return;
+      window.scrollTo(0, target);
+      if (Math.abs(window.scrollY - target) > 2 && tries++ < 20) setTimeout(attempt, 50);
+    };
+    requestAnimationFrame(attempt);
+    return () => {
+      stopped = true;
+      window.removeEventListener('wheel', stop);
+      window.removeEventListener('touchstart', stop);
+    };
   }, []);
 
-  // Próxima página do feed (sem repetir publicações já mostradas)
-  const loadMore = async () => {
-    if (!nextCursor || loadingMore) return;
-    setLoadingMore(true);
-    try {
-      const result = await api.getPosts(nextCursor);
-      if (result.success) {
-        setPosts(prev => [...prev, ...result.data.filter((p: Post) => !prev.some(existing => existing.id === p.id))]);
-        setNextCursor(result.nextCursor || null);
-      }
-    } catch (err: any) {
-      UIkit.notification({ message: err.message || 'Erro ao carregar publicações', status: 'danger', pos: 'top-right' });
-    } finally {
-      setLoadingMore(false);
+  const loadExtras = useCallback(async (only?: FeedKind) => {
+    const want = (kind: FeedKind) => !only || only === kind;
+    const patch = (change: Partial<Extras>) => setExtras(prev => ({ ...prev, ...change }));
+    await Promise.allSettled([
+      want('prayer') && api.getPrayerRequests().then(res => patch({ prayers: res.data || [] })),
+      want('devotional') && api.getDevotionals().then(res => patch({ devotionals: (res.data || []).filter((d: Devotional) => d.isActive) })),
+      want('video') && api.getVideos().then(res => patch({ videos: res.data?.videos || [], waiting: res.data?.waiting || [] })),
+      want('poll') && api.getPolls().then(res => patch({ polls: res.data || [] })),
+      want('event') && api.getEvents().then(res => patch({ events: res.data || [] })),
+    ]);
+  }, []);
+
+  // Primeira página das publicações: "replace" recomeça; "merge" junta as novas às que já estão
+  const loadPosts = useCallback(async (mode: 'replace' | 'merge') => {
+    const res = await api.getPosts();
+    if (!res.success) return;
+    const fresh: Post[] = res.data;
+    if (mode === 'replace') {
+      setPosts(fresh);
+      setNextCursor(res.nextCursor || null);
+    } else {
+      const byId = new Map(fresh.map(p => [p.id, p]));
+      setPosts(prev => [...fresh.filter(p => !prev.some(old => old.id === p.id)), ...prev.map(p => byId.get(p.id) || p)]);
     }
-  };
-
-  const loadPolls = useCallback(async () => {
-    try {
-      const res = await api.getPolls();
-      if (res.success) setPolls(res.data.slice(0, 3));
-    } catch { /* silent */ }
   }, []);
 
-  const loadRanking = useCallback(async () => {
-    if (!user?.churchId) return;
-    try {
-      const res = await api.getChurchMemberStats(user.churchId);
-      if (res.success) setRanking((res.data || []).slice(0, 5));
-    } catch { /* silent */ }
+  // Atualização em segundo plano: o que for novo fica guardado atrás do aviso
+  const refresh = useCallback(async () => {
+    setCutoff(c => (c === Infinity ? shownUntil.current : c));
+    await Promise.allSettled([loadPosts('merge'), loadExtras()]);
+  }, [loadPosts, loadExtras]);
+
+  useEffect(() => {
+    if (!user?.churchId) { setLoading(false); return; }
+    if (restored) {
+      refresh();
+    } else {
+      Promise.allSettled([loadPosts('replace'), loadExtras()]).then(([postsResult]) => {
+        setLoadError(postsResult.status === 'rejected');
+        setLoading(false);
+      });
+    }
+    api.getUsers().then(res => setMembers(res.data || [])).catch(() => {});
+    api.getChurchMemberStats(user.churchId).then(res => {
+      setActive((res.data || []).filter((m: MemberStat) => m.userId !== user.id && m.total > 0).slice(0, 4));
+    }).catch(() => {});
+    const timer = setInterval(() => { if (document.visibilityState === 'visible') refresh(); }, 60000);
+    return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.churchId]);
 
-  useEffect(() => { loadPosts(); loadPolls(); loadRanking(); }, [loadPosts, loadPolls, loadRanking]);
+  // O que a própria pessoa publica (no diálogo ou na agenda) entra logo
+  useEffect(() => {
+    const onChanged = (e: Event) => {
+      const { kind, item } = (e as CustomEvent<{ kind: FeedKind; item?: any }>).detail;
+      setCutoff(Infinity);
+      if (kind === 'post' && item?.id) setPosts(prev => [item, ...prev.filter(p => p.id !== item.id)]);
+      else if (kind === 'prayer' && item?.id) setExtras(prev => ({ ...prev, prayers: [item, ...prev.prayers.filter(p => p.id !== item.id)] }));
+      else if (kind === 'event' && item?.id) setExtras(prev => ({ ...prev, events: [...prev.events.filter(ev => ev.id !== item.id), item] }));
+      else if (kind === 'poll' && item?.id) setExtras(prev => ({ ...prev, polls: [item, ...prev.polls.filter(p => p.id !== item.id)] }));
+      else loadExtras(kind);
+    };
+    window.addEventListener(FEED_CHANGED_EVENT, onChanged);
+    return () => window.removeEventListener(FEED_CHANGED_EVENT, onChanged);
+  }, [loadExtras]);
 
-  const handleReact = async (postId: string, type: string, hasReacted: boolean) => {
+  const loadMore = useCallback(async () => {
+    if (!nextCursor || loadingMoreRef.current) return;
+    loadingMoreRef.current = true;
+    setLoadingMore(true);
     try {
-      if (hasReacted) {
-        await api.removeReaction(postId, type);
-      } else {
-        await api.reactToPost(postId, type);
+      const res = await api.getPosts(nextCursor);
+      if (res.success) {
+        setPosts(prev => [...prev, ...res.data.filter((p: Post) => !prev.some(existing => existing.id === p.id))]);
+        setNextCursor(res.nextCursor || null);
       }
-      setPosts(prev => prev.map(p => {
-        if (p.id !== postId) return p;
-        const newReactions = { ...(p.reactions ?? EMPTY_REACTIONS) };
-        const currentMyReactions = p.myReactions ?? [];
-        if (hasReacted) {
-          newReactions[type as keyof PostReactions] = Math.max(0, newReactions[type as keyof PostReactions] - 1);
-          return { ...p, reactions: newReactions, myReactions: currentMyReactions.filter(r => r !== type) };
-        } else {
-          newReactions[type as keyof PostReactions] += 1;
-          return { ...p, reactions: newReactions, myReactions: [...currentMyReactions, type] };
-        }
-      }));
     } catch (err: any) {
-      UIkit.notification({ message: err.message || 'Erro', status: 'danger', pos: 'top-right' });
+      notify(err.message || 'Não foi possível carregar mais publicações');
+    } finally {
+      loadingMoreRef.current = false;
+      setLoadingMore(false);
+    }
+  }, [nextCursor]);
+
+  // Rolar até ao fim carrega a página seguinte
+  useEffect(() => {
+    const el = sentinel.current;
+    if (!el || !nextCursor) return;
+    const observer = new IntersectionObserver(entries => { if (entries[0].isIntersecting) loadMore(); }, { rootMargin: '600px 0px' });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [nextCursor, loadMore]);
+
+  const membersById = useMemo(() => new Map(members.map(m => [m.id, m])), [members]);
+
+  // Fixados e devocionais do dia no topo; o resto por data. Os itens mais antigos que a última
+  // publicação carregada só entram quando a página dessa altura chegar (a ordem não salta).
+  const { featured, stream, pending } = useMemo(() => {
+    const regular = posts.filter(p => !isPinnedPost(p));
+    const horizon = nextCursor && regular.length ? Math.min(...regular.map(p => time(p.createdAt))) : -Infinity;
+    const videoIds = new Set<string>();
+    const videos = [...extras.waiting, ...extras.videos].filter(v => (videoIds.has(v.id) ? false : (videoIds.add(v.id), true)));
+    const all: Item[] = [
+      ...regular.map(post => ({ kind: 'post' as const, key: `post:${post.id}`, at: time(post.createdAt), post })),
+      ...extras.prayers.map(prayer => ({ kind: 'prayer' as const, key: `prayer:${prayer.id}`, at: time(prayer.createdAt), prayer })),
+      ...videos.map(video => ({ kind: 'video' as const, key: `video:${video.id}`, at: time(video.createdAt), video })),
+      ...extras.polls.map(poll => ({ kind: 'poll' as const, key: `poll:${poll.id}`, at: time(poll.createdAt), poll })),
+      ...extras.events.map(event => ({ kind: 'event' as const, key: `event:${event.id}`, at: time(event.createdAt), event })),
+    ];
+    const ordered = all.filter(item => item.kind === 'post' || item.at >= horizon).sort((a, b) => b.at - a.at);
+    const top: Item[] = [
+      ...posts.filter(isPinnedPost).map(post => ({ kind: 'post' as const, key: `post:${post.id}`, at: time(post.createdAt), post })),
+      ...[...extras.devotionals].sort((a, b) => time(b.createdAt) - time(a.createdAt))
+        .map(devotional => ({ kind: 'devotional' as const, key: `devotional:${devotional.id}`, at: time(devotional.createdAt), devotional })),
+    ];
+    return { featured: top, stream: ordered.filter(item => item.at <= cutoff), pending: ordered.filter(item => item.at > cutoff).length };
+  }, [posts, nextCursor, extras, cutoff]);
+
+  shownUntil.current = Math.max(0, ...stream.map(item => item.at));
+
+  const showPending = () => {
+    setCutoff(Infinity);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  /* ─── Ações ─── */
+  const patchPost = (postId: string, change: (p: Post) => Post) => setPosts(prev => prev.map(p => (p.id === postId ? change(p) : p)));
+  // Substitui (ou, com null, retira) um item de uma das listas do feed
+  const patchList = <K extends keyof Extras>(list: K, id: string, change: (item: Extras[K][number]) => Extras[K][number] | null) =>
+    setExtras(prev => ({
+      ...prev,
+      [list]: (prev[list] as Extras[K][number][]).map(item => (item.id === id ? change(item) : item)).filter(Boolean),
+    }));
+
+  const handleReact = async (postId: string, type: keyof PostReactions, hasReacted: boolean) => {
+    // Muda já no ecrã; se o servidor recusar, volta atrás
+    const apply = (p: Post, add: boolean) => {
+      const reactions = { ...(p.reactions ?? EMPTY_REACTIONS) };
+      reactions[type] = Math.max(0, reactions[type] + (add ? 1 : -1));
+      const mine = p.myReactions ?? [];
+      return { ...p, reactions, myReactions: add ? [...mine, type] : mine.filter(r => r !== type) };
+    };
+    patchPost(postId, p => apply(p, !hasReacted));
+    try {
+      if (hasReacted) await api.removeReaction(postId, type);
+      else await api.reactToPost(postId, type);
+    } catch (err: any) {
+      patchPost(postId, p => apply(p, hasReacted));
+      notify(err.message || 'Não foi possível reagir');
     }
   };
 
   const handlePin = async (postId: string, isPinned: boolean) => {
     try {
       await api.pinPost(postId, !isPinned);
-      setPosts(prev => prev.map(p => p.id === postId ? { ...p, isPinned: !isPinned } : p));
+      patchPost(postId, p => ({ ...p, isPinned: !isPinned }));
+      notify(isPinned ? 'Publicação desafixada' : 'Publicação fixada no topo', 'success');
     } catch (err: any) {
-      UIkit.notification({ message: err.message || 'Erro', status: 'danger', pos: 'top-right' });
+      notify(err.message || 'Não foi possível concluir');
     }
   };
 
   const handleAddComment = async (postId: string, content: string) => {
     try {
       const result = await api.addComment(postId, { content });
-      if (result.success) {
-        setPosts(prev => prev.map(p => p.id === postId ? { ...p, comments: [...p.comments, result.data] } : p));
-      }
+      if (result.success) patchPost(postId, p => ({ ...p, comments: [...p.comments, result.data] }));
+      return true;
     } catch (err: any) {
-      UIkit.notification({ message: err.message || 'Erro ao comentar', status: 'danger', pos: 'top-right' });
+      notify(err.message || 'Não foi possível comentar');
+      return false;
     }
   };
 
@@ -139,19 +277,19 @@ const Feed = () => {
     try {
       await api.deletePost(postId);
       setPosts(prev => prev.filter(p => p.id !== postId));
-      UIkit.notification({ message: 'Publicação excluída', status: 'success', pos: 'top-right' });
+      notify('Publicação excluída', 'success');
     } catch (err: any) {
-      UIkit.notification({ message: err.message || 'Erro ao excluir', status: 'danger', pos: 'top-right' });
+      notify(err.message || 'Não foi possível excluir');
     }
   };
 
   const handleDonated = async (postId: string, donated: boolean) => {
     try {
       const res = await api.setDonated(postId, donated);
-      setPosts(prev => prev.map(p => p.id === postId ? { ...p, donatedAt: res.data.donatedAt } : p));
-      UIkit.notification({ message: res.message, status: 'success', pos: 'top-right' });
+      patchPost(postId, p => ({ ...p, donatedAt: res.data.donatedAt }));
+      notify(res.message, 'success');
     } catch (err: any) {
-      UIkit.notification({ message: err.message || 'Erro', status: 'danger', pos: 'top-right' });
+      notify(err.message || 'Não foi possível concluir');
     }
   };
 
@@ -159,18 +297,95 @@ const Feed = () => {
     if (!confirm('Excluir este comentário?')) return;
     try {
       await api.deleteComment(postId, commentId);
-      setPosts(prev => prev.map(p => p.id === postId ? { ...p, comments: p.comments.filter(c => c.id !== commentId) } : p));
+      patchPost(postId, p => ({ ...p, comments: p.comments.filter(c => c.id !== commentId) }));
     } catch (err: any) {
-      UIkit.notification({ message: err.message || 'Erro ao excluir comentário', status: 'danger', pos: 'top-right' });
+      notify(err.message || 'Não foi possível excluir o comentário');
+    }
+  };
+
+  const handlePray = async (id: string, hasPrayed: boolean) => {
+    try {
+      const res = hasPrayed ? await api.unprayForRequest(id) : await api.prayForRequest(id);
+      if (res.data) patchList('prayers', id, () => res.data);
+    } catch (err: any) {
+      notify(err.message || 'Não foi possível concluir');
+    }
+  };
+
+  const handleAnswered = async (id: string, origin?: DOMRect) => {
+    try {
+      const res = await api.markPrayerAnswered(id);
+      celebrate(origin, ['--success', '--accent', '--success-dark']);
+      if (res.data) patchList('prayers', id, () => res.data);
+      notify('Oração respondida. Glória a Deus!', 'success');
+    } catch (err: any) {
+      notify(err.message || 'Não foi possível concluir');
+    }
+  };
+
+  const handleDeletePrayer = async (id: string) => {
+    if (!confirm('Excluir este pedido de oração?')) return;
+    try {
+      await api.deletePrayerRequest(id);
+      patchList('prayers', id, () => null);
+    } catch (err: any) {
+      notify(err.message || 'Não foi possível excluir');
+    }
+  };
+
+  const handleLikeDevotional = async (id: string) => {
+    try {
+      const res = await api.likeDevotional(id);
+      if (res.success) patchList('devotionals', id, d => ({ ...d, hasLiked: res.data.liked, likeCount: res.data.likeCount }));
+    } catch (err: any) {
+      notify(err.message || 'Não foi possível registrar o Amém');
+    }
+  };
+
+  const handleRetireDevotional = async (id: string) => {
+    if (!confirm('Retirar este devocional do feed? Você pode publicar de novo no Painel do líder.')) return;
+    try {
+      await api.markDevotionalInactive(id);
+      patchList('devotionals', id, () => null);
+      notify('Devocional retirado do feed', 'success');
+    } catch (err: any) {
+      notify(err.message || 'Não foi possível retirar');
+    }
+  };
+
+  const handleReviewVideo = async (video: Video, status: 'approved' | 'rejected') => {
+    let reason: string | undefined;
+    if (status === 'rejected') {
+      const answer = prompt(`Recusar "${video.title}"? Escreva o motivo para o autor (opcional):`);
+      if (answer === null) return;
+      reason = answer;
+    }
+    try {
+      await api.reviewVideo(video.id, status, reason);
+      notify(status === 'approved' ? 'Vídeo aprovado: já aparece para todas as comunidades' : 'Vídeo recusado', 'success');
+      loadExtras('video');
+    } catch (err: any) {
+      notify(err.message || 'Não foi possível concluir');
+    }
+  };
+
+  const handleDeleteVideo = async (video: Video) => {
+    if (!confirm(`Apagar o vídeo "${video.title}"?`)) return;
+    try {
+      await api.deleteVideo(video.id);
+      setExtras(prev => ({ ...prev, videos: prev.videos.filter(v => v.id !== video.id), waiting: prev.waiting.filter(v => v.id !== video.id) }));
+      notify('Vídeo apagado', 'success');
+    } catch (err: any) {
+      notify(err.message || 'Não foi possível apagar');
     }
   };
 
   const handleVotePoll = async (pollId: string, optionId: string) => {
     try {
       const res = await api.votePoll(pollId, optionId);
-      if (res.success && res.data) setPolls(prev => prev.map(p => p.id === pollId ? res.data : p));
+      if (res.success && res.data) patchList('polls', pollId, () => res.data);
     } catch (err: any) {
-      UIkit.notification({ message: err.message || 'Erro', status: 'danger', pos: 'top-right' });
+      notify(err.message || 'Não foi possível votar');
     }
   };
 
@@ -178,356 +393,263 @@ const Feed = () => {
     if (!confirm('Excluir esta enquete?')) return;
     try {
       await api.deletePoll(pollId);
-      setPolls(prev => prev.filter(p => p.id !== pollId));
+      patchList('polls', pollId, () => null);
     } catch (err: any) {
-      UIkit.notification({ message: err.message || 'Erro ao excluir enquete', status: 'danger', pos: 'top-right' });
+      notify(err.message || 'Não foi possível excluir a enquete');
     }
   };
 
-  const isLeader = user?.role === 'leader' || user?.role === 'admin';
+  const handleRsvp = async (eventId: string, status: string) => {
+    try {
+      const res = await api.rsvpEvent(eventId, status);
+      if (res.success && res.data) patchList('events', eventId, () => res.data);
+    } catch (err: any) {
+      notify(err.message || 'Não foi possível responder');
+    }
+  };
 
-  const pinnedPosts = posts.filter(p => p.isPinned === true || p.type === 'announcement');
-  const regularPosts = posts.filter(p => !p.isPinned && p.type !== 'announcement');
+  const handleDeleteEvent = async (eventId: string) => {
+    if (!confirm('Excluir este encontro?')) return;
+    try {
+      await api.deleteEvent(eventId);
+      patchList('events', eventId, () => null);
+      notify('Encontro excluído', 'success');
+    } catch (err: any) {
+      notify(err.message || 'Não foi possível excluir');
+    }
+  };
+
+  const startConversation = async (userId: string) => {
+    try {
+      const res = await api.startConversation(userId);
+      navigate(`/messages?c=${res.data.id}`);
+    } catch (err: any) {
+      notify(err.message || 'Não foi possível abrir a conversa');
+    }
+  };
+
+  const invite = async () => {
+    if (!user?.churchId) return;
+    try {
+      const res = await api.getChurchInvite(user.churchId);
+      await navigator.clipboard.writeText(`${window.location.origin}/convite/${res.data.code}`);
+      notify('Link de convite copiado. Quem entrar por ele fica na sua comunidade.', 'success');
+    } catch {
+      // Sem acesso à área de transferência: o link está no Painel do líder
+      navigate('/dashboard');
+    }
+  };
+
+  if (!user?.churchId) {
+    return (
+      <div className="page is-narrow">
+        <h1 className="visually-hidden">Feed</h1>
+        <div className="card">
+          <EmptyState
+            icon="users"
+            title="Você ainda não participa de uma comunidade"
+            text={isLeader ? 'Crie sua comunidade no Painel do líder para começar.' : 'Peça ao líder da sua comunidade o link de convite.'}
+            action={isLeader && <Link className="uk-button uk-button-primary" to="/dashboard">Abrir o Painel do líder</Link>}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  const me = { id: user.id, name: user.name, role: user.role, churchId: user.churchId, profileImage: user.profileImage };
+  const person = (id: string): Person | null => membersById.get(id) || null;
+  const people = members.filter(m => m.id !== user.id);
+  const upcoming = extras.events
+    .filter(e => time(e.startDate) >= Date.now())
+    .sort((a, b) => time(a.startDate) - time(b.startDate))
+    .slice(0, 3);
+
+  const renderItem = (item: Item) => {
+    switch (item.kind) {
+      case 'post':
+        return <PostCard key={item.key} post={item.post} me={me} onDonated={handleDonated} onOpenImage={setViewer} onComment={handleAddComment}
+          onReact={handleReact} onPin={handlePin} onDelete={handleDeletePost} onDeleteComment={handleDeleteComment} />;
+      case 'prayer':
+        return <PrayerCard key={item.key} prayer={item.prayer} me={me} onPray={handlePray} onAnswered={handleAnswered} onDelete={handleDeletePrayer} />;
+      case 'devotional':
+        return <DevotionalCard key={item.key} devotional={item.devotional} me={me} onLike={handleLikeDevotional} onRetire={handleRetireDevotional} />;
+      case 'video':
+        return <VideoCard key={item.key} video={item.video} me={me} onReview={handleReviewVideo} onDelete={handleDeleteVideo} />;
+      case 'poll':
+        return <PollCard key={item.key} poll={item.poll} me={me} creator={person(item.poll.createdBy)} onVote={handleVotePoll} onDelete={handleDeletePoll} />;
+      case 'event':
+        return <EventCard key={item.key} event={item.event} me={me} creator={person(item.event.createdBy)} onRsvp={handleRsvp} onEdit={setEditingEvent} onDelete={handleDeleteEvent} />;
+    }
+  };
+
+  const empty = !featured.length && !stream.length;
 
   return (
-    <div className="uk-grid uk-grid-medium" uk-grid="">
-      {/* Main feed */}
-      <div className="uk-width-2-3@m">
+    <div className="feed-layout">
+      <h1 className="visually-hidden">Feed</h1>
 
-        <PageHeader icon="rss" title="Feed da Comunidade" subtitle="Mensagens e inspirações compartilhadas pela comunidade" />
+      <div className="feed-main">
+        <section className="composer-entry" aria-label="Publicar">
+          <div className="composer-entry-row">
+            <Avatar name={user.name} profileImage={user.profileImage} size={40} />
+            <button type="button" className="composer-trigger" onClick={() => openComposer()}>
+              O que você quer compartilhar, {firstName(user.name)}?
+            </button>
+          </div>
+          <div className="composer-chips">
+            <button type="button" className="ghost-btn" onClick={() => openComposer('photo')}><Icon name="image" /> Foto</button>
+            <button type="button" className="ghost-btn" onClick={() => openComposer('video')}><Icon name="videos" /> Vídeo</button>
+            <button type="button" className="ghost-btn" onClick={() => openComposer('prayer')}><Icon name="praying" /> Oração</button>
+            <button type="button" className="ghost-btn" onClick={() => openComposer('donation')}><Icon name="gift" /> Doação</button>
+          </div>
+        </section>
 
-        {/* Pinned Announcements */}
-        {pinnedPosts.length > 0 && (
-          <div className="stagger" style={{ marginBottom: '24px' }}>
-            <div className="list-label">Fixados</div>
-            {pinnedPosts.map(post => (
-              <PostCard key={post.id} post={post} currentUserId={user?.id || ''} currentChurchId={user?.churchId || null} userRole={user?.role || ''} onDonated={handleDonated}
-                onComment={handleAddComment} onReact={handleReact} onPin={handlePin} onDelete={handleDeletePost} onDeleteComment={handleDeleteComment} pinned />
+        {(people.length > 0 || isLeader) && (
+          <section aria-labelledby="people-title">
+            <div className="people-strip-head">
+              <h2 id="people-title">Pessoas da comunidade</h2>
+              <Link className="section-link" to="/users">Ver todas</Link>
+            </div>
+            <div className="people-strip">
+              {isLeader && (
+                <button type="button" className="person" onClick={invite} title="Copiar o link de convite da comunidade">
+                  <span className="person-add"><Icon name="user-plus" size={22} /></span>
+                  <span className="person-name">Convidar</span>
+                </button>
+              )}
+              {people.slice(0, 20).map(m => (
+                <Link key={m.id} to={`/profile/${m.id}`} className="person" title={m.name} aria-label={m.name}>
+                  <Avatar name={m.name} profileImage={m.profileImage} size={56} />
+                  <span className="person-name" aria-hidden="true">{firstName(m.name)}</span>
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
+
+        <section aria-labelledby="posts-title">
+          <div className="feed-heading" style={{ marginBottom: '10px' }}>
+            <h2 id="posts-title">Publicações</h2>
+          </div>
+
+          {loading ? (
+            <div aria-busy="true" aria-label="Carregando o feed"><PostSkeleton /><PostSkeleton /></div>
+          ) : loadError && empty ? (
+            <div className="card">
+              <EmptyState icon="warning" title="Não foi possível carregar o feed" text="Verifique a conexão com a internet e tente de novo."
+                action={<button type="button" className="uk-button uk-button-default" onClick={() => {
+                  setLoading(true);
+                  Promise.allSettled([loadPosts('replace'), loadExtras()]).then(([r]) => { setLoadError(r.status === 'rejected'); setLoading(false); });
+                }}>Tentar de novo</button>} />
+            </div>
+          ) : empty ? (
+            <div className="card">
+              <EmptyState icon="pencil" title="Ainda não há nada no feed" text="Comece a conversa: compartilhe uma foto, um vídeo, um versículo ou um pedido de oração."
+                action={<button type="button" className="uk-button uk-button-primary" onClick={() => openComposer()}><Icon name="plus" size={18} /> Publicar</button>} />
+            </div>
+          ) : (
+            <>
+              {featured.map(renderItem)}
+              {stream.map(renderItem)}
+              <div ref={sentinel} />
+              {nextCursor ? (
+                <div className="feed-end">
+                  <button type="button" className="uk-button uk-button-default" onClick={loadMore} disabled={loadingMore}>
+                    {loadingMore ? <><span uk-spinner="ratio: 0.5"></span> Carregando…</> : 'Carregar mais'}
+                  </button>
+                </div>
+              ) : (
+                <p className="feed-end">Você chegou ao fim do feed.</p>
+              )}
+            </>
+          )}
+        </section>
+      </div>
+
+      <aside className="feed-rail" aria-label="Na sua comunidade">
+        {community && (
+          <div className="rail-section">
+            <div className="rail-community-name">{community.name}</div>
+            <div className="rail-community-meta">
+              {plural(community.memberCount || 0, 'membro', 'membros')} · <Link to="/comunidade">Ver comunidade</Link>
+            </div>
+          </div>
+        )}
+
+        <div className="rail-section">
+          <div className="rail-head">
+            <h2>Próximos encontros</h2>
+            <Link className="section-link" to="/events">Agenda</Link>
+          </div>
+          {upcoming.length === 0 ? (
+            <p className="rail-item-meta" style={{ whiteSpace: 'normal' }}>Nenhum encontro marcado.</p>
+          ) : upcoming.map(e => (
+            <Link key={e.id} to="/events" className="rail-item">
+              <DateChip date={e.startDate} />
+              <span className="rail-item-body">
+                <span className="rail-item-title" style={{ display: 'block' }}>{e.title}</span>
+                <span className="rail-item-meta" style={{ display: 'block' }}>{timeOnly(e.startDate)}{e.location ? ` · ${e.location}` : ''}</span>
+              </span>
+            </Link>
+          ))}
+        </div>
+
+        {active.length > 0 && (
+          <div className="rail-section">
+            <div className="rail-head">
+              <h2>Mais ativos</h2>
+              <Link className="section-link" to="/users">Membros</Link>
+            </div>
+            {active.map(m => (
+              <div key={m.userId} className="rail-item">
+                <Link to={`/profile/${m.userId}`} aria-hidden="true" tabIndex={-1}><Avatar name={m.name} profileImage={m.profileImage} size={36} /></Link>
+                <span className="rail-item-body">
+                  <Link to={`/profile/${m.userId}`} className="rail-item-title" style={{ display: 'block', color: 'var(--text)' }}>{m.name}</Link>
+                  <span className="rail-item-meta" style={{ display: 'block' }}>{plural(m.posts, 'publicação', 'publicações')} · {plural(m.comments, 'comentário', 'comentários')}</span>
+                </span>
+                <button type="button" className="action-btn" aria-label={`Enviar mensagem para ${m.name}`} title="Enviar mensagem" onClick={() => startConversation(m.userId)}>
+                  <Icon name="messages" />
+                </button>
+              </div>
             ))}
           </div>
         )}
+      </aside>
 
-        {/* Regular posts */}
-        {loadingPosts ? (
-          <div style={{ textAlign: 'center', padding: '60px 0' }}><span uk-spinner="ratio: 2"></span></div>
-        ) : regularPosts.length === 0 && pinnedPosts.length === 0 ? (
-          <EmptyState icon="pencil" title="Nenhum post ainda" text="Seja o primeiro a compartilhar algo inspirador" />
-        ) : (
-          <>
-            <div className="stagger">
-              {regularPosts.map(post => (
-                <PostCard key={post.id} post={post} currentUserId={user?.id || ''} currentChurchId={user?.churchId || null} userRole={user?.role || ''} onDonated={handleDonated}
-                  onComment={handleAddComment} onReact={handleReact} onPin={handlePin} onDelete={handleDeletePost} onDeleteComment={handleDeleteComment} />
-              ))}
-            </div>
-            {nextCursor && (
-              <div style={{ textAlign: 'center', margin: '8px 0 24px' }}>
-                <button className="uk-button uk-button-default" onClick={loadMore} disabled={loadingMore}>
-                  {loadingMore ? <><span uk-spinner="ratio: 0.5"></span> Carregando...</> : 'Carregar mais'}
-                </button>
-              </div>
-            )}
-          </>
-        )}
-      </div>
+      {pending > 0 && (
+        <button type="button" className="new-posts-pill" onClick={showPending}>
+          <Icon name="arrow-up" size={16} strokeWidth={2} />
+          {pending === 1 ? '1 novidade' : `${pending} novidades`}
+        </button>
+      )}
 
-      {/* Sidebar */}
-      <div className="uk-width-1-3@m uk-visible@m">
-        <div style={{ position: 'sticky', top: '72px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      {viewer && (
+        <Modal title="Imagem da publicação" hideTitle variant="media" onClose={() => setViewer(null)}>
+          <img src={viewer} alt="" className="media-full" />
+        </Modal>
+      )}
 
-          {/* Weekly Ranking */}
-          {ranking.length > 0 && (
-            <div className="card">
-              <div className="card-header">
-                <span className="card-title">Ranking Semanal</span>
-              </div>
-              <div className="stagger" style={{ padding: '4px 0' }}>
-                {ranking.map((m, i) => (
-                  <div key={m.userId} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 16px' }}>
-                    <span style={{ width: '18px', fontSize: '12px', fontWeight: 700, color: i === 0 ? 'var(--text)' : 'var(--text-faint)', textAlign: 'center', flexShrink: 0 }}>{i + 1}</span>
-                    <Avatar name={m.name || '?'} size="small" />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.name}</div>
-                      <div style={{ fontSize: '11px', color: 'var(--text-faint)' }}>{m.posts} {m.posts === 1 ? 'post' : 'posts'} · {m.comments} {m.comments === 1 ? 'comentário' : 'comentários'}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Active Polls */}
-          {polls.length > 0 && (
-            <div className="card">
-              <div className="card-header">
-                <span className="card-title">Enquetes</span>
-              </div>
-              {polls.map((poll, i) => (
-                <PollWidget key={poll.id} poll={poll} onVote={handleVotePoll} isLast={i === polls.length - 1}
-                  onDelete={(isLeader || poll.createdBy === user?.id) ? handleDeletePoll : undefined} />
-              ))}
-            </div>
-          )}
-
-          {/* Info */}
-          {ranking.length === 0 && polls.length === 0 && (
-            <div className="card">
-              <div className="card-header">
-                <span className="card-title">Comunidade</span>
-              </div>
-              <div style={{ padding: '8px 0' }}>
-                <SuggestionItem icon="users" name="Bem-vindo!" subtitle="Explore a comunidade" />
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
+      {editingEvent && (
+        <EventFormModal event={editingEvent} onClose={() => setEditingEvent(null)}
+          onSaved={saved => { patchList('events', saved.id, () => saved); setEditingEvent(null); }} />
+      )}
     </div>
   );
 };
 
-const PollWidget = ({ poll, onVote, onDelete, isLast }: { poll: Poll; onVote: (pollId: string, optionId: string) => void; onDelete?: (pollId: string) => void; isLast?: boolean }) => {
-  // Depois de votar (ou com a enquete encerrada) mostram-se os resultados
-  const showResults = poll.myVoteOptionId !== null || !!poll.isExpired;
-  const canVote = !poll.isExpired;
-
-  const vote = (e: React.MouseEvent<HTMLButtonElement>, optionId: string) => {
-    if (optionId === poll.myVoteOptionId) return;
-    // O primeiro voto é celebrado; trocar de opção só dá o retorno do toque
-    if (!poll.myVoteOptionId) burst(e.currentTarget, { count: 9, colors: ['--accent', '--success'], spread: 18 });
-    onVote(poll.id, optionId);
-  };
-
-  return (
-    // A última enquete não leva linha: a borda do cartão já fecha a lista
-    <div style={{ padding: '14px 16px', borderBottom: isLast ? undefined : '1px solid var(--border)' }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px', marginBottom: '10px' }}>
-        <p style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: 'var(--text)', lineHeight: 1.4 }}>{poll.question}</p>
-        {onDelete && (
-          <button className="action-btn" title="Excluir enquete" onClick={() => onDelete(poll.id)}>
-            <span uk-icon="icon: trash; ratio: 0.7"></span>
-          </button>
-        )}
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-        {poll.options.map(opt => (
-          <button
-            key={opt.id}
-            className="press"
-            disabled={!canVote}
-            onClick={e => vote(e, opt.id)}
-            style={{ position: 'relative', width: '100%', height: '30px', padding: 0, border: `1px solid ${opt.hasVoted ? 'var(--text-muted)' : showResults ? 'var(--border)' : 'var(--border-strong)'}`, borderRadius: 'var(--radius-sm)', background: 'transparent', overflow: 'hidden', cursor: canVote && !opt.hasVoted ? 'pointer' : 'default', fontFamily: 'inherit', textAlign: 'left' }}
-          >
-            {showResults && (
-              <div className="meter-fill" style={{ position: 'absolute', inset: 0, transform: `scaleX(${opt.percentage / 100})`, background: opt.hasVoted ? 'var(--border)' : 'var(--bg-elevated)' }} />
-            )}
-            <div style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 10px', height: '100%' }}>
-              <span style={{ fontSize: '12px', color: opt.hasVoted || !showResults ? 'var(--text)' : 'var(--text-muted)', fontWeight: opt.hasVoted ? 700 : 400 }}>{opt.text}</span>
-              {showResults && <span style={{ fontSize: '11px', color: 'var(--text-faint)', fontWeight: 600 }}><AnimatedNumber value={opt.percentage} />%</span>}
-            </div>
-          </button>
-        ))}
-      </div>
-      <div style={{ marginTop: '8px', fontSize: '11px', color: 'var(--text-faint)' }}>
-        <AnimatedNumber value={poll.totalVotes} /> voto{poll.totalVotes !== 1 ? 's' : ''}
-        {poll.isExpired
-          ? ' · Encerrada'
-          : poll.expiresAt && ` · Encerra em ${new Date(poll.expiresAt).toLocaleDateString('pt-BR', { day: 'numeric', month: 'short' })}`}
-        {poll.myVoteOptionId && !poll.isExpired && ' · Clique noutra opção para mudar o voto'}
+const PostSkeleton = () => (
+  <div className="post" style={{ padding: '16px', marginBottom: '12px' }} aria-hidden="true">
+    <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+      <div className="skeleton" style={{ width: 40, height: 40, borderRadius: '50%' }} />
+      <div style={{ flex: 1 }}>
+        <div className="skeleton" style={{ width: '40%', height: 14 }} />
+        <div className="skeleton" style={{ width: '24%', height: 12, marginTop: 8 }} />
       </div>
     </div>
-  );
-};
-
-const SuggestionItem = ({ icon, name, subtitle }: { icon: string; name: string; subtitle: string }) => (
-  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 20px' }}>
-    <span uk-icon={`icon: ${icon}; ratio: 0.9`} style={{ color: 'var(--text)', flexShrink: 0 }}></span>
-    <div>
-      <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>{name}</div>
-      <div style={{ fontSize: '12px', color: 'var(--text-faint)' }}>{subtitle}</div>
-    </div>
+    <div className="skeleton" style={{ height: 14, marginTop: 16 }} />
+    <div className="skeleton" style={{ width: '82%', height: 14, marginTop: 8 }} />
+    <div className="skeleton" style={{ height: 220, marginTop: 14, borderRadius: 'var(--radius)' }} />
   </div>
 );
-
-interface PostCardProps {
-  post: Post; currentUserId: string; currentChurchId: string | null; userRole: string;
-  onDonated: (postId: string, donated: boolean) => void;
-  onComment: (id: string, content: string) => void;
-  onReact: (postId: string, type: string, hasReacted: boolean) => void;
-  onPin: (postId: string, isPinned: boolean) => void;
-  onDelete: (postId: string) => void;
-  onDeleteComment: (postId: string, commentId: string) => void;
-  pinned?: boolean;
-}
-
-const PostCard = ({ post, currentUserId, currentChurchId, userRole, onComment, onReact, onPin, onDelete, onDeleteComment, onDonated, pinned }: PostCardProps) => {
-  const [commentText, setCommentText] = useState('');
-  const [showComments, setShowComments] = useState(false);
-  const isManager = userRole === 'leader' || userRole === 'admin';
-  const donation = post.type === 'donation';
-  // Doação de outra comunidade: só para ver (pessoas de comunidades diferentes não conversam)
-  const outside = donation && !!post.churchId && post.churchId !== currentChurchId;
-  const canPin = isManager && !outside;
-  const canDelete = post.userId === currentUserId || (isManager && (!outside || userRole === 'admin'));
-  const canMarkDonated = donation && !outside && (post.userId === currentUserId || isManager);
-  const mapUrl = post.latitude != null && post.longitude != null
-    ? `https://www.google.com/maps/search/?api=1&query=${post.latitude},${post.longitude}`
-    : null;
-  const reactions = post.reactions ?? EMPTY_REACTIONS;
-  const myReactions = post.myReactions ?? [];
-
-  const submitComment = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!commentText.trim()) return;
-    onComment(post.id, commentText);
-    setCommentText('');
-    setShowComments(true);
-  };
-
-  const totalReactions = Object.values(reactions).reduce((s, v) => s + v, 0);
-
-  return (
-    <div className="card" style={{ marginBottom: '16px', borderColor: pinned ? 'var(--border-strong)' : undefined }}>
-
-      {/* Author row */}
-      <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-        <Avatar name={post.userName} profileImage={post.userProfileImage} size="small" />
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>{post.userName}</div>
-          <div style={{ fontSize: '11px', color: 'var(--text-faint)', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-            {new Date(post.createdAt).toLocaleDateString('pt-BR', { day: 'numeric', month: 'short', year: 'numeric' })}
-            {outside && post.churchName && <span>· {post.churchName}</span>}
-            {donation && <span className="uk-label">Doação</span>}
-            {post.donatedAt && <span className="uk-label">Já doado</span>}
-          </div>
-        </div>
-        {canPin && (
-          <button className={`action-btn${post.isPinned ? ' is-on' : ''}`} title={post.isPinned ? 'Desafixar' : 'Fixar'} onClick={() => onPin(post.id, !!post.isPinned)}>
-            <span uk-icon="icon: bookmark; ratio: 0.8"></span>
-          </button>
-        )}
-        {canDelete && (
-          <button className="action-btn" title="Excluir publicação" onClick={() => onDelete(post.id)}>
-            <span uk-icon="icon: trash; ratio: 0.8"></span>
-          </button>
-        )}
-        {post.userId !== currentUserId && <ReportButton targetType="post" targetId={post.id} compact />}
-      </div>
-
-      {/* Image */}
-      {post.imageUrl && (
-        <div style={{ position: 'relative', height: '280px', overflow: 'hidden', background: 'var(--bg-elevated)' }}>
-          <img src={post.imageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-          {post.content && (
-            <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.75), transparent)', padding: '32px 16px 14px', color: '#fff', fontSize: '14px', lineHeight: 1.5 }}>
-              {post.content}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Text content */}
-      {!post.imageUrl && post.content && (
-        <div style={{ padding: '16px', fontSize: '14px', lineHeight: 1.6, color: 'var(--text)' }}>{post.content}</div>
-      )}
-
-      {/* Doação: onde buscar */}
-      {donation && (
-        <div className="donation-place">
-          <span uk-icon="icon: location; ratio: 0.8"></span>
-          <span style={{ flex: 1, minWidth: 0 }}>Buscar em <strong>{post.location}</strong></span>
-          {mapUrl && <a href={mapUrl} target="_blank" rel="noreferrer">Ver no mapa</a>}
-          {canMarkDonated && (
-            <button type="button" className={`uk-button uk-button-small ${post.donatedAt ? 'uk-button-default' : 'uk-button-success'}`}
-              onClick={() => onDonated(post.id, !post.donatedAt)}>
-              {post.donatedAt ? 'Voltar a disponível' : <><span uk-icon="icon: check; ratio: 0.7"></span> Marcar como doado</>}
-            </button>
-          )}
-        </div>
-      )}
-      {outside ? null : <>
-
-      {/* Reactions summary */}
-      {totalReactions > 0 && (
-        <div style={{ padding: '6px 16px', display: 'flex', gap: '10px' }}>
-          {REACTION_CONFIG.filter(r => reactions[r.type as keyof PostReactions] > 0).map(r => (
-            <span key={r.type} className="fade-in" style={{ fontSize: '12px', color: 'var(--text-faint)', display: 'flex', alignItems: 'center', gap: '3px' }}>
-              <span uk-icon={`icon: ${r.icon}; ratio: 0.7`}></span>
-              <AnimatedNumber value={reactions[r.type as keyof PostReactions]} />
-            </span>
-          ))}
-        </div>
-      )}
-
-      {/* Reaction buttons */}
-      <div style={{ padding: '6px 16px', display: 'flex', alignItems: 'center', gap: '2px', borderTop: '1px solid var(--border)', flexWrap: 'wrap' }}>
-        {REACTION_CONFIG.map(r => {
-          const hasReacted = myReactions.includes(r.type);
-          return (
-            <button key={r.type} className="press"
-              onClick={e => {
-                if (!hasReacted) { pop(e.currentTarget); burst(e.currentTarget, { count: 6 }); }
-                onReact(post.id, r.type, hasReacted);
-              }}
-              title={r.label}
-              style={{ background: hasReacted ? 'var(--accent)' : 'none', border: `1px solid ${hasReacted ? 'var(--accent)' : 'transparent'}`, borderRadius: 'var(--radius-sm)', cursor: 'pointer', padding: '5px 9px', display: 'flex', alignItems: 'center', gap: '5px', color: hasReacted ? '#fff' : 'var(--text-muted)', fontSize: '12px', fontWeight: hasReacted ? 600 : 400, fontFamily: 'inherit' }}
-              onMouseEnter={e => { if (!hasReacted) { e.currentTarget.style.background = 'var(--bg-elevated)'; e.currentTarget.style.borderColor = 'var(--border)'; } }}
-              onMouseLeave={e => { if (!hasReacted) { e.currentTarget.style.background = 'none'; e.currentTarget.style.borderColor = 'transparent'; } }}>
-              <span uk-icon={`icon: ${r.icon}; ratio: 0.8`}></span>
-              {r.label}
-            </button>
-          );
-        })}
-
-        {post.comments.length > 0 && (
-          <button onClick={() => setShowComments(!showComments)}
-            style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', padding: '5px 8px', display: 'flex', alignItems: 'center', gap: '5px', color: showComments ? 'var(--text)' : 'var(--text-muted)', fontSize: '12px', fontWeight: 500, fontFamily: 'inherit', transition: 'color var(--t)' }}
-            onMouseEnter={e => e.currentTarget.style.color = 'var(--text)'}
-            onMouseLeave={e => { if (!showComments) e.currentTarget.style.color = 'var(--text-muted)'; }}>
-            <span uk-icon="icon: comment; ratio: 0.9"></span>
-            <AnimatedNumber value={post.comments.length} /> comentário{post.comments.length !== 1 ? 's' : ''}
-          </button>
-        )}
-      </div>
-
-      {/* Comments list */}
-      {post.comments.length > 0 && showComments && (
-        <div className="list-enter" style={{ borderTop: '1px solid var(--border)', maxHeight: '320px', overflowY: 'auto' }}>
-          {post.comments.map(comment => (
-            <div key={comment.id} style={{ display: 'flex', gap: '10px', padding: '12px 16px' }}>
-              <Avatar name={comment.userName} profileImage={comment.userProfileImage} size="small" />
-              <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '3px' }}>
-                  <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>{comment.userName}</span>
-                  <span style={{ fontSize: '11px', color: 'var(--text-faint)' }}>
-                    {new Date(comment.createdAt).toLocaleDateString('pt-BR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                  </span>
-                </div>
-                <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.5 }}>{comment.content}</p>
-              </div>
-              {(comment.userId === currentUserId || canPin) && (
-                <button className="action-btn" title="Excluir comentário" onClick={() => onDeleteComment(post.id, comment.id)}>
-                  <span uk-icon="icon: trash; ratio: 0.7"></span>
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Comment input */}
-      {/* Com a lista aberta, a linha marca o fim da área com scroll; fechada, o campo segue as reações */}
-      <form onSubmit={submitComment} style={{ padding: '12px 16px', borderTop: post.comments.length > 0 && showComments ? '1px solid var(--border)' : undefined, display: 'flex', gap: '8px' }}>
-        <input type="text" className="uk-input" placeholder="Escreva um comentário..." value={commentText} onChange={e => setCommentText(e.target.value)}
-          style={{ flex: 1 }} />
-        <button type="submit" className="uk-button uk-button-primary">
-          <span uk-icon="icon: reply; ratio: 0.8"></span>
-          Enviar
-        </button>
-      </form>
-      </>}
-    </div>
-  );
-};
 
 export default Feed;

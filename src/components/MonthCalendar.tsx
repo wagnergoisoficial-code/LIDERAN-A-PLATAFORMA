@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import Icon from './Icon';
 
 const WEEKDAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
@@ -34,22 +35,22 @@ const MonthCalendar: React.FC<MonthCalendarProps> = ({ events, selected, onSelec
   const title = month.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
 
   return (
-    <div className="card calendar">
+    <section className="card calendar" aria-label="Calendário">
       <div className="calendar-head">
-        <strong className="calendar-title">{title.charAt(0).toUpperCase() + title.slice(1)}</strong>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-          <button type="button" className="uk-button uk-button-default uk-button-small" onClick={() => setMonth(firstOfMonth(new Date()))}>Hoje</button>
+        <h2 className="calendar-title" aria-live="polite">{title.charAt(0).toUpperCase() + title.slice(1)}</h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+          <button type="button" className="ghost-btn" onClick={() => setMonth(firstOfMonth(new Date()))}>Hoje</button>
           <button type="button" className="action-btn" aria-label="Mês anterior" onClick={() => setMonth(m => new Date(m.getFullYear(), m.getMonth() - 1, 1))}>
-            <span uk-icon="icon: chevron-left; ratio: 0.9"></span>
+            <Icon name="chevron-left" />
           </button>
           <button type="button" className="action-btn" aria-label="Mês seguinte" onClick={() => setMonth(m => new Date(m.getFullYear(), m.getMonth() + 1, 1))}>
-            <span uk-icon="icon: chevron-right; ratio: 0.9"></span>
+            <Icon name="chevron-right" />
           </button>
         </div>
       </div>
 
       <div className="calendar-grid">
-        {WEEKDAYS.map(w => <div key={w} className="calendar-weekday">{w}</div>)}
+        {WEEKDAYS.map(w => <div key={w} className="calendar-weekday" aria-hidden="true">{w}</div>)}
         {days.map(d => {
           const key = dayKey(d);
           const list = byDay.get(key) || [];
@@ -65,7 +66,7 @@ const MonthCalendar: React.FC<MonthCalendarProps> = ({ events, selected, onSelec
               type="button"
               className={className}
               aria-pressed={key === selected}
-              aria-label={`${d.getDate()} de ${monthName(d)}${list.length ? `, ${list.length} ${list.length === 1 ? 'evento' : 'eventos'}` : ''}`}
+              aria-label={`${d.getDate()} de ${monthName(d)}${list.length ? `, ${list.length} ${list.length === 1 ? 'encontro' : 'encontros'}` : ''}`}
               onClick={() => onSelect(key === selected || !list.length ? null : key)}
             >
               <span className="calendar-num">{d.getDate()}</span>
@@ -76,7 +77,7 @@ const MonthCalendar: React.FC<MonthCalendarProps> = ({ events, selected, onSelec
           );
         })}
       </div>
-    </div>
+    </section>
   );
 };
 

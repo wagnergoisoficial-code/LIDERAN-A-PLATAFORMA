@@ -59,7 +59,7 @@ const InviteRegister: React.FC = () => {
 
   if (invalid) {
     return (
-      <AuthLayout title="Convite inválido" subtitle="Este link já não funciona. Peça um link novo ao seu líder." footer={<Link to="/login">Ir para o início</Link>}>
+      <AuthLayout title="Convite inválido" subtitle="Este link não funciona mais. Peça um link novo ao seu líder." footer={<Link to="/login">Ir para o início</Link>}>
         <span />
       </AuthLayout>
     );
@@ -67,8 +67,8 @@ const InviteRegister: React.FC = () => {
 
   if (isAuthenticated) {
     return (
-      <AuthLayout title="Já tem sessão iniciada" subtitle={`Está a usar a conta de ${user?.name}. Para criar uma conta nova com este convite, saia primeiro.`}
-        footer={<Link to="/">Continuar com a minha conta</Link>}>
+      <AuthLayout title="Você já está conectado" subtitle={`Você está usando a conta de ${user?.name}. Para criar uma conta nova com este convite, saia primeiro.`}
+        footer={<Link to="/">Continuar com minha conta</Link>}>
         <button className="uk-button uk-button-default auth-submit" type="button" onClick={signOutHere}>Sair e usar o convite</button>
       </AuthLayout>
     );
@@ -77,7 +77,7 @@ const InviteRegister: React.FC = () => {
   return (
     <AuthLayout
       title="Entrar na comunidade"
-      subtitle={church ? `Foi convidado para ${church.name}. Crie a sua conta para entrar.` : 'A carregar o convite...'}
+      subtitle={church ? `Você foi convidado para ${church.name}. Crie sua conta para entrar.` : 'Carregando o convite…'}
       footer={<>Já tem uma conta? <Link to="/login">Entrar</Link></>}
     >
       <form onSubmit={submit}>
@@ -97,7 +97,7 @@ const InviteRegister: React.FC = () => {
             value={form.birthDate} onChange={e => set('birthDate')(e.target.value)} required />
           {minor && (
             <p className="auth-hint" role="alert">
-              Menores de 18 anos são cadastrados pelo líder da comunidade, com a autorização dos pais. Fale com o seu líder.
+              Menores de 18 anos são cadastrados pelo líder da comunidade, com a autorização dos pais. Fale com seu líder.
             </p>
           )}
         </div>

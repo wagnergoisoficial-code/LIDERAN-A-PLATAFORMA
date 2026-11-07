@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import UIkit from 'uikit';
 import { api } from '../services/api';
+import Icon from './Icon';
 
 // Link de convite da comunidade: quem se regista por ele entra direto nela
 const InviteLink: React.FC<{ churchId: string }> = ({ churchId }) => {
@@ -38,26 +39,24 @@ const InviteLink: React.FC<{ churchId: string }> = ({ churchId }) => {
   };
 
   return (
-    <div>
-      <div className="section-head">
-        <span className="list-label">Link de convite</span>
-      </div>
+    <section aria-labelledby="invite-title">
+      <h2 id="invite-title" className="list-label">Link de convite</h2>
       <div className="card" style={{ padding: '16px' }}>
-        <p style={{ margin: '0 0 10px', fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-          Quem se regista por este link entra direto nesta comunidade. Menores de 18 anos continuam a ser cadastrados por si, com os pais.
+        <p className="form-hint" style={{ margin: '0 0 12px' }}>
+          Quem se cadastra por este link entra direto nesta comunidade. Menores de 18 anos continuam sendo cadastrados por você, com os pais.
         </p>
         <div className="protection-row">
-          <input className="form-input" style={{ flex: 1, minWidth: '220px' }} readOnly value={url} placeholder="A gerar o link..."
+          <input className="form-input" style={{ flex: '1 1 220px' }} readOnly value={url} placeholder="Gerando o link…"
             aria-label="Link de convite" onFocus={e => e.currentTarget.select()} />
-          <button type="button" className="uk-button uk-button-primary uk-button-small" onClick={copy} disabled={!code}>
-            <span uk-icon="icon: copy; ratio: 0.75"></span> Copiar
+          <button type="button" className="uk-button uk-button-primary" onClick={copy} disabled={!code}>
+            <Icon name="copy" size={18} /> Copiar
           </button>
-          <button type="button" className="uk-button uk-button-default uk-button-small" onClick={regenerate} disabled={busy || !code}>
+          <button type="button" className="uk-button uk-button-default" onClick={regenerate} disabled={busy || !code}>
             Gerar link novo
           </button>
         </div>
       </div>
-    </div>
+    </section>
   );
 };
 

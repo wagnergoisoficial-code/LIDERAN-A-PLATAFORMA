@@ -4,6 +4,7 @@ import { api, RESTRICTED_KEY } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import UIkit from 'uikit';
 import AuthLayout, { PasswordInput } from '../components/AuthLayout';
+import Icon from '../components/Icon';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -50,9 +51,9 @@ const Login = () => {
       footer={<>Não tem uma conta? <Link to="/register">Criar conta</Link></>}
     >
       {notice && (
-        <div className="protected-note" role="alert" style={{ marginBottom: '16px', borderRadius: 'var(--radius-sm)' }}>
-          <span uk-icon="icon: warning; ratio: 0.75"></span>
-          {notice}
+        <div className="error-note auth-notice" role="alert">
+          <Icon name="warning" size={18} />
+          <span>{notice}</span>
         </div>
       )}
 
@@ -86,7 +87,7 @@ const Login = () => {
         </div>
 
         <button className="uk-button uk-button-primary auth-submit" type="submit" disabled={loading}>
-          {loading ? <><span uk-spinner="ratio: 0.5"></span> Entrando...</> : 'Entrar'}
+          {loading ? <><span uk-spinner="ratio: 0.5"></span> Entrando…</> : 'Entrar'}
         </button>
       </form>
     </AuthLayout>

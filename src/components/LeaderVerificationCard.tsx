@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import UIkit from 'uikit';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import Icon from './Icon';
 
 interface Verification {
   id: string;
@@ -18,13 +19,13 @@ interface Verification {
 }
 
 const FIELDS: { key: keyof Verification; label: string; placeholder: string; optional?: boolean; wide?: boolean }[] = [
-  { key: 'churchName', label: 'Igreja onde é líder *', placeholder: 'Ex.: Igreja Evangélica da Matola', wide: true },
-  { key: 'position', label: 'Cargo na igreja *', placeholder: 'Ex.: Pastor, líder de jovens' },
-  { key: 'phone', label: 'Telefone *', placeholder: '+258 84 000 0000' },
-  { key: 'city', label: 'Cidade *', placeholder: 'Ex.: Matola' },
-  { key: 'region', label: 'Província ou estado *', placeholder: 'Ex.: Maputo' },
-  { key: 'country', label: 'País *', placeholder: 'Ex.: Moçambique' },
-  { key: 'address', label: 'Endereço da igreja', placeholder: 'Rua, bairro', optional: true },
+  { key: 'churchName', label: 'Igreja onde você é líder', placeholder: 'Ex.: Igreja Evangélica da Matola', wide: true },
+  { key: 'position', label: 'Cargo na igreja', placeholder: 'Ex.: Pastor, líder de jovens' },
+  { key: 'phone', label: 'Telefone', placeholder: '+258 84 000 0000' },
+  { key: 'city', label: 'Cidade', placeholder: 'Ex.: Matola' },
+  { key: 'region', label: 'Província ou estado', placeholder: 'Ex.: Maputo' },
+  { key: 'country', label: 'País', placeholder: 'Ex.: Moçambique' },
+  { key: 'address', label: 'Endereço da igreja (opcional)', placeholder: 'Rua, bairro', optional: true },
 ];
 const ACCEPT = 'image/jpeg,image/png,image/webp,application/pdf';
 
@@ -36,13 +37,13 @@ const FilePick: React.FC<{ label: string; hint: string; file: File | null; onCha
   return (
     <div>
       <div className="form-label">{label}</div>
-      <p style={{ margin: '0 0 6px', fontSize: '12px', color: 'var(--text-muted)' }}>{hint}</p>
+      <p className="form-hint" style={{ margin: '0 0 8px' }}>{hint}</p>
       <input ref={input} type="file" accept={ACCEPT} style={{ display: 'none' }} onChange={e => onChange(e.target.files?.[0] || null)} />
       <div className="protection-row">
         <button type="button" className="uk-button uk-button-default uk-button-small" onClick={() => input.current?.click()}>
-          <span uk-icon="icon: upload; ratio: 0.75"></span> {file ? 'Trocar ficheiro' : 'Anexar ficheiro'}
+          <Icon name="upload" size={16} /> {file ? 'Trocar arquivo' : 'Anexar arquivo'}
         </button>
-        {file && <span style={{ fontSize: '12px', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.name}</span>}
+        {file && <span className="muted truncate" style={{ fontSize: '13px', maxWidth: '100%' }}>{file.name}</span>}
       </div>
     </div>
   );
@@ -89,37 +90,37 @@ const LeaderVerificationCard: React.FC = () => {
     }
   };
 
-  if (loading) return <div style={{ padding: '40px', textAlign: 'center' }}><span uk-spinner="ratio: 1"></span></div>;
+  if (loading) return <div className="loading-block"><span uk-spinner="ratio: 1"></span></div>;
 
   if (verification?.status === 'pending') {
     return (
-      <div className="card" style={{ padding: '20px', maxWidth: '640px' }}>
-        <div className="list-label" style={{ marginBottom: '6px' }}>Verificação em análise</div>
-        <p style={{ margin: 0, fontSize: '14px', color: 'var(--text)' }}>
+      <div className="card" style={{ padding: '20px' }}>
+        <h2 className="list-label" style={{ marginBottom: '6px' }}>Verificação em análise</h2>
+        <p style={{ fontSize: '15px' }}>
           Recebemos os dados de <strong>{verification.churchName}</strong> em {new Date(verification.submittedAt).toLocaleDateString('pt-BR')}.
         </p>
-        <p style={{ margin: '6px 0 0', fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-          O administrador da plataforma está a analisar o pedido. Assim que for aprovado, recebe uma notificação e pode criar a sua comunidade.
+        <p className="form-hint">
+          O administrador da plataforma está analisando o pedido. Assim que for aprovado, você recebe uma notificação e pode criar sua comunidade.
         </p>
       </div>
     );
   }
 
   return (
-    <form className="card" style={{ padding: '20px', maxWidth: '640px' }} onSubmit={submit}>
-      <div className="list-label" style={{ marginBottom: '6px' }}>Verificação de líder</div>
-      <p style={{ margin: '0 0 14px', fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-        Para criar uma comunidade, confirme que é líder de uma igreja. Só o administrador da plataforma vê estes dados e documentos.
+    <form className="card" style={{ padding: '20px' }} onSubmit={submit}>
+      <h2 className="list-label" style={{ marginBottom: '6px' }}>Verificação de líder</h2>
+      <p className="form-hint" style={{ margin: '0 0 16px' }}>
+        Para criar uma comunidade, confirme que você é líder de uma igreja. Só o administrador da plataforma vê estes dados e documentos.
       </p>
 
       {verification?.status === 'rejected' && (
-        <div className="protected-note" role="alert" style={{ margin: '0 0 14px' }}>
-          <span uk-icon="icon: warning; ratio: 0.7"></span>
-          O pedido anterior foi recusado: {verification.reason}. Corrija e envie de novo.
+        <div className="error-note" role="alert" style={{ marginBottom: '16px' }}>
+          <Icon name="warning" size={18} />
+          <span>O pedido anterior foi recusado: {verification.reason}. Corrija e envie de novo.</span>
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+      <div className="form-grid">
         {FIELDS.map(f => (
           <div key={f.key} style={f.wide ? { gridColumn: '1 / -1' } : undefined}>
             <label className="form-label" htmlFor={`verification-${f.key}`}>{f.label}</label>
@@ -130,13 +131,13 @@ const LeaderVerificationCard: React.FC = () => {
       </div>
 
       <div className="protection-section">
-        <FilePick label="Documento de identificação *" hint="Bilhete de identidade ou passaporte. PDF ou foto." file={identity} onChange={setIdentity} />
-        <FilePick label="Comprovativo de liderança *" hint="Carta ou credencial da igreja que confirme o seu cargo. PDF ou foto." file={leadership} onChange={setLeadership} />
+        <FilePick label="Documento de identidade" hint="Documento de identidade ou passaporte. PDF ou foto." file={identity} onChange={setIdentity} />
+        <FilePick label="Comprovante de liderança" hint="Carta ou credencial da igreja que confirme seu cargo. PDF ou foto." file={leadership} onChange={setLeadership} />
       </div>
 
       <div className="form-btn-row" style={{ marginTop: '20px' }}>
         <button type="submit" className="form-btn primary" disabled={saving}>
-          {saving ? <><span uk-spinner="ratio: 0.5"></span> Enviando...</> : 'Enviar para verificação'}
+          {saving ? <><span uk-spinner="ratio: 0.5"></span> Enviando…</> : 'Enviar para verificação'}
         </button>
       </div>
     </form>

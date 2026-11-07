@@ -395,58 +395,6 @@ export const api = {
       method: 'PATCH',
     }),
 
-  // Sermons
-  getSermons: () =>
-    request(`/sermons`),
-
-  createSermon: (data: any) =>
-    request(`/sermons`, {
-      method: 'POST',
-      body: JSON.stringify(data)
-    }),
-
-  updateSermon: (id: string, data: any) =>
-    request(`/sermons/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data)
-    }),
-
-  deleteSermon: (id: string) =>
-    request(`/sermons/${id}`, {
-      method: 'DELETE',
-    }),
-
-  // Groups / Células
-  getGroups: () =>
-    request(`/groups`),
-
-  createGroup: (data: any) =>
-    request(`/groups`, {
-      method: 'POST',
-      body: JSON.stringify(data)
-    }),
-
-  updateGroup: (id: string, data: any) =>
-    request(`/groups/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data)
-    }),
-
-  deleteGroup: (id: string) =>
-    request(`/groups/${id}`, {
-      method: 'DELETE',
-    }),
-
-  joinGroup: (id: string) =>
-    request(`/groups/${id}/join`, {
-      method: 'POST',
-    }),
-
-  leaveGroup: (id: string) =>
-    request(`/groups/${id}/leave`, {
-      method: 'POST',
-    }),
-
   // Devotional Likes
   likeDevotional: (id: string) =>
     request(`/devotionals/${id}/like`, {

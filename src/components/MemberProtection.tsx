@@ -3,6 +3,8 @@ import UIkit from 'uikit';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import GuardianFields, { EMPTY_GUARDIAN, GuardianDraft, guardianPayload, relationshipLabel } from './GuardianFields';
+import Icon from './Icon';
+import Modal from './Modal';
 
 interface Guardian {
   id: string;
@@ -101,22 +103,14 @@ const MemberProtection: React.FC<MemberProtectionProps> = ({ churchId, member, c
 
   const changeRole = () => {
     const question = isLeader
-      ? `Tirar a liderança a ${member.name}? Continua membro da comunidade.`
-      : `Tornar ${member.name} líder? Vai poder gerir os membros, ler as conversas privadas e moderar a comunidade.`;
+      ? `Tirar a liderança de ${member.name}? Continua membro da comunidade.`
+      : `Tornar ${member.name} líder? Vai poder gerenciar os membros, ler as conversas privadas e moderar a comunidade.`;
     if (confirm(question)) run(() => api.setMemberRole(churchId, member.id, isLeader ? 'member' : 'leader'), isLeader ? 'Deixou de ser líder' : 'Agora é líder');
   };
 
   return (
-    <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="modal-box" style={{ maxWidth: '560px' }}>
-        <div className="modal-header">
-          <h4>Proteção e acesso — {member.name}</h4>
-          <button className="modal-close-btn" onClick={onClose} aria-label="Fechar">
-            <span uk-icon="icon: close; ratio: 0.9"></span>
-          </button>
-        </div>
-
-        <div className="protection-row" style={{ fontSize: '13px' }}>
+    <Modal title={`Proteção e acesso de ${member.name}`} onClose={onClose} width={560}>
+        <div className="protection-row" style={{ fontSize: '14px' }}>
           <span className="uk-label">{statusLabel(member)}</span>
           {member.isMinor && <span className="uk-label">Menor de idade</span>}
           {member.statusReason && <span style={{ color: 'var(--text-muted)' }}>Motivo: {member.statusReason}</span>}
@@ -125,17 +119,17 @@ const MemberProtection: React.FC<MemberProtectionProps> = ({ churchId, member, c
         {member.status === 'pending_authorization' && (
           <div className="protection-section">
             <div className="list-label" style={{ margin: 0 }}>Autorização dos pais</div>
-            <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>
+            <p className="form-hint" style={{ margin: 0 }}>
               Confirme depois de receber a autorização assinada do responsável. A foto do termo é opcional.
             </p>
             <input ref={proofInput} type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }}
               onChange={e => setProof(e.target.files?.[0] || null)} />
             <div className="protection-row">
               <button type="button" className="uk-button uk-button-default" onClick={() => proofInput.current?.click()} disabled={busy}>
-                <span uk-icon="icon: image; ratio: 0.8"></span> {proof ? 'Trocar foto' : 'Anexar foto do termo'}
+                <Icon name="image" size={18} /> {proof ? 'Trocar foto' : 'Anexar foto do termo'}
               </button>
               <button className="uk-button uk-button-success" onClick={authorize} disabled={busy}>
-                <span uk-icon="icon: check; ratio: 0.8"></span> Confirmar autorização
+                <Icon name="check" size={18} /> Confirmar autorização
               </button>
             </div>
             {proof && <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Foto anexada: {proof.name}</span>}
@@ -146,10 +140,10 @@ const MemberProtection: React.FC<MemberProtectionProps> = ({ churchId, member, c
           <div className="protection-section">
             <div className="list-label" style={{ margin: 0 }}>Responsáveis</div>
             {(member.guardians || []).length === 0 ? (
-              <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>Nenhum responsável vinculado a este menor.</p>
+              <p className="form-hint" style={{ margin: 0 }}>Nenhum responsável vinculado a este menor.</p>
             ) : (
               (member.guardians || []).map(g => (
-                <div key={g.id} style={{ fontSize: '13px' }}>
+                <div key={g.id} style={{ fontSize: '14px' }}>
                   <strong style={{ color: 'var(--text)' }}>{g.name}</strong>
                   <span style={{ color: 'var(--text-muted)' }}> · {relationshipLabel(g.relationship)} · {g.email}</span>
                   <div style={{ fontSize: '12px', color: 'var(--text-faint)' }}>
@@ -172,7 +166,7 @@ const MemberProtection: React.FC<MemberProtectionProps> = ({ churchId, member, c
             ) : (
               <div>
                 <button className="uk-button uk-button-default uk-button-small" onClick={() => setAddingGuardian(true)}>
-                  <span uk-icon="icon: plus; ratio: 0.75"></span> Adicionar responsável
+                  <Icon name="plus" size={16} /> Adicionar responsável
                 </button>
               </div>
             )}
@@ -182,10 +176,10 @@ const MemberProtection: React.FC<MemberProtectionProps> = ({ churchId, member, c
         {showRole && (
           <div className="protection-section">
             <div className="list-label" style={{ margin: 0 }}>Liderança</div>
-            <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>
+            <p className="form-hint" style={{ margin: 0 }}>
               {isLeader
-                ? 'É líder desta comunidade: gere os membros, lê as conversas privadas e modera.'
-                : 'Os líderes gerem os membros, leem as conversas privadas e moderam a comunidade.'}
+                ? 'É líder desta comunidade: gerencia os membros, lê as conversas privadas e modera.'
+                : 'Os líderes gerenciam os membros, leem as conversas privadas e moderam a comunidade.'}
             </p>
             <div>
               <button className={`uk-button uk-button-small ${isLeader ? 'uk-button-default' : 'uk-button-primary'}`} onClick={changeRole} disabled={busy}>
@@ -198,7 +192,7 @@ const MemberProtection: React.FC<MemberProtectionProps> = ({ churchId, member, c
         {member.status !== 'pending_authorization' && (
           <div className="protection-section">
             <div className="list-label" style={{ margin: 0 }}>Suspender ou bloquear</div>
-            <input className="uk-input" placeholder="Motivo (opcional, fica no histórico)" value={reason} onChange={e => setReason(e.target.value)} maxLength={500} />
+            <input className="form-input" placeholder="Motivo (opcional, fica no histórico)" aria-label="Motivo" value={reason} onChange={e => setReason(e.target.value)} maxLength={500} />
             <div className="protection-row">
               <select className="uk-select" value={days} onChange={e => setDays(Number(e.target.value))} style={{ width: 'auto' }} aria-label="Duração da suspensão">
                 {SUSPENSION_DAYS.map(d => <option key={d} value={d}>{d} {d === 1 ? 'dia' : 'dias'}</option>)}
@@ -207,14 +201,13 @@ const MemberProtection: React.FC<MemberProtectionProps> = ({ churchId, member, c
               <button className="uk-button uk-button-danger" onClick={() => moderate('block')} disabled={busy}>Bloquear</button>
               {restricted && (
                 <button className="uk-button uk-button-success" onClick={() => moderate('reactivate')} disabled={busy}>
-                  <span uk-icon="icon: check; ratio: 0.8"></span> Reativar
+                  <Icon name="check" size={18} /> Reativar
                 </button>
               )}
             </div>
           </div>
         )}
-      </div>
-    </div>
+    </Modal>
   );
 };
 

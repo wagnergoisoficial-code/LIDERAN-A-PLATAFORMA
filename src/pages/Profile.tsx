@@ -1,11 +1,15 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { Link, useParams, useNavigate } from 'react-router-dom';
+import UIkit from 'uikit';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import UIkit from 'uikit';
+import { useTheme } from '../context/ThemeContext';
+import { roleLabel } from '../lib/format';
+import Avatar from '../components/Avatar';
+import Icon from '../components/Icon';
 import EmptyState from '../components/EmptyState';
-import PageHeader from '../components/PageHeader';
-import ReportButton from '../components/ReportButton';
+import MoreMenu, { MenuAction } from '../components/MoreMenu';
+import { sendReport } from '../components/ReportButton';
 
 interface UserProfile {
   id: string;
@@ -20,11 +24,13 @@ interface UserProfile {
   location?: string;
   title?: string;
   createdAt: string;
-  socialLinks: any[];
+  socialLinks: SocialLink[];
   achievements: any[];
   churchName?: string | null;
   isBlocked?: boolean;
 }
+
+interface SocialLink { id: string; platform: string; url: string }
 
 const SOCIAL_PLATFORMS: Record<string, string> = {
   whatsapp: 'WhatsApp',
@@ -33,22 +39,23 @@ const SOCIAL_PLATFORMS: Record<string, string> = {
   linkedin: 'LinkedIn',
 };
 
-interface SocialLink {
-  id: string;
-  platform: string;
-  url: string;
-}
+const notify = (message: string, status: 'success' | 'danger' = 'danger') => UIkit.notification({ message, status, pos: 'top-right' });
 
 const Profile = () => {
   const { userId } = useParams<{ userId: string }>();
-  const { user: currentUser, updateUser } = useAuth();
+  const { user: currentUser, updateUser, logout } = useAuth();
+  const { theme, toggle: toggleTheme } = useTheme();
+  const navigate = useNavigate();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
-  const [isOwnProfile, setIsOwnProfile] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [profileImagePreview, setProfileImagePreview] = useState('');
-
+  const [saving, setSaving] = useState(false);
+  const [blocking, setBlocking] = useState(false);
+  const [openingChat, setOpeningChat] = useState(false);
+  const [reported, setReported] = useState(false);
+  const photoInput = useRef<HTMLInputElement>(null);
   const [editForm, setEditForm] = useState({
     name: '',
     age: '',
@@ -60,9 +67,38 @@ const Profile = () => {
     profileImage: '',
     socialLinks: [] as { platform: string; url: string }[],
   });
-  const [blocking, setBlocking] = useState(false);
-  const [openingChat, setOpeningChat] = useState(false);
-  const navigate = useNavigate();
+
+  const id = userId || currentUser?.id;
+  const isOwnProfile = id === currentUser?.id;
+  const isLeader = currentUser?.role === 'leader' || currentUser?.role === 'admin';
+
+  const fillForm = (data: UserProfile) => setEditForm({
+    name: data.name,
+    age: data.age ? String(data.age) : '',
+    bio: data.bio || '',
+    location: data.location || '',
+    title: data.title || '',
+    backgroundTheme: data.backgroundTheme || 'light',
+    skillsText: (data.skills || []).join(', '),
+    profileImage: data.profileImage || '',
+    socialLinks: (data.socialLinks || []).map(l => ({ platform: l.platform, url: l.url })),
+  });
+
+  useEffect(() => {
+    if (!id) return;
+    setLoading(true);
+    setIsEditing(false);
+    setReported(false);
+    api.getUserProfile(id)
+      .then(result => {
+        if (result.success) {
+          setProfile(result.data);
+          fillForm(result.data);
+        }
+      })
+      .catch(() => setProfile(null))
+      .finally(() => setLoading(false));
+  }, [id]);
 
   // Abre (ou cria) a conversa privada com esta pessoa
   const handleMessage = async () => {
@@ -72,45 +108,14 @@ const Profile = () => {
       const res = await api.startConversation(profile.id);
       navigate(`/messages?c=${res.data.id}`);
     } catch (err: any) {
-      UIkit.notification({ message: err.message || 'Não foi possível abrir a conversa', status: 'danger' });
+      notify(err.message || 'Não foi possível abrir a conversa');
       setOpeningChat(false);
-    }
-  };
-
-  useEffect(() => {
-    const id = userId || currentUser?.id;
-    if (id) {
-      loadProfile(id);
-      setIsOwnProfile(id === currentUser?.id);
-    }
-  }, [userId, currentUser?.id]);
-
-  const loadProfile = async (id: string) => {
-    try {
-      const result = await api.getUserProfile(id);
-      if (result.success) {
-        setProfile(result.data);
-        setEditForm({
-          name: result.data.name,
-          age: result.data.age || '',
-          bio: result.data.bio || '',
-          location: result.data.location || '',
-          title: result.data.title || '',
-          backgroundTheme: result.data.backgroundTheme || 'light',
-          skillsText: (result.data.skills || []).join(', '),
-          profileImage: result.data.profileImage || '',
-          socialLinks: (result.data.socialLinks || []).map((l: SocialLink) => ({ platform: l.platform, url: l.url })),
-        });
-      }
-    } catch {
-      UIkit.notification({ message: 'Erro ao carregar perfil', status: 'danger' });
-    } finally {
-      setLoading(false);
     }
   };
 
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
     setProfileImagePreview(URL.createObjectURL(file));
     setUploadingImage(true);
@@ -118,10 +123,10 @@ const Profile = () => {
       const result = await api.uploadProfileImage(file);
       if (result.success) {
         setEditForm(prev => ({ ...prev, profileImage: result.data.profileImage }));
-        UIkit.notification({ message: 'Foto carregada! Clique em Salvar para confirmar.', status: 'success' });
+        notify('Foto carregada. Toque em "Salvar" para confirmar.', 'success');
       }
     } catch (err: any) {
-      UIkit.notification({ message: err.message || 'Erro ao enviar foto', status: 'danger' });
+      notify(err.message || 'Não foi possível enviar a foto');
       setProfileImagePreview('');
     } finally {
       setUploadingImage(false);
@@ -130,10 +135,11 @@ const Profile = () => {
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSaving(true);
     try {
       const result = await api.updateUserProfile({
         name: editForm.name,
-        age: editForm.age ? parseInt(editForm.age) : null,
+        age: editForm.age ? parseInt(editForm.age, 10) : null,
         bio: editForm.bio,
         location: editForm.location,
         title: editForm.title,
@@ -147,11 +153,20 @@ const Profile = () => {
         setIsEditing(false);
         setProfileImagePreview('');
         updateUser({ name: result.data.name, profileImage: result.data.profileImage, title: result.data.title });
-        UIkit.notification({ message: 'Perfil atualizado com sucesso!', status: 'success' });
+        notify('Perfil atualizado', 'success');
       }
     } catch (err: any) {
-      UIkit.notification({ message: err.message || 'Erro ao atualizar perfil', status: 'danger' });
+      // O formulário fica aberto com o que foi escrito
+      notify(err.message || 'Não foi possível guardar o perfil');
+    } finally {
+      setSaving(false);
     }
+  };
+
+  const cancelEdit = () => {
+    if (profile) fillForm(profile);
+    setProfileImagePreview('');
+    setIsEditing(false);
   };
 
   const handleToggleBlock = async () => {
@@ -162,9 +177,9 @@ const Profile = () => {
       if (profile.isBlocked) await api.unblockUser(profile.id);
       else await api.blockUser(profile.id);
       setProfile({ ...profile, isBlocked: !profile.isBlocked });
-      UIkit.notification({ message: profile.isBlocked ? 'Usuário desbloqueado' : 'Usuário bloqueado', status: 'success' });
+      notify(profile.isBlocked ? 'Pessoa desbloqueada' : 'Pessoa bloqueada', 'success');
     } catch (err: any) {
-      UIkit.notification({ message: err.message || 'Erro ao atualizar bloqueio', status: 'danger' });
+      notify(err.message || 'Não foi possível atualizar o bloqueio');
     } finally {
       setBlocking(false);
     }
@@ -173,282 +188,205 @@ const Profile = () => {
   const setSocialLink = (i: number, field: 'platform' | 'url', value: string) =>
     setEditForm(prev => ({ ...prev, socialLinks: prev.socialLinks.map((l, idx) => idx === i ? { ...l, [field]: value } : l) }));
 
-  const getRoleBadge = (role: string) => {
-    switch (role) {
-      case 'admin': return { label: 'Administrador', cls: 'uk-label-danger' };
-      case 'leader': return { label: 'Líder', cls: 'uk-label-warning' };
-      default: return { label: 'Membro', cls: 'uk-label-info' };
-    }
-  };
-
-  const socialIcons: Record<string, string> = {
-    whatsapp: 'whatsapp', linkedin: 'linkedin',
-    facebook: 'facebook', instagram: 'instagram',
-  };
-
   if (loading) {
-    return (
-      <div style={{ textAlign: 'center', padding: '80px 0' }}>
-        <span uk-spinner="ratio: 2"></span>
-      </div>
-    );
+    return <div className="loading-block" role="status" aria-label="Carregando o perfil"><span uk-spinner="ratio: 1.2"></span></div>;
   }
 
   if (!profile) {
     return (
-      <EmptyState icon="user" title="Usuário não encontrado" />
+      <div className="page is-medium">
+        <div className="card"><EmptyState icon="user" title="Perfil não encontrado" text="Só é possível ver perfis de pessoas da sua comunidade." /></div>
+      </div>
     );
   }
 
-  const roleBadge = getRoleBadge(profile.role);
   const avatarSrc = profileImagePreview || editForm.profileImage || profile.profileImage;
+  const guardianViewer = currentUser?.role === 'guardian';
+  const menuActions: MenuAction[] = isOwnProfile ? [] : [
+    ...(!guardianViewer ? [{ label: reported ? 'Denúncia enviada' : 'Denunciar perfil', icon: 'flag' as const, disabled: reported, onSelect: async () => setReported(await sendReport('profile', profile.id)) }] : []),
+    { label: profile.isBlocked ? 'Desbloquear' : 'Bloquear', icon: profile.isBlocked ? 'unlock' : 'ban', danger: !profile.isBlocked, disabled: blocking, onSelect: handleToggleBlock },
+  ];
 
   return (
-    <div>
-      <PageHeader
-        icon="user"
-        title={isOwnProfile ? 'Meu Perfil' : 'Perfil'}
-        subtitle={isOwnProfile ? 'Suas informações na comunidade' : 'Informações do membro'}
-        actions={isOwnProfile ? (
-          <button className="uk-button uk-button-default" onClick={() => setIsEditing(!isEditing)}>
-            <span uk-icon={`icon: ${isEditing ? 'close' : 'pencil'}; ratio: 0.8`}></span>
-            {isEditing ? 'Cancelar' : 'Editar Perfil'}
-          </button>
-        ) : (
-          <>
-            {!profile.isBlocked && currentUser?.role !== 'guardian' && (
-              <button className="uk-button uk-button-primary" onClick={handleMessage} disabled={openingChat}>
-                <span uk-icon="icon: mail; ratio: 0.8"></span>
-                Mensagem
-              </button>
-            )}
-            {currentUser?.role !== 'guardian' && <ReportButton targetType="profile" targetId={profile.id} />}
-            <button
-              className={`uk-button ${profile.isBlocked ? 'uk-button-default' : 'uk-button-danger'}`}
-              onClick={handleToggleBlock}
-              disabled={blocking}
-            >
-              <span uk-icon={`icon: ${profile.isBlocked ? 'unlock' : 'ban'}; ratio: 0.8`}></span>
-              {profile.isBlocked ? 'Desbloquear' : 'Bloquear'}
-            </button>
-          </>
-        )}
-      />
-
-      {profile.isBlocked && (
-        <div className="card" style={{ padding: '12px 16px', marginBottom: '20px', fontSize: '13px', color: 'var(--text-muted)' }}>
-          Você bloqueou este usuário. As publicações, comentários e mensagens dele ficam ocultos para você.
-        </div>
-      )}
-
-      {/* ── PROFILE HEADER ──────────────────────────────────────── */}
-      <div className="card" style={{ marginBottom: '20px' }}>
-
-        <div style={{ padding: '24px', display: 'flex', alignItems: 'flex-start', gap: '20px' }}>
-          {/* Avatar */}
-          <div style={{
-            width: '72px', height: '72px',
-            background: 'var(--bg-elevated)',
-            border: '1px solid var(--border-strong)',
-            borderRadius: '50%',
-            overflow: 'hidden',
-            flexShrink: 0,
-            display: 'flex', alignItems: 'center', justifyContent: 'center'
-          }}>
-            {profile.profileImage ? (
-              <img src={profile.profileImage} alt={profile.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            ) : (
-              <span uk-icon="icon: user; ratio: 1.8" style={{ color: 'var(--text-faint)' }}></span>
-            )}
-          </div>
-
-          {/* Info */}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <h2 style={{ margin: '0 0 4px', fontSize: '18px', fontWeight: 700 }}>{profile.name}</h2>
-            {profile.title && (
-              <p style={{ margin: '0 0 8px', fontSize: '13px', color: 'var(--text-muted)' }}>{profile.title}</p>
-            )}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-              <span className={`uk-label ${roleBadge.cls}`}>{roleBadge.label}</span>
-              {profile.location && (
-                <span style={{ fontSize: '12px', color: 'var(--text-faint)', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                  <span uk-icon="icon: location; ratio: 0.75"></span>
-                  {profile.location}
-                </span>
+    <div className="page is-medium">
+      <section className="profile-head" aria-labelledby="profile-name">
+        <div className="profile-head-row">
+          <Avatar name={profile.name} profileImage={profile.profileImage} size={96} />
+          <div className="profile-info">
+            <h1 id="profile-name" className="profile-name">{profile.name}</h1>
+            {profile.title && <p className="profile-title">{profile.title}</p>}
+            <div className="profile-facts">
+              <span><Icon name={profile.role === 'leader' || profile.role === 'admin' ? 'shield' : 'user'} size={16} /> {roleLabel(profile.role)}</span>
+              {profile.churchName && <span><Icon name="users" size={16} /> {profile.churchName}</span>}
+              {profile.location && <span><Icon name="location" size={16} /> {profile.location}</span>}
+              <span><Icon name="calendar" size={16} /> Desde {new Date(profile.createdAt).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</span>
+            </div>
+            <div className="profile-actions">
+              {isOwnProfile ? (
+                !isEditing && (
+                  <button type="button" className="uk-button uk-button-default" onClick={() => setIsEditing(true)}>
+                    <Icon name="pencil" size={18} /> Editar perfil
+                  </button>
+                )
+              ) : (
+                <>
+                  {!profile.isBlocked && !guardianViewer && (
+                    <button type="button" className="uk-button uk-button-primary" onClick={handleMessage} disabled={openingChat}>
+                      <Icon name="messages" size={18} /> Mensagem
+                    </button>
+                  )}
+                  <MoreMenu actions={menuActions} label={`Mais opções sobre ${profile.name}`} />
+                </>
               )}
-              <span style={{ fontSize: '12px', color: 'var(--text-faint)' }}>
-                Membro desde {new Date(profile.createdAt).toLocaleDateString('pt-BR')}
-              </span>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* ── EDIT FORM ────────────────────────────────────────────── */}
-      {isOwnProfile && isEditing && (
-        <div className="card" style={{ marginBottom: '20px' }}>
-          <div className="card-header">
-            <span className="card-title">Editar Perfil</span>
-          </div>
-          <div className="card-body">
-            <form onSubmit={handleSaveProfile} className="uk-form-stacked">
+        {profile.isBlocked && (
+          <p className="protected-note" style={{ marginTop: '16px', borderRadius: 'var(--radius)' }}>
+            <Icon name="ban" size={16} /> Você bloqueou esta pessoa: as publicações, comentários e mensagens dela ficam ocultos para você.
+          </p>
+        )}
 
-              {/* Avatar upload */}
-              <div style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '16px' }}>
-                <div
-                  style={{
-                    width: '64px', height: '64px',
-                    border: '1px dashed var(--border-strong)',
-                    borderRadius: '50%',
-                    background: 'var(--bg-elevated)',
-                    overflow: 'hidden',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    cursor: 'pointer', flexShrink: 0
-                  }}
-                  onClick={() => document.getElementById('profileImageInput')?.click()}
-                >
-                  {avatarSrc ? (
-                    <img src={avatarSrc} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  ) : (
-                    <span uk-icon="icon: camera; ratio: 1.2" style={{ color: 'var(--text-faint)' }}></span>
-                  )}
-                </div>
-                <div>
-                  <input id="profileImageInput" type="file" accept="image/jpeg,image/png,image/gif,image/webp" style={{ display: 'none' }} onChange={handleImageSelect} />
-                  <button
-                    type="button"
-                    className="uk-button uk-button-default"
-                    onClick={() => document.getElementById('profileImageInput')?.click()}
-                    disabled={uploadingImage}
-                    style={{ fontSize: '12px', height: '30px' }}
-                  >
-                    {uploadingImage ? 'Enviando...' : 'Alterar Foto'}
-                  </button>
-                  {editForm.profileImage && !uploadingImage && (
-                    <p style={{ margin: '5px 0 0', fontSize: '12px', color: 'var(--text-muted)' }}>
-                      <span uk-icon="icon: check; ratio: 0.8"></span> Foto pronta
-                    </p>
-                  )}
-                </div>
+        {profile.bio && !isEditing && <p className="profile-bio">{profile.bio}</p>}
+
+        {!isEditing && ((profile.skills && profile.skills.length > 0) || profile.socialLinks?.length > 0) && (
+          <div style={{ display: 'grid', gap: '16px', marginTop: '20px' }}>
+            {profile.skills && profile.skills.length > 0 && (
+              <div>
+                <h2 className="list-label" style={{ fontSize: '14px', marginBottom: '8px' }}>Habilidades</h2>
+                <div className="chip-list">{profile.skills.map(skill => <span key={skill} className="tag">{skill}</span>)}</div>
               </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', alignItems: 'start' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label className="uk-form-label" style={{ marginBottom: 0 }}>Nome</label>
-                  <input className="uk-input" type="text" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} required />
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label className="uk-form-label" style={{ marginBottom: 0 }}>Idade</label>
-                  <input className="uk-input" type="number" min="1" max="150" value={editForm.age} onChange={(e) => setEditForm({ ...editForm, age: e.target.value })} />
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label className="uk-form-label" style={{ marginBottom: 0 }}>Localização</label>
-                  <input className="uk-input" type="text" placeholder="Ex: São Paulo, SP" value={editForm.location} onChange={(e) => setEditForm({ ...editForm, location: e.target.value })} />
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label className="uk-form-label" style={{ marginBottom: 0 }}>Título / Cargo</label>
-                  <input className="uk-input" type="text" placeholder="Ex: Líder de Jovens" value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} />
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', gridColumn: '1 / -1' }}>
-                  <label className="uk-form-label" style={{ marginBottom: 0 }}>Bio</label>
-                  <textarea className="uk-textarea" rows={3} placeholder="Conte um pouco sobre você..." value={editForm.bio} onChange={(e) => setEditForm({ ...editForm, bio: e.target.value })}></textarea>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', gridColumn: '1 / -1' }}>
-                  <label className="uk-form-label" style={{ marginBottom: 0 }}>Habilidades (separadas por vírgula)</label>
-                  <input className="uk-input" type="text" placeholder="Ex: Liderança, Música, Design" value={editForm.skillsText} onChange={(e) => setEditForm({ ...editForm, skillsText: e.target.value })} />
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', gridColumn: '1 / -1' }}>
-                  <label className="uk-form-label" style={{ marginBottom: 0 }}>Redes Sociais</label>
-                  {editForm.socialLinks.map((link, i) => (
-                    <div key={i} style={{ display: 'flex', gap: '8px' }}>
-                      <select className="uk-select" value={link.platform} onChange={(e) => setSocialLink(i, 'platform', e.target.value)} style={{ width: '150px', flexShrink: 0 }}>
-                        {Object.entries(SOCIAL_PLATFORMS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                      </select>
-                      <input className="uk-input" type="url" placeholder="https://..." value={link.url} onChange={(e) => setSocialLink(i, 'url', e.target.value)} />
-                      <button type="button" className="icon-btn" title="Remover" onClick={() => setEditForm(prev => ({ ...prev, socialLinks: prev.socialLinks.filter((_, idx) => idx !== i) }))}>
-                        <span uk-icon="icon: close; ratio: 0.75"></span>
-                      </button>
-                    </div>
+            )}
+            {profile.socialLinks?.length > 0 && (
+              <div>
+                <h2 className="list-label" style={{ fontSize: '14px', marginBottom: '8px' }}>Redes sociais</h2>
+                <div className="chip-list">
+                  {profile.socialLinks.map(link => (
+                    <a key={link.id} href={link.url} target="_blank" rel="noopener noreferrer" className="social-link">
+                      {SOCIAL_PLATFORMS[link.platform] || link.platform} <Icon name="external" size={14} />
+                    </a>
                   ))}
-                  {editForm.socialLinks.length < 4 && (
-                    <button type="button" className="link-btn" style={{ alignSelf: 'flex-start' }}
-                      onClick={() => setEditForm(prev => ({ ...prev, socialLinks: [...prev.socialLinks, { platform: Object.keys(SOCIAL_PLATFORMS).find(p => !prev.socialLinks.some(l => l.platform === p)) || 'instagram', url: '' }] }))}>
-                      + Adicionar rede social
-                    </button>
-                  )}
                 </div>
               </div>
+            )}
+          </div>
+        )}
+      </section>
 
-              <div style={{ marginTop: '16px' }}>
-                <button className="uk-button uk-button-primary" type="submit" style={{ height: '36px' }}>
-                  <span uk-icon="icon: check; ratio: 0.85"></span>
-                  Salvar Alterações
+      {/* Editar o próprio perfil */}
+      {isOwnProfile && isEditing && (
+        <form className="card section" style={{ padding: '20px' }} onSubmit={handleSaveProfile} aria-labelledby="edit-title">
+          <h2 id="edit-title" className="list-label" style={{ fontSize: '17px', marginBottom: '16px' }}>Editar perfil</h2>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '20px' }}>
+            <button type="button" className="avatar-picker" onClick={() => photoInput.current?.click()} aria-label="Escolher foto de perfil">
+              {avatarSrc ? <img src={avatarSrc} alt="" /> : <Icon name="camera" size={24} />}
+            </button>
+            <div>
+              <input ref={photoInput} type="file" accept="image/jpeg,image/png,image/gif,image/webp" hidden onChange={handleImageSelect} />
+              <button type="button" className="uk-button uk-button-default uk-button-small" onClick={() => photoInput.current?.click()} disabled={uploadingImage}>
+                {uploadingImage ? 'Enviando…' : 'Alterar foto'}
+              </button>
+              <p className="form-hint">JPEG, PNG, GIF ou WebP.</p>
+            </div>
+          </div>
+
+          <div className="form-grid">
+            <div>
+              <label className="form-label" htmlFor="profile-name-input">Nome</label>
+              <input id="profile-name-input" className="form-input" type="text" value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })} required />
+            </div>
+            <div>
+              <label className="form-label" htmlFor="profile-age">Idade</label>
+              <input id="profile-age" className="form-input" type="number" min="1" max="150" value={editForm.age} onChange={e => setEditForm({ ...editForm, age: e.target.value })} />
+            </div>
+            <div>
+              <label className="form-label" htmlFor="profile-location">Localização</label>
+              <input id="profile-location" className="form-input" type="text" placeholder="Ex.: Matola, Maputo" value={editForm.location} onChange={e => setEditForm({ ...editForm, location: e.target.value })} />
+            </div>
+            <div>
+              <label className="form-label" htmlFor="profile-title">Título ou função</label>
+              <input id="profile-title" className="form-input" type="text" placeholder="Ex.: Líder de louvor" value={editForm.title} onChange={e => setEditForm({ ...editForm, title: e.target.value })} />
+            </div>
+            <div className="is-wide">
+              <label className="form-label" htmlFor="profile-bio">Sobre você</label>
+              <textarea id="profile-bio" className="form-input" rows={3} placeholder="Conte um pouco sobre você…" value={editForm.bio} onChange={e => setEditForm({ ...editForm, bio: e.target.value })} />
+            </div>
+            <div className="is-wide">
+              <label className="form-label" htmlFor="profile-skills">Habilidades</label>
+              <input id="profile-skills" className="form-input" type="text" placeholder="Ex.: Música, Design, Liderança" value={editForm.skillsText} onChange={e => setEditForm({ ...editForm, skillsText: e.target.value })} aria-describedby="profile-skills-hint" />
+              <p id="profile-skills-hint" className="form-hint">Separe por vírgulas.</p>
+            </div>
+            <fieldset className="is-wide" style={{ margin: 0, padding: 0, border: 0, display: 'grid', gap: '8px' }}>
+              <legend className="form-label">Redes sociais</legend>
+              {editForm.socialLinks.map((link, i) => (
+                <div key={i} style={{ display: 'flex', gap: '8px' }}>
+                  <select className="uk-select" aria-label={`Rede ${i + 1}`} value={link.platform} onChange={e => setSocialLink(i, 'platform', e.target.value)} style={{ width: '150px', flexShrink: 0 }}>
+                    {Object.entries(SOCIAL_PLATFORMS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                  </select>
+                  <input className="form-input" type="url" placeholder="https://…" aria-label={`Endereço da rede ${i + 1}`} value={link.url} onChange={e => setSocialLink(i, 'url', e.target.value)} />
+                  <button type="button" className="action-btn" aria-label={`Remover a rede ${i + 1}`} onClick={() => setEditForm(prev => ({ ...prev, socialLinks: prev.socialLinks.filter((_, idx) => idx !== i) }))}>
+                    <Icon name="close" size={18} />
+                  </button>
+                </div>
+              ))}
+              {editForm.socialLinks.length < 4 && (
+                <button type="button" className="ghost-btn" style={{ justifySelf: 'start', paddingLeft: 0 }}
+                  onClick={() => setEditForm(prev => ({ ...prev, socialLinks: [...prev.socialLinks, { platform: Object.keys(SOCIAL_PLATFORMS).find(p => !prev.socialLinks.some(l => l.platform === p)) || 'instagram', url: '' }] }))}>
+                  <Icon name="plus" size={18} /> Adicionar rede social
                 </button>
-              </div>
-            </form>
+              )}
+            </fieldset>
           </div>
-        </div>
+
+          <div className="form-btn-row">
+            <button type="button" className="form-btn" onClick={cancelEdit}>Cancelar</button>
+            <button type="submit" className="form-btn primary" disabled={saving || uploadingImage}>
+              {saving ? <><span uk-spinner="ratio: 0.5"></span> Salvando…</> : 'Salvar'}
+            </button>
+          </div>
+        </form>
       )}
 
-      {/* ── BIO ──────────────────────────────────────────────────── */}
-      {profile.bio && (
-        <div className="card" style={{ marginBottom: '16px' }}>
-          <div className="card-header"><span className="card-title">Sobre</span></div>
-          <div style={{ padding: '16px 20px' }}>
-            <p style={{ margin: 0, fontSize: '14px', color: 'var(--text)', lineHeight: 1.7 }}>{profile.bio}</p>
-          </div>
-        </div>
-      )}
-
-      {/* ── SKILLS ──────────────────────────────────────────────── */}
-      {profile.skills && profile.skills.length > 0 && (
-        <div className="card" style={{ marginBottom: '16px' }}>
-          <div className="card-header"><span className="card-title">Habilidades</span></div>
-          <div style={{ padding: '16px 20px', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-            {profile.skills.map((skill, i) => (
-              <span key={i} className="tag">
-                {skill}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ── SOCIAL LINKS ────────────────────────────────────────── */}
-      {profile.socialLinks?.length > 0 && (
-        <div className="card" style={{ marginBottom: '16px' }}>
-          <div className="card-header"><span className="card-title">Redes Sociais</span></div>
-          <div style={{ padding: '16px 20px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-            {profile.socialLinks.map((link: SocialLink) => (
-              <a
-                key={link.id}
-                href={link.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="uk-icon-button"
-                title={link.platform}
-              >
-                <span uk-icon={socialIcons[link.platform] || 'world'}></span>
-              </a>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ── ACHIEVEMENTS ────────────────────────────────────────── */}
+      {/* Distintivos */}
       {profile.achievements?.length > 0 && (
-        <div className="card" style={{ marginBottom: '16px' }}>
-          <div className="card-header"><span className="card-title">Distintivos</span></div>
-          <div style={{ padding: '20px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '16px' }}>
+        <section className="section" aria-labelledby="achievements-title">
+          <h2 id="achievements-title" className="list-label">Distintivos</h2>
+          <div className="card">
             {profile.achievements.map((a: any) => (
-              <div key={a.id} style={{ textAlign: 'center', padding: '16px' }}>
-                <span uk-icon="icon: star; ratio: 1.8" style={{ display: 'block', marginBottom: '8px' }}></span>
-                <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)', marginBottom: '4px' }}>{a.name}</div>
-                {a.description && <div style={{ fontSize: '12px', color: 'var(--text-faint)' }}>{a.description}</div>}
+              <div key={a.id} className="list-row">
+                <Icon name="award" size={22} className="muted" />
+                <span className="list-row-body">
+                  <span className="list-row-title"><span>{a.name}</span></span>
+                  {a.description && <span className="list-row-meta" style={{ display: 'block', whiteSpace: 'normal' }}>{a.description}</span>}
+                </span>
               </div>
             ))}
           </div>
-        </div>
+        </section>
+      )}
+
+      {/* Conta (no telemóvel; no computador está no menu do avatar) */}
+      {isOwnProfile && (
+        <section className="section hide-wide" aria-labelledby="account-title">
+          <h2 id="account-title" className="list-label">Conta</h2>
+          <div className="card">
+            {isLeader && (
+              <>
+                <Link to="/dashboard" className="list-row"><Icon name="dashboard" /><span className="list-row-body list-row-title">Painel do líder</span><Icon name="chevron-right" size={18} className="faint" /></Link>
+                <Link to="/reports" className="list-row"><Icon name="reports" /><span className="list-row-body list-row-title">Relatórios</span><Icon name="chevron-right" size={18} className="faint" /></Link>
+              </>
+            )}
+            <button type="button" className="list-row" role="switch" aria-checked={theme === 'dark'} onClick={toggleTheme}>
+              <Icon name="moon" /><span className="list-row-body list-row-title">Tema escuro</span>
+              <span className={`switch${theme === 'dark' ? ' is-on' : ''}`} aria-hidden="true"></span>
+            </button>
+            <button type="button" className="list-row" onClick={logout} style={{ color: 'var(--danger)' }}>
+              <Icon name="logout" /><span className="list-row-body" style={{ fontSize: '15px', fontWeight: 600 }}>Sair</span>
+            </button>
+          </div>
+        </section>
       )}
     </div>
   );

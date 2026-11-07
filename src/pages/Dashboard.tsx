@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
+import UIkit from 'uikit';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import UIkit from 'uikit';
+import { listDays, plural } from '../lib/format';
 import ChurchCreate from '../components/ChurchCreate';
 import ChurchMembers from '../components/ChurchMembers';
 import ReportsPanel from '../components/ReportsPanel';
@@ -9,8 +10,12 @@ import LeaderVerificationCard from '../components/LeaderVerificationCard';
 import VerificationsPanel from '../components/VerificationsPanel';
 import InviteLink from '../components/InviteLink';
 import CommunityConversations from '../components/CommunityConversations';
+import RetiredDevotionals from '../components/RetiredDevotionals';
 import PageHeader from '../components/PageHeader';
 import EmptyState from '../components/EmptyState';
+import Icon from '../components/Icon';
+import MoreMenu, { MenuAction } from '../components/MoreMenu';
+import { LeaderTabs } from '../components/SectionTabs';
 
 interface Church {
   id: string;
@@ -24,6 +29,9 @@ interface Church {
   isOwner?: boolean;
 }
 
+const notify = (message: string, status: 'success' | 'danger' = 'danger') => UIkit.notification({ message, status, pos: 'top-right' });
+
+// Área de liderança: comunidades, convite, denúncias, conversas e membros
 const Dashboard = () => {
   const { user, applySession } = useAuth();
   const [churches, setChurches] = useState<Church[]>([]);
@@ -32,9 +40,6 @@ const Dashboard = () => {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [showMembersModal, setShowMembersModal] = useState(false);
-
-  useEffect(() => { loadChurches(); }, [user?.churchId]);
 
   // Mantém a comunidade selecionada; sem seleção, abre a ativa
   const loadChurches = async (selectId?: string) => {
@@ -48,11 +53,14 @@ const Dashboard = () => {
         );
       }
     } catch (err: any) {
-      UIkit.notification({ message: err.message || 'Erro ao carregar comunidades', status: 'danger', pos: 'top-right' });
+      notify(err.message || 'Não foi possível carregar as comunidades');
     } finally {
       setLoading(false);
     }
   };
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { loadChurches(); }, [user?.churchId]);
 
   // Após criar, abre a nova comunidade; após editar, mantém a seleção
   const handleChurchCreated = (church?: { id: string }) => {
@@ -66,9 +74,9 @@ const Dashboard = () => {
     try {
       const res = await api.activateChurch(church.id);
       applySession(res.session);
-      UIkit.notification({ message: res.message || 'Comunidade ativada', status: 'success', pos: 'top-right' });
+      notify(res.message || 'Comunidade ativada', 'success');
     } catch (err: any) {
-      UIkit.notification({ message: err.message || 'Erro ao ativar comunidade', status: 'danger', pos: 'top-right' });
+      notify(err.message || 'Não foi possível ativar a comunidade');
     } finally {
       setBusy(false);
     }
@@ -82,9 +90,9 @@ const Dashboard = () => {
       applySession(res.session);
       setSelectedChurch(null);
       await loadChurches();
-      UIkit.notification({ message: 'Comunidade excluída', status: 'success', pos: 'top-right' });
+      notify('Comunidade excluída', 'success');
     } catch (err: any) {
-      UIkit.notification({ message: err.message || 'Erro ao excluir comunidade', status: 'danger', pos: 'top-right' });
+      notify(err.message || 'Não foi possível excluir a comunidade');
     } finally {
       setBusy(false);
     }
@@ -95,26 +103,30 @@ const Dashboard = () => {
   const unverified = user?.role === 'leader' && user.leaderVerified === false;
   if (unverified && !user?.churchId) {
     return (
-      <div>
-        <PageHeader icon="grid" title="Painel do Líder" subtitle="Antes de criar a comunidade, verificamos que é líder de uma igreja" />
+      <div className="page is-medium">
+        <LeaderTabs />
+        <PageHeader title="Painel do líder" subtitle="Antes de criar a comunidade, confirmamos que você é líder de uma igreja." />
         <LeaderVerificationCard />
       </div>
     );
   }
 
+  const churchActions: MenuAction[] = selectedChurch ? [
+    { label: 'Editar dados', icon: 'pencil', onSelect: () => { setEditing(true); setShowCreateForm(false); } },
+    ...((selectedChurch.isOwner || user?.role === 'admin') ? [{ label: 'Excluir comunidade', icon: 'trash' as const, danger: true, disabled: busy, onSelect: () => handleDelete(selectedChurch) }] : []),
+  ] : [];
+
   return (
     <div>
+      <LeaderTabs />
       <PageHeader
-        icon="grid"
-        title="Painel do Líder"
-        subtitle="Gerencie suas comunidades"
+        title="Painel do líder"
+        subtitle="Suas comunidades: convites, denúncias, conversas e membros."
         actions={!unverified && (
-          <button
-            className={`uk-button ${showCreateForm ? 'uk-button-default' : 'uk-button-primary'}`}
-            onClick={() => { setShowCreateForm(!showCreateForm); setEditing(false); }}
-          >
-            <span uk-icon={`icon: ${showCreateForm ? 'close' : 'plus'}; ratio: 0.8`}></span>
-            {showCreateForm ? 'Cancelar' : 'Nova Comunidade'}
+          <button type="button" className={`uk-button ${showCreateForm ? 'uk-button-default' : 'uk-button-primary'}`}
+            onClick={() => { setShowCreateForm(!showCreateForm); setEditing(false); }}>
+            <Icon name={showCreateForm ? 'close' : 'plus'} size={18} />
+            {showCreateForm ? 'Cancelar' : 'Nova comunidade'}
           </button>
         )}
       />
@@ -122,198 +134,85 @@ const Dashboard = () => {
       {user?.role === 'admin' && <VerificationsPanel />}
 
       <div className="dash-layout">
-
-        {/* ── LISTA DE COMUNIDADES ──────────────────────────────── */}
-        <aside className="card">
-          <div className="card-header">
-            <span className="card-title">Comunidades</span>
-            {!loading && <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-faint)' }}>{churches.length}</span>}
-          </div>
-
-          {loading ? (
-            <div style={{ padding: '20px', textAlign: 'center' }}>
-              <span uk-spinner="ratio: 0.7"></span>
-            </div>
-          ) : churches.length === 0 ? (
-            <div style={{ padding: '20px 16px', fontSize: '12px', color: 'var(--text-faint)', textAlign: 'center' }}>
-              Nenhuma comunidade criada
-            </div>
-          ) : (
-            churches.map((church) => {
+        <aside aria-labelledby="churches-title">
+          <h2 id="churches-title" className="list-label">Comunidades{!loading && churches.length ? ` · ${churches.length}` : ''}</h2>
+          <div className="card">
+            {loading ? (
+              <div className="loading-block" style={{ padding: '24px' }}><span uk-spinner="ratio: 0.7"></span></div>
+            ) : churches.length === 0 ? (
+              <p className="list-empty">Você ainda não criou nenhuma comunidade.</p>
+            ) : churches.map(church => {
               const active = selectedChurch?.id === church.id;
               return (
-                <button
-                  key={church.id}
-                  onClick={() => { setSelectedChurch(church); setShowCreateForm(false); setEditing(false); }}
-                  style={{
-                    width: '100%',
-                    padding: '10px 16px',
-                    background: active ? 'var(--bg-elevated)' : 'transparent',
-                    color: active ? 'var(--text)' : 'var(--text-muted)',
-                    border: 'none',
-                    borderLeft: `2px solid ${active ? 'var(--accent)' : 'transparent'}`,
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                    fontSize: '13px',
-                    fontFamily: 'inherit',
-                    fontWeight: active ? 600 : 400,
-                    transition: 'background var(--t), color var(--t)'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!active) {
-                      e.currentTarget.style.background = 'var(--bg-elevated)';
-                      e.currentTarget.style.color = 'var(--text)';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!active) {
-                      e.currentTarget.style.background = 'transparent';
-                      e.currentTarget.style.color = 'var(--text-muted)';
-                    }
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '2px' }}>
-                    <span style={{ fontWeight: 600, fontSize: '13px', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{church.name}</span>
-                    {church.isActive && <span className="uk-label">Ativa</span>}
-                  </div>
-                  <div style={{ fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px', opacity: 0.7 }}>
-                    <span uk-icon="icon: users; ratio: 0.65"></span>
-                    {church.memberCount ?? church.users?.length ?? 0} membro{(church.memberCount ?? church.users?.length) !== 1 ? 's' : ''}
-                  </div>
+                <button key={church.id} type="button" className={`church-pick${active ? ' is-active' : ''}`} aria-current={active ? 'true' : undefined}
+                  onClick={() => { setSelectedChurch(church); setShowCreateForm(false); setEditing(false); }}>
+                  <span className="church-pick-name">
+                    <span className="truncate">{church.name}</span>
+                    {church.isActive && <span className="tag">Ativa</span>}
+                  </span>
+                  <span className="church-pick-meta" style={{ display: 'block' }}>{plural(church.memberCount ?? church.users?.length ?? 0, 'membro', 'membros')}</span>
                 </button>
               );
-            })
-          )}
+            })}
+          </div>
         </aside>
 
-        {/* ── CONTEÚDO ─────────────────────────────────────────── */}
         <div style={{ minWidth: 0 }}>
-
           {showCreateForm || (editing && selectedChurch) ? (
-            <div style={{ maxWidth: '600px' }}>
+            <div style={{ maxWidth: '640px' }}>
               <ChurchCreate
                 key={editing ? selectedChurch?.id : 'new'}
                 church={editing && selectedChurch ? selectedChurch : undefined}
                 onChurchCreated={handleChurchCreated}
+                onCancel={editing ? () => setEditing(false) : () => setShowCreateForm(false)}
               />
-              {editing && (
-                <button className="uk-button uk-button-default" style={{ marginTop: '12px' }} onClick={() => setEditing(false)}>
-                  Cancelar
-                </button>
-              )}
             </div>
-
           ) : selectedChurch ? (
             <div>
-              {/* Dados da comunidade */}
-              <div className="card" style={{ padding: '24px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px' }}>
+              <section className="community-head" aria-labelledby="selected-church">
+                <div className="community-head-row">
                   <div style={{ minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: 'var(--text)' }}>{selectedChurch.name}</h2>
-                      {selectedChurch.isActive && <span className="uk-label">Ativa</span>}
-                    </div>
-                    {selectedChurch.title && (
-                      <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'var(--text-muted)' }}>{selectedChurch.title}</p>
-                    )}
+                    <h2 id="selected-church" className="community-name" style={{ fontSize: '20px' }}>{selectedChurch.name}</h2>
+                    {selectedChurch.title && <p className="community-church">{selectedChurch.title}</p>}
                   </div>
-                  <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
-                    {!selectedChurch.isActive && (
-                      <button className="uk-button uk-button-primary uk-button-small" disabled={busy} onClick={() => handleActivate(selectedChurch)}>
-                        <span uk-icon="icon: check; ratio: 0.8"></span>
-                        Tornar ativa
+                  <div className="community-actions" style={{ alignItems: 'center' }}>
+                    {selectedChurch.isActive ? (
+                      <span className="tag">Comunidade ativa</span>
+                    ) : (
+                      <button type="button" className="uk-button uk-button-primary uk-button-small" disabled={busy} onClick={() => handleActivate(selectedChurch)}>
+                        <Icon name="check" size={16} /> Tornar ativa
                       </button>
                     )}
-                    <button className="uk-button uk-button-default uk-button-small" onClick={() => setShowMembersModal(true)}>
-                      <span uk-icon="icon: users; ratio: 0.8"></span>
-                      Ver Membros
-                    </button>
+                    <MoreMenu actions={churchActions} label={`Opções de ${selectedChurch.name}`} />
                   </div>
                 </div>
-
+                <div className="community-facts">
+                  <span><Icon name="users" size={18} /> {plural(selectedChurch.memberCount ?? 0, 'membro', 'membros')}</span>
+                  {!!selectedChurch.cultosDias?.length && <span><Icon name="calendar" size={18} /> Cultos: {listDays(selectedChurch.cultosDias)}</span>}
+                </div>
+                <p className="community-desc" style={{ color: selectedChurch.description ? undefined : 'var(--text-muted)' }}>
+                  {selectedChurch.description || 'Sem descrição. Use "Editar dados" no menu ⋯ para apresentar a comunidade.'}
+                </p>
                 {!selectedChurch.isActive && (
-                  <p style={{ margin: '12px 0 0', fontSize: '12px', color: 'var(--text-muted)' }}>
-                    Feed, chat, eventos e demais páginas mostram a comunidade ativa. Torne esta comunidade ativa para publicar nela.
-                  </p>
+                  <p className="form-hint">O feed, o chat, a agenda e as outras páginas mostram a comunidade ativa. Torne esta ativa para publicar nela.</p>
                 )}
+              </section>
 
-                <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                  <div>
-                    <div className="list-label" style={{ marginBottom: '6px' }}>Descrição</div>
-                    <p style={{ margin: 0, fontSize: '13px', color: selectedChurch.description ? 'var(--text)' : 'var(--text-faint)', lineHeight: 1.6 }}>
-                      {selectedChurch.description || 'Sem descrição cadastrada.'}
-                    </p>
-                  </div>
-
-                  {selectedChurch.cultosDias && selectedChurch.cultosDias.length > 0 && (
-                    <div>
-                      <div className="list-label" style={{ marginBottom: '8px' }}>Dias de Culto</div>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                        {selectedChurch.cultosDias.map((dia) => (
-                          <span key={dia} className="tag" style={{ textTransform: 'capitalize' }}>
-                            {dia}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <div style={{ marginTop: '20px', paddingTop: '16px', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                  <button className="uk-button uk-button-default uk-button-small" onClick={() => { setEditing(true); setShowCreateForm(false); }}>
-                    <span uk-icon="icon: pencil; ratio: 0.8"></span>
-                    Editar
-                  </button>
-                  {(selectedChurch.isOwner || user?.role === 'admin') && (
-                    <button className="uk-button uk-button-danger uk-button-small" disabled={busy} onClick={() => handleDelete(selectedChurch)}>
-                      <span uk-icon="icon: trash; ratio: 0.8"></span>
-                      Excluir
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Link de convite */}
-              <div style={{ marginTop: '24px' }}>
-                <InviteLink churchId={selectedChurch.id} />
-              </div>
-
-              {/* Denúncias */}
-              <div style={{ marginTop: '24px' }}>
-                <ReportsPanel churchId={selectedChurch.id} />
-              </div>
-
-              {/* Conversas privadas (só leitura) */}
-              <div style={{ marginTop: '24px' }}>
-                <CommunityConversations churchId={selectedChurch.id} />
-              </div>
-
-              {/* Membros */}
-              <div style={{ marginTop: '24px' }}>
+              <div className="section"><InviteLink churchId={selectedChurch.id} /></div>
+              <div className="section"><ReportsPanel churchId={selectedChurch.id} /></div>
+              <div className="section"><CommunityConversations churchId={selectedChurch.id} /></div>
+              {selectedChurch.isActive && <div className="section"><RetiredDevotionals /></div>}
+              <div className="section">
                 <ChurchMembers churchId={selectedChurch.id} churchName={selectedChurch.name} canChangeRoles={!!selectedChurch.isOwner || user?.role === 'admin'} />
               </div>
             </div>
-
           ) : (
-            <EmptyState icon="list" title="Selecione uma comunidade ou crie uma nova" />
+            <div className="card">
+              <EmptyState icon="users" title="Escolha uma comunidade ou crie uma nova" />
+            </div>
           )}
         </div>
       </div>
-
-      {/* ── MODAL DE MEMBROS ─────────────────────────────────────── */}
-      {showMembersModal && selectedChurch && (
-        <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowMembersModal(false); }}>
-          <div className="modal-box" style={{ maxWidth: '1000px' }}>
-            <div className="modal-header">
-              <h3>Membros — {selectedChurch.name}</h3>
-              <button className="modal-close-btn" onClick={() => setShowMembersModal(false)}>
-                <span uk-icon="icon: close; ratio: 0.9"></span>
-              </button>
-            </div>
-            <ChurchMembers churchId={selectedChurch.id} churchName={selectedChurch.name} canChangeRoles={!!selectedChurch.isOwner || user?.role === 'admin'} />
-          </div>
-        </div>
-      )}
     </div>
   );
 };
