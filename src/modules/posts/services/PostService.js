@@ -31,6 +31,7 @@ class PostService {
       imageUrl: createPostDto.imageUrl,
       userId: user.id,
       churchId,
+      background: createPostDto.background,
       ...(donation && {
         type: 'donation',
         location: createPostDto.location,

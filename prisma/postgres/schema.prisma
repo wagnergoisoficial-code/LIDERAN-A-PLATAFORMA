@@ -161,6 +161,8 @@ model Post {
   imageUrl  String?
   isPinned  Boolean  @default(false)
   type      String   @default("post") // post, announcement, donation
+  // Cor de fundo escolhida para um texto curto (como os estados do WhatsApp); "none" = sem cor
+  background String?
   // Doação: aparece no feed de todas as comunidades, com o local para buscar
   location  String?
   latitude  Float?
@@ -310,6 +312,8 @@ model PrayerRequest {
   title     String
   content   String
   isAnswered Boolean  @default(false)
+  // Cor de fundo do pedido no feed; "none" = sem cor
+  background String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

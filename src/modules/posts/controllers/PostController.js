@@ -17,6 +17,7 @@ class PostController {
       imageUrl: post.imageUrl,
       isPinned: post.isPinned || false,
       type: post.type || 'post',
+      background: post.background || null,
       churchId: post.churchId,
       churchName: post.church?.name || null,
       location: post.location || null,
@@ -55,6 +56,7 @@ class PostController {
         location: req.body.location,
         latitude: req.body.latitude,
         longitude: req.body.longitude,
+        background: req.body.background,
       });
 
       dto.validate();

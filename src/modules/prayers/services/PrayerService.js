@@ -1,6 +1,7 @@
 const { NotFoundError, ValidationError } = require('../../../shared/errors/AppError');
 const { requireChurch, assertSameChurch, assertOwnerOrLeader } = require('../../../shared/utils/church.util');
 const { notifyChurch, notifyUser, notifyUsers, preview } = require('../../../shared/utils/notifier');
+const { normalizeBackground } = require('../../../shared/utils/background.util');
 
 class PrayerService {
   constructor(prayerRepository) {
@@ -14,8 +15,9 @@ class PrayerService {
 
     if (title.length < 3) throw new ValidationError('O título deve ter pelo menos 3 caracteres');
     if (content.length < 5) throw new ValidationError('Descreva o pedido (mínimo 5 caracteres)');
+    const background = normalizeBackground(dto.background);
 
-    const pr = await this.prayerRepository.create({ title, content, userId: user.id, churchId });
+    const pr = await this.prayerRepository.create({ title, content, background, userId: user.id, churchId });
 
     await notifyChurch(churchId, user.id, {
       type: 'new_prayer',

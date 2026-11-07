@@ -1,5 +1,6 @@
 const { ValidationError } = require('../../../shared/errors/AppError');
 const ValidationUtil = require('../../../shared/utils/validation.util');
+const { normalizeBackground } = require('../../../shared/utils/background.util');
 
 const MAX_LENGTH = 5000;
 const TYPES = ['post', 'donation'];
@@ -17,6 +18,7 @@ class CreatePostDto {
     this.location = typeof data.location === 'string' ? data.location.trim() : '';
     this.latitude = toNumber(data.latitude);
     this.longitude = toNumber(data.longitude);
+    this.background = data.background;
   }
 
   get isDonation() {
@@ -39,6 +41,9 @@ class CreatePostDto {
     if (!TYPES.includes(this.type)) {
       throw new ValidationError('Tipo de publicação inválido');
     }
+
+    // A cor só vale para texto sem imagem; doações mostram o local, sem cor
+    this.background = this.imageUrl || this.type === 'donation' ? null : normalizeBackground(this.background);
 
     if (this.isDonation) {
       if (this.location.length < 3 || this.location.length > 200) {

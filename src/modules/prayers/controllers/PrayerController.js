@@ -9,6 +9,7 @@ class PrayerController {
       title: pr.title,
       content: pr.content,
       isAnswered: pr.isAnswered,
+      background: pr.background || null,
       userId: pr.userId,
       authorName: pr.author?.name || null,
       authorProfileImage: pr.author?.profileImage || null,
