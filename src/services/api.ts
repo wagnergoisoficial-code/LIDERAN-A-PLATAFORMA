@@ -461,6 +461,26 @@ export const api = {
     return res.blob();
   },
 
+  // Painéis por cargo (sempre na comunidade ativa)
+  setCargo: (memberId: string, cargo: string | null) =>
+    request(`/panel/cargos/${memberId}`, { method: 'PUT', body: JSON.stringify({ cargo }) }),
+  getFinance: (month?: string) => request(`/panel/finance${month ? `?month=${month}` : ''}`),
+  createFinance: (data: any) => request('/panel/finance', { method: 'POST', body: JSON.stringify(data) }),
+  deleteFinance: (id: string) => request(`/panel/finance/${id}`, { method: 'DELETE' }),
+  getDocuments: () => request('/panel/documents'),
+  createDocument: (form: FormData) =>
+    request('/panel/documents', { method: 'POST', body: form, headers: getHeadersWithoutContentType() }),
+  deleteDocument: (id: string) => request(`/panel/documents/${id}`, { method: 'DELETE' }),
+  getDocumentFile: async (id: string) => {
+    const res = await fetch(`${BASE_URL}/panel/documents/${id}/file`, { headers: getHeadersWithoutContentType() });
+    if (!res.ok) throw new Error('Não foi possível abrir o arquivo');
+    return res.blob();
+  },
+  getSongs: () => request('/panel/songs'),
+  saveSong: (data: any, id?: string) =>
+    request(id ? `/panel/songs/${id}` : '/panel/songs', { method: id ? 'PUT' : 'POST', body: JSON.stringify(data) }),
+  deleteSong: (id: string) => request(`/panel/songs/${id}`, { method: 'DELETE' }),
+
   // Link de convite da comunidade
   getChurchInvite: (churchId: string) => request(`/churches/${churchId}/invite`),
   regenerateChurchInvite: (churchId: string) => request(`/churches/${churchId}/invite`, { method: 'POST' }),

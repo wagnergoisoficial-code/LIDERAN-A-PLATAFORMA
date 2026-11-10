@@ -11,12 +11,7 @@ export const COMMUNITY_TABS: Tab[] = [
   { to: '/users', label: 'Membros' },
 ];
 
-export const LEADER_TABS: Tab[] = [
-  { to: '/dashboard', label: 'Painel' },
-  { to: '/reports', label: 'Relatórios' },
-];
-
-/** Separadores de uma área (comunidade ou liderança); o ativo fica visível no telemóvel. */
+/** Separadores de uma área; o ativo fica visível no telemóvel. */
 const SectionTabs: React.FC<{ tabs: Tab[]; label: string }> = ({ tabs, label }) => {
   const nav = useRef<HTMLElement>(null);
 
@@ -37,6 +32,5 @@ const SectionTabs: React.FC<{ tabs: Tab[]; label: string }> = ({ tabs, label }) 
 };
 
 export const CommunityTabs = () => <SectionTabs tabs={COMMUNITY_TABS} label="Secções da comunidade" />;
-export const LeaderTabs = () => <SectionTabs tabs={LEADER_TABS} label="Liderança" />;
 
 export default SectionTabs;

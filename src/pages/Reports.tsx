@@ -7,7 +7,6 @@ import { useAuth } from '../context/AuthContext';
 import Avatar from '../components/Avatar';
 import PageHeader from '../components/PageHeader';
 import EmptyState from '../components/EmptyState';
-import { LeaderTabs } from '../components/SectionTabs';
 
 interface MemberStat {
   userId: string; name: string; profileImage?: string;
@@ -59,7 +58,6 @@ const Reports: React.FC = () => {
   if (!user?.churchId) {
     return (
       <div className="page is-medium">
-        <LeaderTabs />
         <div className="card"><EmptyState icon="reports" title="Nenhuma comunidade ativa" text="Os relatórios mostram a comunidade ativa. Escolha-a no Painel do líder." /></div>
       </div>
     );
@@ -79,7 +77,6 @@ const Reports: React.FC = () => {
 
   return (
     <div>
-      <LeaderTabs />
       <PageHeader title="Relatórios" subtitle={`Participação na comunidade${church ? ` ${church.name}` : ''}, desde o início.`} />
 
       <section className="card" aria-label="Resumo">

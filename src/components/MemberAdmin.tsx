@@ -82,6 +82,8 @@ interface Options {
   churchId: string;
   // Só o criador da comunidade (ou um administrador) torna alguém líder
   canChangeRole?: boolean;
+  // Secretaria: só editar os dados
+  editOnly?: boolean;
   // Depois de editar, suspender, tornar líder ou remover: a página recarrega os dados
   onChanged: () => void;
 }
@@ -90,7 +92,7 @@ interface Options {
  * Poderes do líder sobre um membro: editar dados, suspender ou bloquear (por dias), reativar,
  * autorizar menores, tornar líder e remover. Devolve as ações para o menu "Gerir" e os diálogos.
  */
-export const useMemberAdmin = ({ churchId, canChangeRole, onChanged }: Options) => {
+export const useMemberAdmin = ({ churchId, canChangeRole, editOnly, onChanged }: Options) => {
   const { user } = useAuth();
   const [editing, setEditing] = useState<ManagedMember | null>(null);
   const [protecting, setProtecting] = useState<ManagedMember | null>(null);
@@ -124,7 +126,7 @@ export const useMemberAdmin = ({ churchId, canChangeRole, onChanged }: Options) 
   const actionsFor = (member: ManagedMember): MenuAction[] => {
     const isMe = member.id === user?.id;
     const actions: MenuAction[] = [{ label: 'Editar dados', icon: 'pencil', onSelect: () => setEditing(member) }];
-    if (isMe) return actions;
+    if (isMe || editOnly) return actions;
     actions.push({ label: accessLabel(member), icon: 'shield', onSelect: () => setProtecting(member) });
     if (canChangeRole && member.role !== 'admin' && !member.isMinor && member.status === 'active') {
       actions.push({ label: member.role === 'leader' ? 'Tirar de líder' : 'Tornar líder', icon: 'user-plus', onSelect: () => changeRole(member) });

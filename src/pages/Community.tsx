@@ -50,7 +50,7 @@ const Community: React.FC = () => {
             icon="users"
             title="Você ainda não participa de uma comunidade"
             text={isLeader ? 'Crie sua comunidade no Painel do líder.' : 'Peça ao líder o link de convite da comunidade.'}
-            action={isLeader && <Link className="uk-button uk-button-primary" to="/dashboard">Abrir o Painel do líder</Link>}
+            action={isLeader && <Link className="uk-button uk-button-primary" to="/painel/lideranca">Abrir o Painel do líder</Link>}
           />
         </div>
       </div>
@@ -69,7 +69,7 @@ const Community: React.FC = () => {
           </div>
           <div className="community-actions">
             <Link className="uk-button uk-button-primary" to="/chat"><Icon name="chat" size={18} /> Abrir o chat</Link>
-            {isLeader && <Link className="uk-button uk-button-default" to="/dashboard">Gerenciar comunidade</Link>}
+            {isLeader && <Link className="uk-button uk-button-default" to="/painel/lideranca">Gerenciar comunidade</Link>}
           </div>
         </div>
         <div className="community-facts">

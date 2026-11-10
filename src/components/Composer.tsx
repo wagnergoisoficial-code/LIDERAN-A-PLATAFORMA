@@ -102,7 +102,8 @@ export const Composer: React.FC<ComposerProps> = ({ start, initialContent, onPub
   const { community } = useCommunity();
   const userId = user?.id || '';
   const isLeader = user?.role === 'leader' || user?.role === 'admin';
-  const kinds = KINDS.filter(k => !k.leader || isLeader);
+  // Quem tem cargo também marca encontros (ensaios, reuniões)
+  const kinds = KINDS.filter(k => !k.leader || isLeader || (k.value === 'event' && !!user?.cargo));
   const [draft, setDraft] = useState<Draft>(() => {
     const saved = readDraft(userId);
     if (initialContent) {

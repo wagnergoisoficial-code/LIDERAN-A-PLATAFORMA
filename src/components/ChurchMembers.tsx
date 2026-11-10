@@ -10,12 +10,15 @@ import EmptyState from './EmptyState';
 import GuardianFields, { EMPTY_GUARDIAN, GuardianDraft, guardianPayload, isMinorDate, todayInput } from './GuardianFields';
 import { statusLabel } from './MemberProtection';
 import { useMemberAdmin } from './MemberAdmin';
+import { cargoLabel } from '../lib/cargos';
 
 interface ChurchMembersProps {
   churchId: string;
   churchName: string;
   // Só o criador da comunidade (ou um administrador) torna alguém líder
   canChangeRoles?: boolean;
+  // Secretaria: cadastra e edita dados; suspender, bloquear e remover ficam com a liderança
+  editOnly?: boolean;
 }
 
 const emptyForm = { name: '', email: '', password: '', confirmPassword: '', birthDate: '', title: '', location: '' };
@@ -31,7 +34,7 @@ const ADD_FIELDS = [
 ];
 
 // Painel do líder: membros da comunidade, com cadastro, edição, proteção e remoção
-const ChurchMembers: React.FC<ChurchMembersProps> = ({ churchId, canChangeRoles }) => {
+const ChurchMembers: React.FC<ChurchMembersProps> = ({ churchId, canChangeRoles, editOnly }) => {
   const [members, setMembers] = useState<any[]>([]);
   const [loadingMembers, setLoadingMembers] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -80,7 +83,7 @@ const ChurchMembers: React.FC<ChurchMembersProps> = ({ churchId, canChangeRoles 
     }
   };
 
-  const admin = useMemberAdmin({ churchId, canChangeRole: canChangeRoles, onChanged: loadMembers });
+  const admin = useMemberAdmin({ churchId, canChangeRole: canChangeRoles, editOnly, onChanged: loadMembers });
 
   const pendingCount = members.filter(m => m.status === 'pending_authorization').length;
 
@@ -96,7 +99,7 @@ const ChurchMembers: React.FC<ChurchMembersProps> = ({ churchId, canChangeRoles 
       {pendingCount > 0 && (
         <p className="protected-note" style={{ marginBottom: '10px', borderRadius: 'var(--radius)' }}>
           <Icon name="lock" size={16} />
-          {pendingCount === 1 ? '1 menor aguarda' : `${pendingCount} menores aguardam`} a autorização dos pais. Use “Gerir” → “Autorizar cadastro” para confirmar.
+          {pendingCount === 1 ? '1 menor aguarda' : `${pendingCount} menores aguardam`} a autorização dos pais. {editOnly ? 'A liderança confirma em “Gerir” → “Autorizar cadastro”.' : 'Use “Gerir” → “Autorizar cadastro” para confirmar.'}
         </p>
       )}
 
@@ -134,6 +137,7 @@ const ChurchMembers: React.FC<ChurchMembersProps> = ({ churchId, canChangeRoles 
                         ? <span className="tag">{statusLabel(member)}</span>
                         : <span className="muted">{statusLabel(member)}</span>}
                       {member.role === 'leader' && <span className="tag">Líder</span>}
+                      {member.cargo && <span className="tag">{cargoLabel(member.cargo)}</span>}
                       {member.isMinor && <span className="tag">Menor</span>}
                     </div>
                   </td>

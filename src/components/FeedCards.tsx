@@ -18,6 +18,8 @@ export const EMPTY_REACTIONS: PostReactions = { amen: 0, praying: 0, heart: 0, f
 export interface Post {
   id: string; content: string; imageUrl?: string;
   isPinned?: boolean; type?: string; background?: string | null;
+  // No topo do feed: fixada, da liderança (últimos 7 dias) ou aniversário recente
+  top?: boolean;
   churchId?: string; churchName?: string | null;
   location?: string | null; latitude?: number | null; longitude?: number | null; donatedAt?: string | null;
   userId?: string; userName: string; userProfileImage?: string;
@@ -171,6 +173,8 @@ export const PostCard: React.FC<PostCardProps> = ({ post, me, onComment, onReact
   const manager = isManager(me);
   const own = post.userId === me.id;
   const donation = post.type === 'donation';
+  // Aviso de aniversário publicado pela plataforma
+  const birthday = post.type === 'birthday';
   // Doação de outra comunidade: só para ver (pessoas de comunidades diferentes não conversam)
   const outside = donation && !!post.churchId && post.churchId !== me.churchId;
   const canPin = manager && !outside;
@@ -183,7 +187,8 @@ export const PostCard: React.FC<PostCardProps> = ({ post, me, onComment, onReact
   const myReactions = post.myReactions ?? [];
   const commentsCount = post.comments.length;
   // Texto curto sem foto (e que não seja doação): aparece sobre a cor escolhida
-  const color = !post.imageUrl && !donation && fitsColor(post.content) ? backgroundColor(post.background, post.id) : null;
+  const color = birthday ? backgroundColor('rosa', post.id)
+    : !post.imageUrl && !donation && fitsColor(post.content) ? backgroundColor(post.background, post.id) : null;
 
   useEffect(() => {
     if (showComments && focusComment.current) {
@@ -219,7 +224,8 @@ export const PostCard: React.FC<PostCardProps> = ({ post, me, onComment, onReact
         person={post.userId ? { id: post.userId, name: post.userName, profileImage: post.userProfileImage } : null}
         linkProfile={!outside}
         at={post.createdAt}
-        label={isPinnedPost(post) ? { icon: 'pin', text: 'Fixado' } : donation ? { icon: 'gift', text: post.donatedAt ? 'Já doado' : 'Doação' } : undefined}
+        label={isPinnedPost(post) ? { icon: 'pin', text: 'Fixado' } : birthday ? { icon: 'cake', text: 'Aniversário' }
+          : donation ? { icon: 'gift', text: post.donatedAt ? 'Já doado' : 'Doação' } : undefined}
         extra={[outside && post.churchName]}
         actions={actions}
         menuLabel="Opções da publicação"

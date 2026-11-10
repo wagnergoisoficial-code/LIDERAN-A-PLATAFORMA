@@ -25,6 +25,13 @@ import Reports from './pages/Reports';
 import Messages from './pages/Messages';
 import Bible from './pages/Bible';
 import GuardianHome from './pages/GuardianHome';
+import PanelLayout, { PanelHome, PanelGuard, PanelMembers } from './pages/panel/PanelLayout';
+import Cargos from './pages/panel/Cargos';
+import Birthdays from './pages/panel/Birthdays';
+import Documents from './pages/panel/Documents';
+import Finance from './pages/panel/Finance';
+import Songs from './pages/panel/Songs';
+import { hasPanel, panelLabel } from './lib/cargos';
 
 class ErrorBoundary extends Component<{ children: React.ReactNode }, { error: Error | null }> {
   constructor(props: any) {
@@ -71,14 +78,6 @@ const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   return <>{children}</>;
 };
 
-const RoleRoute: React.FC<{ children: React.ReactNode; allowedRoles: string[] }> = ({ children, allowedRoles }) => {
-  const { isAuthenticated, isLoading, user } = useAuth();
-  if (isLoading) return <FullPageSpinner />;
-  if (!isAuthenticated) return <Navigate to="/login" />;
-  if (!user || !allowedRoles.includes(user.role)) return <Navigate to="/" />;
-  return <>{children}</>;
-};
-
 interface Notification { id: string; type: string; title: string; body: string; isRead: boolean; createdAt: string; linkType?: string | null; linkId?: string | null; }
 
 // Página aberta ao clicar numa notificação: o que se publica está no feed; a gestão, no Painel
@@ -91,15 +90,16 @@ const NOTIFICATION_ROUTES: Record<string, string> = {
   video: '/',
   sermon: '/',
   group: '/',
-  report: '/dashboard',
-  member: '/dashboard',
-  verification: '/dashboard',
+  report: '/painel/lideranca',
+  member: '/painel/lideranca',
+  verification: '/painel/lideranca',
+  panel: '/painel',
 };
 
 // Destinos principais: o feed, a comunidade (sobre, agenda e membros) e as mensagens
 const COMMUNITY_PATHS = COMMUNITY_TABS.map(t => t.to);
 const isCommunityPath = (path: string) => COMMUNITY_PATHS.includes(path);
-const isLeaderPath = (path: string) => path === '/dashboard' || path === '/reports';
+const isPanelPath = (path: string) => path.startsWith('/painel');
 
 interface NavItem { to: string; label: string; icon: IconName; active: (path: string) => boolean; badge?: number }
 
@@ -345,7 +345,6 @@ const AccountMenu: React.FC = () => {
   const [open, setOpen] = useState(false);
   const button = useRef<HTMLButtonElement>(null);
   const menu = useRef<HTMLDivElement>(null);
-  const isLeader = user?.role === 'leader' || user?.role === 'admin';
 
   const close = (refocus = true) => {
     setOpen(false);
@@ -374,13 +373,8 @@ const AccountMenu: React.FC = () => {
             </div>
           </div>
           <Link to={`/profile/${user?.id}`} role="menuitem" className="menu-item"><Icon name="user" size={18} /> Meu perfil</Link>
-          {isLeader && (
-            <>
-              <div className="menu-divider" role="separator"></div>
-              <div className="menu-label">Liderança</div>
-              <Link to="/dashboard" role="menuitem" className="menu-item"><Icon name="dashboard" size={18} /> Painel do líder</Link>
-              <Link to="/reports" role="menuitem" className="menu-item"><Icon name="reports" size={18} /> Relatórios</Link>
-            </>
+          {hasPanel(user) && (
+            <Link to="/painel" role="menuitem" className="menu-item"><Icon name="dashboard" size={18} /> {panelLabel(user)}</Link>
           )}
           <div className="menu-divider" role="separator"></div>
           <button type="button" role="menuitemcheckbox" aria-checked={theme === 'dark'} className="menu-item" onClick={toggleTheme}>
@@ -397,6 +391,7 @@ const AccountMenu: React.FC = () => {
 
 /* ─── Cabeçalho ─────────────────────────────────────────────── */
 const Header: React.FC<{ items: NavItem[]; guardian: boolean }> = ({ items, guardian }) => {
+  const { user } = useAuth();
   const location = useLocation();
   const { openComposer } = useComposer();
   const [searchOpen, setSearchOpen] = useState(false);
@@ -434,6 +429,11 @@ const Header: React.FC<{ items: NavItem[]; guardian: boolean }> = ({ items, guar
               <Icon name="plus" size={18} strokeWidth={2} /> Publicar
             </button>
           )}
+          {hasPanel(user) && (
+            <Link to="/painel" className={`icon-btn${isPanelPath(location.pathname) ? ' is-active' : ''}`} aria-label={panelLabel(user)} title={panelLabel(user)}>
+              <Icon name="dashboard" />
+            </Link>
+          )}
           <Notifications />
           <AccountMenu />
         </div>
@@ -448,7 +448,7 @@ const BottomNav: React.FC<{ items: NavItem[]; guardian: boolean }> = ({ items, g
   const location = useLocation();
   const { openComposer } = useComposer();
   const path = location.pathname;
-  const profileActive = path === '/profile' || path === `/profile/${user?.id}` || isLeaderPath(path);
+  const profileActive = path === '/profile' || path === `/profile/${user?.id}` || isPanelPath(path);
 
   const link = (item: NavItem) => {
     const active = item.active(path);
@@ -511,7 +511,7 @@ const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   return (
     <ComposerProvider>
-      <div className={`app${immersive ? ' is-immersive' : ''}`}>
+      <div className={`app${immersive ? ' is-immersive' : ''}${isPanelPath(location.pathname) ? ' is-wide' : ''}`}>
         <a className="skip-link" href="#conteudo">Pular para o conteúdo</a>
         <Header items={items} guardian={guardian} />
         <main id="conteudo" className="app-main" tabIndex={-1}>{children}</main>
@@ -544,7 +544,18 @@ export default function App() {
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/convite/:code" element={<InviteRegister />} />
-      <Route path="/dashboard" element={<RoleRoute allowedRoles={['leader', 'admin']}><Dashboard /></RoleRoute>} />
+      <Route path="/painel" element={<PrivateRoute><PanelLayout /></PrivateRoute>}>
+        <Route index element={<PanelHome />} />
+        <Route path="lideranca" element={<PanelGuard area="lideranca"><Dashboard /></PanelGuard>} />
+        <Route path="cargos" element={<PanelGuard area="lideranca"><Cargos /></PanelGuard>} />
+        <Route path="relatorios" element={<PanelGuard area="lideranca"><Reports /></PanelGuard>} />
+        <Route path="membros" element={<PanelGuard area="secretario"><PanelMembers /></PanelGuard>} />
+        <Route path="aniversarios" element={<PanelGuard area="secretario"><Birthdays /></PanelGuard>} />
+        <Route path="documentos" element={<PanelGuard area="secretario"><Documents /></PanelGuard>} />
+        <Route path="tesouraria" element={<PanelGuard area="tesoureiro"><Finance /></PanelGuard>} />
+        <Route path="repertorio" element={<PanelGuard area="regente"><Songs /></PanelGuard>} />
+      </Route>
+      <Route path="/dashboard" element={<Navigate to="/painel/lideranca" replace />} />
       <Route path="/" element={<PrivateRoute><Feed /></PrivateRoute>} />
       <Route path="/posts" element={<PrivateRoute><Posts /></PrivateRoute>} />
       <Route path="/comunidade" element={<PrivateRoute><Community /></PrivateRoute>} />
@@ -554,7 +565,7 @@ export default function App() {
       <Route path="/biblia" element={<PrivateRoute><Bible /></PrivateRoute>} />
       <Route path="/biblia/:book/:chapter" element={<PrivateRoute><Bible /></PrivateRoute>} />
       <Route path="/users" element={<PrivateRoute><Users /></PrivateRoute>} />
-      <Route path="/reports" element={<RoleRoute allowedRoles={['leader', 'admin']}><Reports /></RoleRoute>} />
+      <Route path="/reports" element={<Navigate to="/painel/relatorios" replace />} />
       <Route path="/profile/:userId" element={<PrivateRoute><Profile /></PrivateRoute>} />
       <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
       <Route path="*" element={<Navigate to="/" />} />

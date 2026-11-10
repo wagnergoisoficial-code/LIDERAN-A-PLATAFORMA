@@ -10,6 +10,9 @@ interface User {
   profileImage?: string | null;
   title?: string | null;
   leaderVerified?: boolean;
+  // Cargo com painel próprio (o líder entra em todos)
+  cargo?: 'secretario' | 'tesoureiro' | 'regente' | null;
+  birthDate?: string | null;
 }
 
 export interface Session {

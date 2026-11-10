@@ -15,7 +15,6 @@ import PageHeader from '../components/PageHeader';
 import EmptyState from '../components/EmptyState';
 import Icon from '../components/Icon';
 import MoreMenu, { MenuAction } from '../components/MoreMenu';
-import { LeaderTabs } from '../components/SectionTabs';
 
 interface Church {
   id: string;
@@ -104,7 +103,6 @@ const Dashboard = () => {
   if (unverified && !user?.churchId) {
     return (
       <div className="page is-medium">
-        <LeaderTabs />
         <PageHeader title="Painel do líder" subtitle="Antes de criar a comunidade, confirmamos que você é líder de uma igreja." />
         <LeaderVerificationCard />
       </div>
@@ -118,7 +116,6 @@ const Dashboard = () => {
 
   return (
     <div>
-      <LeaderTabs />
       <PageHeader
         title="Painel do líder"
         subtitle="Suas comunidades: convites, denúncias, conversas e membros."

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useLayoutEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useLayoutEffect, useMemo, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import UIkit from 'uikit';
 import { api } from '../services/api';
@@ -89,6 +89,41 @@ const useChatPeek = (enabled: boolean) => {
 const notify = (message: string, status: 'success' | 'danger' = 'danger') => UIkit.notification({ message, status, pos: 'top-right' });
 
 // O feed fica guardado ao sair: ao voltar, reaparece igual e na mesma posição de leitura
+// Quem ainda não tem data de nascimento indica-a aqui uma vez; o feed avisa a comunidade na véspera
+const BirthDateAsk = () => {
+  const { refreshUser } = useAuth();
+  const [value, setValue] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const save = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await api.updateUserProfile({ birthDate: value });
+      await refreshUser();
+      notify('Data de nascimento guardada', 'success');
+    } catch (err: any) {
+      notify(err.message || 'Não foi possível guardar');
+      setSaving(false);
+    }
+  };
+
+  return (
+    <form className="card birthday-ask" onSubmit={save}>
+      <span className="group-avatar"><Icon name="cake" /></span>
+      <label htmlFor="ask-birth" style={{ flex: '1 1 220px', minWidth: 0 }}>
+        <span className="list-row-title"><span>Quando é o seu aniversário?</span></span>
+        <span className="list-row-meta" style={{ display: 'block' }}>A comunidade recebe um aviso na véspera para dar os parabéns.</span>
+      </label>
+      <span style={{ display: 'flex', gap: '8px' }}>
+        <input id="ask-birth" className="form-input" type="date" required max={new Date().toLocaleDateString('en-CA')}
+          value={value} onChange={e => setValue(e.target.value)} style={{ width: 'auto' }} />
+        <button type="submit" className="uk-button uk-button-primary" disabled={saving || !value}>Guardar</button>
+      </span>
+    </form>
+  );
+};
+
 interface FeedCache { key: string; posts: Post[]; nextCursor: string | null; extras: Extras; members: Member[]; scrollY: number }
 let feedCache: FeedCache | null = null;
 
@@ -259,7 +294,7 @@ const Feed = () => {
     const past = extras.events.filter(e => time(e.startDate) < now).sort((a, b) => time(b.startDate) - time(a.startDate));
     // Em cada tipo, primeiro o que ainda pede ação: orações por responder, enquetes abertas, encontros por vir
     const buckets: Record<MixKind, Item[]> = {
-      post: posts.filter(p => !isPinnedPost(p)).map(post => ({ kind: 'post' as const, key: `post:${post.id}`, at: time(post.createdAt), post })),
+      post: posts.map(post => ({ kind: 'post' as const, key: `post:${post.id}`, at: time(post.createdAt), post })),
       prayer: [...extras.prayers.filter(p => !p.isAnswered).sort(byRecent), ...extras.prayers.filter(p => p.isAnswered).sort(byRecent)]
         .map(prayer => ({ kind: 'prayer' as const, key: `prayer:${prayer.id}`, at: time(prayer.createdAt), prayer })),
       video: videos.map(video => ({ kind: 'video' as const, key: `video:${video.id}`, at: time(video.createdAt), video })),
@@ -267,15 +302,33 @@ const Feed = () => {
         .map(poll => ({ kind: 'poll' as const, key: `poll:${poll.id}`, at: time(poll.createdAt), poll })),
       event: [...upcoming, ...past].map(event => ({ kind: 'event' as const, key: `event:${event.id}`, at: time(event.createdAt), event })),
     };
+    // O que a liderança publicou nos últimos 7 dias fica no topo, com as fixadas e os aniversários
+    const leaders = new Set(members.filter(m => m.role === 'leader' || m.role === 'admin').map(m => m.id));
+    const fromLeader = (authorId: string | null | undefined, at: number) => !!authorId && leaders.has(authorId) && now - at < 7 * 24 * 60 * 60 * 1000;
+    const isTop = (item: Item) => {
+      switch (item.kind) {
+        case 'post': return !!item.post.top || isPinnedPost(item.post);
+        case 'prayer': return fromLeader(item.prayer.userId, item.at);
+        case 'video': return fromLeader(item.video.author?.id, item.at);
+        case 'poll': return fromLeader(item.poll.createdBy, item.at);
+        case 'event': return fromLeader(item.event.createdBy, item.at);
+        default: return false;
+      }
+    };
+    const lifted: Item[] = [];
+    MIX_ORDER.forEach(k => {
+      lifted.push(...buckets[k].filter(isTop));
+      buckets[k] = buckets[k].filter(item => !isTop(item));
+    });
     const hidden = MIX_ORDER.reduce((sum, k) => sum + buckets[k].length - shown(buckets[k]).length, 0);
     MIX_ORDER.forEach(k => { buckets[k] = shown(buckets[k]); });
+    const pinnedFirst = (item: Item) => (item.kind === 'post' && isPinnedPost(item.post) ? 1 : 0);
     const top: Item[] = [
-      ...posts.filter(isPinnedPost).map(post => ({ kind: 'post' as const, key: `post:${post.id}`, at: time(post.createdAt), post })),
-      ...[...extras.devotionals].sort(byRecent)
-        .map(devotional => ({ kind: 'devotional' as const, key: `devotional:${devotional.id}`, at: time(devotional.createdAt), devotional })),
-    ];
+      ...lifted,
+      ...extras.devotionals.map(devotional => ({ kind: 'devotional' as const, key: `devotional:${devotional.id}`, at: time(devotional.createdAt), devotional })),
+    ].sort((a, b) => pinnedFirst(b) - pinnedFirst(a) || b.at - a.at);
     return { featured: top, stream: mixFeed(buckets, !!nextCursor), pending: hidden };
-  }, [posts, nextCursor, extras, cutoff]);
+  }, [posts, nextCursor, extras, cutoff, members]);
 
   shownUntil.current = Math.max(0, ...stream.map(item => item.at));
 
@@ -496,7 +549,7 @@ const Feed = () => {
       notify('Link de convite copiado. Quem entrar por ele fica na sua comunidade.', 'success');
     } catch {
       // Sem acesso à área de transferência: o link está no Painel do líder
-      navigate('/dashboard');
+      navigate('/painel/lideranca');
     }
   };
 
@@ -509,7 +562,7 @@ const Feed = () => {
             icon="users"
             title="Você ainda não participa de uma comunidade"
             text={isLeader ? 'Crie sua comunidade no Painel do líder para começar.' : 'Peça ao líder da sua comunidade o link de convite.'}
-            action={isLeader && <Link className="uk-button uk-button-primary" to="/dashboard">Abrir o Painel do líder</Link>}
+            action={isLeader && <Link className="uk-button uk-button-primary" to="/painel/lideranca">Abrir o Painel do líder</Link>}
           />
         </div>
       </div>
@@ -565,6 +618,8 @@ const Feed = () => {
           </div>
         </section>
 
+        {!user.birthDate && user.role !== 'admin' && <BirthDateAsk />}
+
         <Link to="/chat" className="chat-peek-row below-rail" aria-label={`Chat da comunidade${lastChat ? `. Última mensagem de ${lastChat.user.name}: ${lastChat.content}` : ''}`}>
           <span className="group-avatar"><Icon name="chat" /></span>
           <span style={{ flex: 1, minWidth: 0 }}>
@@ -602,7 +657,7 @@ const Feed = () => {
 
         <section aria-labelledby="posts-title">
           <div className="feed-heading" style={{ marginBottom: '10px' }}>
-            <h2 id="posts-title">Publicações</h2>
+            <h2 id="posts-title">{featured.length && !loading ? 'Em destaque' : 'Publicações'}</h2>
           </div>
 
           {loading ? (
@@ -623,6 +678,9 @@ const Feed = () => {
           ) : (
             <>
               {featured.map(renderItem)}
+              {featured.length > 0 && stream.length > 0 && (
+                <div className="feed-heading" style={{ margin: '28px 0 10px' }}><h2>Publicações</h2></div>
+              )}
               {stream.map(renderItem)}
               <div ref={sentinel} />
               {nextCursor ? (

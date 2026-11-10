@@ -12,6 +12,7 @@ const PASSWORD_HINT = 'A senha deve ter pelo menos 8 caracteres, com letra maiú
 const Register = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [birthDate, setBirthDate] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPasswords, setShowPasswords] = useState(false);
@@ -31,11 +32,11 @@ const Register = () => {
     }
     setLoading(true);
     try {
-      const response = await api.register({ name, email, password, confirmPassword });
+      const response = await api.register({ name, email, birthDate, password, confirmPassword });
       if (response.success) {
         login(response.data.user, response.data.token);
         UIkit.notification({ message: 'Conta criada com sucesso!', status: 'success', pos: 'top-right' });
-        navigate('/dashboard');
+        navigate('/painel/lideranca');
       }
     } catch (err: any) {
       UIkit.notification({ message: err.message || 'Erro ao criar conta', status: 'danger', pos: 'top-right' });
@@ -77,6 +78,21 @@ const Register = () => {
             autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+        </div>
+
+        <div className="auth-field">
+          <label className="auth-label" htmlFor="register-birth">Data de nascimento</label>
+          <input
+            id="register-birth"
+            name="birthDate"
+            className="uk-input"
+            type="date"
+            autoComplete="bday"
+            max={new Date().toLocaleDateString('en-CA')}
+            value={birthDate}
+            onChange={(e) => setBirthDate(e.target.value)}
             required
           />
         </div>
