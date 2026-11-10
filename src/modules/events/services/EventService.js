@@ -1,9 +1,9 @@
-const { NotFoundError, ValidationError } = require('../../../shared/errors/AppError');
+const { NotFoundError, ValidationError, ForbiddenError } = require('../../../shared/errors/AppError');
 const {
   requireChurch,
   assertSameChurch,
   assertOwnerOrLeader,
-  assertLeader,
+  isLeaderOrAdmin,
 } = require('../../../shared/utils/church.util');
 const { notifyChurch } = require('../../../shared/utils/notifier');
 const { isUploadUrl } = require('../../../shared/utils/url.util');
@@ -51,7 +51,8 @@ class EventService {
   }
 
   async createEvent(dto, user) {
-    assertLeader(user, 'Apenas líderes podem criar eventos');
+    // Líderes e quem tem cargo (ex.: ensaios da regência, reuniões da secretaria)
+    if (!isLeaderOrAdmin(user) && !user.cargo) throw new ForbiddenError('Apenas a liderança pode criar eventos');
     const churchId = requireChurch(user);
     const data = this.buildData(dto);
     this.assertDates(data.startDate, data.endDate);

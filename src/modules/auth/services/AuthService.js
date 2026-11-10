@@ -1,7 +1,8 @@
 const bcrypt = require('bcrypt');
 const JwtUtil = require('../../../shared/utils/jwt.util');
 const { getPrismaClient } = require('../../../config/database');
-const { canManageChurch } = require('../../../shared/utils/church.util');
+const { hasCargo } = require('../../../shared/utils/church.util');
+const { ageFrom } = require('../../../shared/utils/minor.util');
 const { assertAccountActive } = require('../../../shared/utils/account-status.util');
 const guardianService = require('../../guardians/guardian.service');
 const RegisterMemberDto = require('../dtos/RegisterMemberDto');
@@ -34,6 +35,7 @@ class AuthService {
       email: registerDto.email,
       password: hashedPassword,
       role: registerDto.role,
+      ...(registerDto.birthDate && { birthDate: registerDto.birthDate, age: ageFrom(registerDto.birthDate) }),
     });
 
     return this.formatAuthResponse(user, this.signToken(user));
@@ -79,8 +81,8 @@ class AuthService {
       throw new NotFoundError('Comunidade não encontrada');
     }
 
-    if (!canManageChurch(requester, church)) {
-      throw new ForbiddenError('Apenas os líderes desta comunidade podem cadastrar membros');
+    if (!hasCargo(requester, church, 'secretario')) {
+      throw new ForbiddenError('Apenas a liderança e a secretaria desta comunidade podem cadastrar membros');
     }
 
     const existingUser = await this.userRepository.findByEmail(registerMemberDto.email);
@@ -185,6 +187,8 @@ class AuthService {
       title: user.title || null,
       status: user.status || 'active',
       leaderVerified: !!user.leaderVerifiedAt,
+      cargo: user.cargo || null,
+      birthDate: user.birthDate || null,
     };
   }
 

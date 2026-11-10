@@ -1,6 +1,7 @@
 const { NotFoundError, ConflictError, ForbiddenError, ValidationError } = require('../../../shared/errors/AppError');
 const { requireChurch, isAdmin } = require('../../../shared/utils/church.util');
 const bcrypt = require('bcrypt');
+const { ageFrom, MINOR_AGE } = require('../../../shared/utils/minor.util');
 
 const parseSkills = (value) => {
   if (!value) return [];
@@ -127,6 +128,19 @@ class UserService {
       updateData.skills = JSON.stringify([...new Set(skills)].slice(0, 20));
     }
     if (dto.socialLinks !== undefined) updateData.socialLinks = dto.socialLinks;
+    // A data de nascimento é definida uma vez pelo próprio; depois só a liderança ou a secretaria a corrige
+    if (dto.birthDate) {
+      const birthDate = new Date(dto.birthDate);
+      if (Number.isNaN(birthDate.getTime()) || birthDate > new Date()) throw new ValidationError('Data de nascimento inválida');
+      if (user.birthDate && new Date(user.birthDate).getTime() !== birthDate.getTime()) {
+        throw new ValidationError('A data de nascimento já foi definida. Peça à secretaria para corrigir.');
+      }
+      if (!user.birthDate) {
+        if (ageFrom(birthDate) < MINOR_AGE) throw new ValidationError('Menores de 18 anos são cadastrados pela liderança, com autorização dos pais');
+        updateData.birthDate = birthDate;
+        updateData.age = ageFrom(birthDate);
+      }
+    }
 
     const updated = await this.userRepository.updateProfile(userId, updateData);
     const fresh = await this.userRepository.findByIdWithProfile(updated.id);

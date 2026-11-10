@@ -38,6 +38,11 @@ const canManageChurch = (user, church) =>
 
 const canViewChurch = (user, church) => canManageChurch(user, church) || user?.churchId === church.id;
 
+// Cargos com painel próprio; os líderes entram em todos os painéis
+const CARGOS = ['secretario', 'tesoureiro', 'regente'];
+const hasCargo = (user, church, cargo) =>
+  canManageChurch(user, church) || (user?.cargo === cargo && user?.churchId === church.id);
+
 module.exports = {
   NO_CHURCH_MESSAGE,
   isAdmin,
@@ -48,4 +53,6 @@ module.exports = {
   assertLeader,
   canManageChurch,
   canViewChurch,
+  CARGOS,
+  hasCargo,
 };

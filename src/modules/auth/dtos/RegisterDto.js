@@ -1,5 +1,6 @@
 const { ValidationError } = require('../../../shared/errors/AppError');
 const ValidationUtil = require('../../../shared/utils/validation.util');
+const { ageFrom, MINOR_AGE } = require('../../../shared/utils/minor.util');
 
 const PASSWORD_RULE_MESSAGE = 'A senha deve ter pelo menos 8 caracteres, com letra maiúscula, minúscula e número';
 
@@ -11,6 +12,7 @@ class RegisterDto {
     this.email = typeof data.email === 'string' ? data.email.trim() : data.email;
     this.password = data.password;
     this.confirmPassword = data.confirmPassword;
+    this.birthDate = data.birthDate ? new Date(data.birthDate) : null;
     this.role = 'leader';
   }
 
@@ -41,6 +43,15 @@ class RegisterDto {
 
     if (this.password !== this.confirmPassword) {
       throw new ValidationError('As senhas não conferem');
+    }
+
+    if (this.birthDate) {
+      if (Number.isNaN(this.birthDate.getTime()) || this.birthDate > new Date()) {
+        throw new ValidationError('Data de nascimento inválida');
+      }
+      if (ageFrom(this.birthDate) < MINOR_AGE) {
+        throw new ValidationError('O cadastro de líder é só para maiores de 18 anos');
+      }
     }
 
     return true;

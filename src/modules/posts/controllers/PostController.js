@@ -16,6 +16,8 @@ class PostController {
       content: post.content,
       imageUrl: post.imageUrl,
       isPinned: post.isPinned || false,
+      // No topo do feed (fixada, da liderança ou aniversário recente)
+      top: !!post.top,
       type: post.type || 'post',
       background: post.background || null,
       churchId: post.churchId,

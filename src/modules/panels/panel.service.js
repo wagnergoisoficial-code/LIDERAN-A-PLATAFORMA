@@ -1,0 +1,213 @@
+const { getPrismaClient } = require('../../config/database');
+const { ValidationError, NotFoundError, ForbiddenError } = require('../../shared/errors/AppError');
+const { requireChurch, canManageChurch, hasCargo, CARGOS } = require('../../shared/utils/church.util');
+const { isMinor } = require('../../shared/utils/minor.util');
+const { notifyUser } = require('../../shared/utils/notifier');
+
+const CARGO_NAMES = { secretario: 'secretário(a)', tesoureiro: 'tesoureiro(a)', regente: 'regente' };
+const FINANCE_KINDS = ['entrada', 'saida'];
+const DOCUMENT_KINDS = ['ata', 'recomendacao', 'transferencia', 'batismo', 'ficha', 'outro'];
+const MAX_CENTS = 1000000000;
+const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
+const DOCUMENT_SELECT = {
+  id: true, kind: true, title: true, date: true, memberId: true, notes: true,
+  mimeType: true, size: true, createdById: true, createdAt: true,
+};
+
+const prisma = () => getPrismaClient();
+
+// Texto opcional (ou obrigatório) com limite de tamanho; label leva o artigo: "o título"
+const text = (value, max, label, required = false) => {
+  const clean = typeof value === 'string' ? value.trim() : '';
+  if (!clean) {
+    if (required) throw new ValidationError(`Informe ${label}`);
+    return null;
+  }
+  if (clean.length > max) {
+    const noun = label.slice(label.indexOf(' ') + 1);
+    throw new ValidationError(`${noun[0].toUpperCase()}${noun.slice(1)}: no máximo ${max} caracteres`);
+  }
+  return clean;
+};
+
+const dateOf = (value, required = false) => {
+  if (value === undefined || value === null || value === '') {
+    if (required) throw new ValidationError('Informe a data');
+    return null;
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) throw new ValidationError('Data inválida');
+  return date;
+};
+
+const linkOf = (value) => {
+  const link = text(value, 500, 'o link');
+  if (!link) return null;
+  let url;
+  try {
+    url = new URL(link);
+  } catch {
+    throw new ValidationError('Link inválido');
+  }
+  if (!['http:', 'https:'].includes(url.protocol)) throw new ValidationError('O link deve começar por http:// ou https://');
+  return link;
+};
+
+// O painel trabalha sempre na comunidade ativa de quem o abre
+const panelChurch = async (user, cargo) => {
+  const church = await prisma().church.findUnique({ where: { id: requireChurch(user) } });
+  if (!church) throw new NotFoundError('Comunidade não encontrada');
+  if (!hasCargo(user, church, cargo)) throw new ForbiddenError('Este painel é só para a liderança e para quem tem o cargo');
+  return church;
+};
+
+const memberOf = async (churchId, memberId) => {
+  if (!memberId) return null;
+  const member = await prisma().user.findFirst({ where: { id: String(memberId), churchId }, select: { id: true } });
+  if (!member) throw new ValidationError('Membro não encontrado nesta comunidade');
+  return member.id;
+};
+
+const songData = (body) => ({
+  title: text(body.title, 120, 'o título', true),
+  artist: text(body.artist, 120, 'o autor'),
+  musicKey: text(body.musicKey, 10, 'o tom'),
+  link: linkOf(body.link),
+  notes: text(body.notes, 2000, 'as observações'),
+});
+
+module.exports = {
+  panelChurch,
+
+  /* ─── Cargos (só a liderança atribui) ─── */
+  async setCargo(user, memberId, value) {
+    const church = await prisma().church.findUnique({ where: { id: requireChurch(user) } });
+    if (!church || !canManageChurch(user, church)) throw new ForbiddenError('Apenas a liderança desta comunidade atribui cargos');
+    const cargo = value === undefined || value === null || value === '' ? null : value;
+    if (cargo !== null && !CARGOS.includes(cargo)) throw new ValidationError('Cargo inválido');
+
+    const member = await prisma().user.findFirst({
+      where: { id: memberId, churchId: church.id },
+      select: { id: true, birthDate: true, age: true, status: true, cargo: true },
+    });
+    if (!member) throw new NotFoundError('Membro não encontrado nesta comunidade');
+    if (cargo && (member.status !== 'active' || isMinor(member))) {
+      throw new ValidationError('Só membros adultos e ativos podem ter um cargo');
+    }
+    if (member.cargo === cargo) return { id: member.id, cargo };
+
+    await prisma().user.update({ where: { id: member.id }, data: { cargo } });
+    await notifyUser(member.id, cargo
+      ? { type: 'cargo', title: `Você agora é ${CARGO_NAMES[cargo]} de ${church.name}`, body: 'Acesse o seu painel pelo menu da sua conta.', linkType: 'panel' }
+      : { type: 'cargo', title: `Você deixou de ter cargo em ${church.name}`, body: 'Continua sendo membro da comunidade.' });
+    return { id: member.id, cargo };
+  },
+
+  /* ─── Tesouraria ─── */
+  // Lançamentos (de um mês, se pedido) e o saldo de sempre
+  async listFinance(user, { month } = {}) {
+    const church = await panelChurch(user, 'tesoureiro');
+    const where = { churchId: church.id };
+    if (month) {
+      if (!MONTH.test(month)) throw new ValidationError('Mês inválido');
+      const start = new Date(`${month}-01T00:00:00.000Z`);
+      const end = new Date(start);
+      end.setUTCMonth(end.getUTCMonth() + 1);
+      where.date = { gte: start, lt: end };
+    }
+    const [entries, totals] = await Promise.all([
+      prisma().financeEntry.findMany({ where, orderBy: [{ date: 'desc' }, { createdAt: 'desc' }], take: 2000 }),
+      prisma().financeEntry.groupBy({ by: ['kind'], where: { churchId: church.id }, _sum: { amountCents: true } }),
+    ]);
+    const sum = (kind) => totals.find((t) => t.kind === kind)?._sum.amountCents || 0;
+    return { entries, balanceCents: sum('entrada') - sum('saida') };
+  },
+
+  async createFinance(user, body = {}) {
+    const church = await panelChurch(user, 'tesoureiro');
+    if (!FINANCE_KINDS.includes(body.kind)) throw new ValidationError('Escolha entrada ou saída');
+    const amountCents = Math.round(Number(String(body.amount ?? '').replace(',', '.')) * 100);
+    if (!Number.isFinite(amountCents) || amountCents <= 0 || amountCents > MAX_CENTS) throw new ValidationError('Valor inválido');
+    return prisma().financeEntry.create({
+      data: {
+        kind: body.kind,
+        category: text(body.category, 60, 'a categoria', true),
+        amountCents,
+        date: dateOf(body.date, true),
+        description: text(body.description, 300, 'a descrição'),
+        memberId: await memberOf(church.id, body.memberId),
+        createdById: user.id,
+        churchId: church.id,
+      },
+    });
+  },
+
+  async removeFinance(user, id) {
+    const church = await panelChurch(user, 'tesoureiro');
+    const { count } = await prisma().financeEntry.deleteMany({ where: { id, churchId: church.id } });
+    if (!count) throw new NotFoundError('Lançamento não encontrado');
+  },
+
+  /* ─── Secretaria: documentos ─── */
+  async listDocuments(user) {
+    const church = await panelChurch(user, 'secretario');
+    return prisma().churchDocument.findMany({ where: { churchId: church.id }, select: DOCUMENT_SELECT, orderBy: { createdAt: 'desc' }, take: 1000 });
+  },
+
+  async createDocument(user, body = {}, file = null) {
+    const church = await panelChurch(user, 'secretario');
+    if (!DOCUMENT_KINDS.includes(body.kind)) throw new ValidationError('Escolha o tipo de documento');
+    return prisma().churchDocument.create({
+      data: {
+        kind: body.kind,
+        title: text(body.title, 120, 'o título', true),
+        date: dateOf(body.date),
+        memberId: await memberOf(church.id, body.memberId),
+        notes: text(body.notes, 2000, 'as observações'),
+        mimeType: file?.mimeType || null,
+        size: file ? file.data.length : null,
+        data: file?.data || null,
+        createdById: user.id,
+        churchId: church.id,
+      },
+      select: DOCUMENT_SELECT,
+    });
+  },
+
+  async documentFile(user, id) {
+    const church = await panelChurch(user, 'secretario');
+    const document = await prisma().churchDocument.findFirst({ where: { id, churchId: church.id }, select: { mimeType: true, data: true } });
+    if (!document?.data) throw new NotFoundError('Arquivo não encontrado');
+    return document;
+  },
+
+  async removeDocument(user, id) {
+    const church = await panelChurch(user, 'secretario');
+    const { count } = await prisma().churchDocument.deleteMany({ where: { id, churchId: church.id } });
+    if (!count) throw new NotFoundError('Documento não encontrado');
+  },
+
+  /* ─── Regência: repertório ─── */
+  async listSongs(user) {
+    const church = await panelChurch(user, 'regente');
+    return prisma().song.findMany({ where: { churchId: church.id }, orderBy: { title: 'asc' }, take: 2000 });
+  },
+
+  async createSong(user, body = {}) {
+    const church = await panelChurch(user, 'regente');
+    return prisma().song.create({ data: { ...songData(body), createdById: user.id, churchId: church.id } });
+  },
+
+  async updateSong(user, id, body = {}) {
+    const church = await panelChurch(user, 'regente');
+    const { count } = await prisma().song.updateMany({ where: { id, churchId: church.id }, data: songData(body) });
+    if (!count) throw new NotFoundError('Música não encontrada');
+    return prisma().song.findUnique({ where: { id } });
+  },
+
+  async removeSong(user, id) {
+    const church = await panelChurch(user, 'regente');
+    const { count } = await prisma().song.deleteMany({ where: { id, churchId: church.id } });
+    if (!count) throw new NotFoundError('Música não encontrada');
+  },
+};

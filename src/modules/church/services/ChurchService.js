@@ -3,7 +3,7 @@ const ChurchRepository = require('../repositories/ChurchRepository');
 const CreateChurchDto = require('../dtos/CreateChurchDto');
 const { isUploadUrl } = require('../../../shared/utils/url.util');
 const JwtUtil = require('../../../shared/utils/jwt.util');
-const { canManageChurch, canViewChurch, isAdmin } = require('../../../shared/utils/church.util');
+const { canManageChurch, canViewChurch, isAdmin, hasCargo } = require('../../../shared/utils/church.util');
 const { isMinor, ageFrom } = require('../../../shared/utils/minor.util');
 const guardianService = require('../../guardians/guardian.service');
 const { getPrismaClient } = require('../../../config/database');
@@ -177,7 +177,8 @@ class ChurchService {
   async getChurchMembers(churchId, user) {
     const church = await this.findOr404(churchId);
     if (!canViewChurch(user, church)) throw new NotFoundError('Comunidade não encontrada');
-    const manager = canManageChurch(user, church);
+    // A secretaria vê os dados de cadastro (e-mail, nascimento, situação) como a liderança
+    const manager = hasCargo(user, church, 'secretario');
     const members = await ChurchRepository.getMembers(churchId);
     return members.map((m) => this.formatMember(m, manager));
   }
@@ -341,7 +342,10 @@ class ChurchService {
   }
 
   async updateMember(memberId, churchId, data, user) {
-    await this.findManageable(churchId, user, 'Apenas os líderes desta comunidade podem editar membros');
+    const church = await this.findOr404(churchId);
+    if (!hasCargo(user, church, 'secretario')) {
+      throw new ForbiddenError('Apenas a liderança e a secretaria desta comunidade podem editar membros');
+    }
 
     const update = {};
 
@@ -389,6 +393,8 @@ class ChurchService {
         profileImage: user.profileImage || null,
         title: user.title || null,
         leaderVerified: !!user.leaderVerifiedAt,
+        cargo: user.cargo || null,
+        birthDate: user.birthDate || null,
       },
       token: JwtUtil.sign({ id: user.id, email: user.email, role: user.role, churchId: user.churchId }),
     };

@@ -33,22 +33,64 @@ class PostRepository {
   }
 
   // O feed de uma comunidade: as publicações dela e as doações de todas as comunidades
-  async findPage(churchId, hiddenUserIds = [], { cursor, limit = 20 } = {}) {
+  // Líderes da comunidade: o criador e quem tem o papel de líder
+  async leaderIds(churchId) {
+    const [church, leaders] = await Promise.all([
+      this.prisma.church.findUnique({ where: { id: churchId }, select: { leaderID: true } }),
+      this.prisma.user.findMany({ where: { churchId, role: { in: ['leader', 'admin'] } }, select: { id: true } }),
+    ]);
+    return [...new Set([church?.leaderID, ...leaders.map((l) => l.id)].filter(Boolean))];
+  }
+
+  // Membros ativos com data de nascimento, para os avisos de aniversário
+  async birthdayMembers(churchId) {
+    return this.prisma.user.findMany({
+      where: { churchId, status: 'active', birthDate: { not: null } },
+      select: { id: true, name: true, birthDate: true, birthdayNoticeYear: true },
+    });
+  }
+
+  // Um aviso por pessoa e por ano: quem marca o ano primeiro publica (pedidos em paralelo não duplicam,
+  // e apagar a publicação não a faz voltar)
+  async createBirthdayPost({ userId, churchId, year, content }) {
+    return this.prisma.$transaction(async (tx) => {
+      const { count } = await tx.user.updateMany({
+        where: { id: userId, OR: [{ birthdayNoticeYear: null }, { birthdayNoticeYear: { lt: year } }] },
+        data: { birthdayNoticeYear: year },
+      });
+      if (count) await tx.post.create({ data: { type: 'birthday', content, userId, churchId } });
+    });
+  }
+
+  // No topo do feed: fixadas, o que a liderança publicou nos últimos 7 dias e os aniversários recentes
+  topWhere(leaderIds) {
+    const ago = (days) => new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    return {
+      OR: [
+        { isPinned: true },
+        { userId: { in: leaderIds }, createdAt: { gte: ago(7) } },
+        { type: 'birthday', createdAt: { gte: ago(2) } },
+      ],
+    };
+  }
+
+  async findPage(churchId, hiddenUserIds = [], { cursor, limit = 20, leaderIds = [] } = {}) {
     const notHidden = hiddenUserIds.length ? { userId: { notIn: hiddenUserIds } } : {};
+    const top = this.topWhere(leaderIds);
 
     const pinned = cursor
       ? []
       : await this.prisma.post.findMany({
-          where: { ...notHidden, churchId, isPinned: true },
+          where: { ...notHidden, churchId, ...top },
           include: this.postInclude(hiddenUserIds),
-          orderBy: { createdAt: 'desc' },
-          take: 20,
+          orderBy: [{ isPinned: 'desc' }, { createdAt: 'desc' }],
+          take: 30,
         });
 
     const regular = await this.prisma.post.findMany({
       where: {
         ...notHidden,
-        OR: [{ churchId, isPinned: false }, { type: 'donation', churchId: { not: churchId } }],
+        OR: [{ churchId, NOT: top }, { type: 'donation', churchId: { not: churchId } }],
       },
       include: this.postInclude(hiddenUserIds),
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
@@ -58,7 +100,7 @@ class PostRepository {
 
     const hasMore = regular.length > limit;
     const page = hasMore ? regular.slice(0, limit) : regular;
-    return { posts: [...pinned, ...page], nextCursor: hasMore ? page[page.length - 1].id : null };
+    return { posts: [...pinned.map((p) => ({ ...p, top: true })), ...page], nextCursor: hasMore ? page[page.length - 1].id : null };
   }
 
   async findById(id, hiddenUserIds = []) {

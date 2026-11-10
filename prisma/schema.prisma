@@ -36,6 +36,10 @@ model Church {
   conversations Conversation[]
   reports      Report[]
   videos       Video[]
+  // Painéis por cargo
+  financeEntries FinanceEntry[]
+  documents      ChurchDocument[]
+  songs          Song[]
 
   @@map("churches")
 }
@@ -47,6 +51,10 @@ model User {
   name              String
   password          String
   role              String   @default("member") // member, leader, admin
+  // Cargo na comunidade, com painel próprio: secretario, tesoureiro, regente (o líder entra em todos)
+  cargo             String?
+  // Ano do último aviso de aniversário publicado no feed (um por ano, mesmo que a publicação seja apagada)
+  birthdayNoticeYear Int?
   
   // Profile fields
   age               Int?
@@ -662,4 +670,62 @@ model Video {
   @@index([status])
   @@index([churchId])
   @@map("videos")
+}
+
+// Tesouraria: entradas (dízimos, ofertas...) e saídas, em cêntimos
+model FinanceEntry {
+  id          String   @id @default(cuid())
+  kind        String   // entrada, saida
+  category    String
+  amountCents Int
+  date        DateTime
+  description String?
+  memberId    String?  // quem contribuiu (opcional)
+  createdById String
+  createdAt   DateTime @default(now())
+
+  churchId    String
+  church      Church   @relation(fields: [churchId], references: [id], onDelete: Cascade)
+
+  @@index([churchId, date])
+  @@map("finance_entries")
+}
+
+// Secretaria: atas, cartas, certificados e outros documentos (o ficheiro fica na base, privado)
+model ChurchDocument {
+  id          String   @id @default(cuid())
+  kind        String   // ata, recomendacao, transferencia, batismo, ficha, outro
+  title       String
+  date        DateTime?
+  memberId    String?
+  notes       String?
+  mimeType    String?
+  size        Int?
+  data        Bytes?
+  createdById String
+  createdAt   DateTime @default(now())
+
+  churchId    String
+  church      Church   @relation(fields: [churchId], references: [id], onDelete: Cascade)
+
+  @@index([churchId])
+  @@map("church_documents")
+}
+
+// Regência: repertório da comunidade
+model Song {
+  id          String   @id @default(cuid())
+  title       String
+  artist      String?
+  musicKey    String?  // tom
+  link        String?
+  notes       String?
+  createdById String
+  createdAt   DateTime @default(now())
+
+  churchId    String
+  church      Church   @relation(fields: [churchId], references: [id], onDelete: Cascade)
+
+  @@index([churchId])
+  @@map("songs")
 }

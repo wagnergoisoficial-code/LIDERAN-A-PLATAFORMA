@@ -30,6 +30,7 @@ const reportRoutes = require('./routes/report.routes');
 const leaderVerificationRoutes = require('./routes/leader-verification.routes');
 const inviteRoutes = require('./routes/invite.routes');
 const videoRoutes = require('./routes/video.routes');
+const panelRoutes = require('./routes/panel.routes');
 
 class App {
   constructor() {
@@ -144,6 +145,7 @@ class App {
     this.app.use('/api/leader-verification', leaderVerificationRoutes);
     this.app.use('/api/invites', inviteRoutes);
     this.app.use('/api/videos', videoRoutes);
+    this.app.use('/api/panel', panelRoutes);
 
     // 404 handler
     this.app.use((req, res) => {

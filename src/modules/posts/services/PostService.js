@@ -8,6 +8,7 @@ const {
 } = require('../../../shared/utils/church.util');
 const { notifyChurch, notifyUser, preview } = require('../../../shared/utils/notifier');
 const { pageSize } = require('../../../shared/utils/query.util');
+const { dueBirthdays } = require('../../../shared/utils/birthday.util');
 
 const REACTION_TYPES = ['amen', 'praying', 'heart', 'fire', 'strong'];
 
@@ -54,8 +55,25 @@ class PostService {
   // Feed paginado: a primeira página traz também as publicações fixadas
   async getAllPosts(user, { cursor, limit } = {}) {
     if (!user.churchId) return { posts: [], nextCursor: null };
-    const hidden = await this.postRepository.blockedIds(user.id);
-    return this.postRepository.findPage(user.churchId, hidden, { cursor, limit: pageSize(limit) });
+    if (!cursor) await this.publishBirthdays(user.churchId);
+    const [hidden, leaderIds] = await Promise.all([
+      this.postRepository.blockedIds(user.id),
+      this.postRepository.leaderIds(user.churchId),
+    ]);
+    return this.postRepository.findPage(user.churchId, hidden, { cursor, limit: pageSize(limit), leaderIds });
+  }
+
+  // Na véspera, a plataforma avisa no feed quem faz anos (sem cron: corre quando alguém abre o feed)
+  async publishBirthdays(churchId) {
+    const due = dueBirthdays(await this.postRepository.birthdayMembers(churchId));
+    for (const { member, year, tomorrow } of due) {
+      await this.postRepository.createBirthdayPost({
+        userId: member.id,
+        churchId,
+        year,
+        content: `${tomorrow ? 'Amanhã' : 'Hoje'} é aniversário de ${member.name}! 🎂 Deixe sua mensagem de parabéns.`,
+      });
+    }
   }
 
   async getPostById(id, user) {

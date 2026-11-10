@@ -7,6 +7,7 @@ const MEMBER_SELECT = {
   role: true,
   profileImage: true,
   title: true,
+  cargo: true,
   location: true,
   age: true,
   birthDate: true,
@@ -107,14 +108,15 @@ class ChurchRepository {
   async setUserChurch(userId, churchId) {
     return this.prisma.user.update({
       where: { id: userId },
-      data: { churchId },
+      // O cargo só vale na comunidade onde foi dado
+      data: { churchId, cargo: null },
     });
   }
 
   async removeMemberFromChurch(userId, churchId) {
     return this.prisma.user.updateMany({
       where: { id: userId, churchId },
-      data: { churchId: null },
+      data: { churchId: null, cargo: null },
     });
   }
 

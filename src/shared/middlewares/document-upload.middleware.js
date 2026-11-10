@@ -2,22 +2,20 @@ const multer = require('multer');
 const config = require('../../config/environment');
 const { SIGNATURES, processImage } = require('./upload.middleware');
 
-// Documentos da verificação de líder, nos campos "identity" e "leadership".
+// Documentos em PDF ou imagem, um por campo (ex.: "identity" e "leadership" na verificação de líder).
 // Imagens são reprocessadas (sem metadados, legíveis até 2400 px); PDF fica como veio.
-const FIELDS = ['identity', 'leadership'];
 const DOCUMENT_DIMENSION = 2400;
 const isPdf = (buffer) => buffer.length > 4 && buffer.subarray(0, 5).toString('ascii') === '%PDF-';
 
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: config.file.maxFileSize, files: FIELDS.length, fields: 20, fieldSize: 10 * 1024 },
-});
-
 const reject = (res, message) => res.status(400).json({ success: false, message, statusCode: 400 });
 
-// Expõe req.documents: [{ kind, mimeType, data }]
-const documentUploadMiddleware = (req, res, next) => {
-  upload.fields(FIELDS.map((name) => ({ name, maxCount: 1 })))(req, res, async (err) => {
+// Expõe req.documents: [{ kind, mimeType, data }], com kind = nome do campo
+const documentUpload = (FIELDS) => {
+  const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: config.file.maxFileSize, files: FIELDS.length, fields: 20, fieldSize: 10 * 1024 },
+  });
+  return (req, res, next) => upload.fields(FIELDS.map((name) => ({ name, maxCount: 1 })))(req, res, async (err) => {
     if (err instanceof multer.MulterError) {
       return reject(res, err.code === 'LIMIT_FILE_SIZE'
         ? `Cada documento pode ter no máximo ${Math.round(config.file.maxFileSize / 1024 / 1024)} MB`
@@ -47,4 +45,6 @@ const documentUploadMiddleware = (req, res, next) => {
   });
 };
 
-module.exports = { documentUploadMiddleware };
+const documentUploadMiddleware = documentUpload(['identity', 'leadership']);
+
+module.exports = { documentUpload, documentUploadMiddleware };

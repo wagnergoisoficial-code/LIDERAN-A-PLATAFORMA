@@ -12,6 +12,7 @@ class UpdateUserProfileDto {
     this.backgroundTheme = data.backgroundTheme;
     this.location = data.location;
     this.title = data.title;
+    this.birthDate = data.birthDate;
     this.socialLinks = data.socialLinks; // Array of {platform, url}
   }
 
