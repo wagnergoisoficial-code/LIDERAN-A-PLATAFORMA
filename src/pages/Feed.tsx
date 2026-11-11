@@ -38,6 +38,7 @@ const time = (value: string) => new Date(value).getTime();
 // O feed mistura os tipos, como uma rede social: em cada 7 itens, 3 publicações e um de cada outro tipo.
 // Cada tipo segue a sua ordem (o mais atual primeiro). Com os mesmos dados, a ordem é sempre a mesma.
 type MixKind = 'post' | 'prayer' | 'video' | 'poll' | 'event';
+type FeedOrder = 'recent' | 'relevant' | 'saved';
 const MIX_ORDER: MixKind[] = ['post', 'prayer', 'video', 'poll', 'event'];
 const MIX_WEIGHT: Record<MixKind, number> = { post: 3, prayer: 1, video: 1, poll: 1, event: 1 };
 
@@ -147,6 +148,13 @@ const Feed = () => {
   const [loadingMore, setLoadingMore] = useState(false);
   // O que chegou depois deste instante só aparece quando a pessoa pede (a leitura não salta)
   const [cutoff, setCutoff] = useState(Infinity);
+  const [order, setOrder] = useState<FeedOrder>('recent');
+  // shortcut: as guardadas ficam só neste aparelho (localStorage); passar para a API se ele as quiser noutros aparelhos
+  const savedKey = `lidera:guardadas:${user?.id}`;
+  const [saved, setSaved] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem(savedKey) || '[]'); } catch { return []; }
+  });
+  const [savedPosts, setSavedPosts] = useState<Post[] | null>(null);
   const [viewer, setViewer] = useState<string | null>(null);
   const [editingEvent, setEditingEvent] = useState<EventItem | null>(null);
   const loadingMoreRef = useRef(false);
@@ -230,7 +238,7 @@ const Feed = () => {
     }
     api.getUsers().then(res => setMembers(res.data || [])).catch(() => {});
     api.getChurchMemberStats(user.churchId).then(res => {
-      setActive((res.data || []).filter((m: MemberStat) => m.userId !== user.id && m.total > 0).slice(0, 4));
+      setActive((res.data || []).filter((m: MemberStat) => m.userId !== user.id && m.total > 0).slice(0, 3));
     }).catch(() => {});
     const timer = setInterval(() => { if (document.visibilityState === 'visible') refresh(); }, 60000);
     return () => clearInterval(timer);
@@ -286,6 +294,14 @@ const Feed = () => {
   // último instante mostrado fica de fora até a pessoa tocar em "novidades".
   const { featured, stream, pending } = useMemo(() => {
     const now = Date.now();
+    if (order === 'saved') {
+      const ids = new Set(saved);
+      const list = [...posts, ...(savedPosts || []).filter(p => !posts.some(x => x.id === p.id))]
+        .filter(p => ids.has(p.id))
+        .map(post => ({ kind: 'post' as const, key: `post:${post.id}`, at: time(post.createdAt), post }))
+        .sort((a, b) => b.at - a.at);
+      return { featured: [] as Item[], stream: list as Item[], pending: 0 };
+    }
     const shown = <T extends Item>(items: T[]) => items.filter(item => item.at <= cutoff);
     const byRecent = <T extends { createdAt: string }>(a: T, b: T) => time(b.createdAt) - time(a.createdAt);
     const videoIds = new Set<string>();
@@ -327,8 +343,35 @@ const Feed = () => {
       ...lifted,
       ...extras.devotionals.map(devotional => ({ kind: 'devotional' as const, key: `devotional:${devotional.id}`, at: time(devotional.createdAt), devotional })),
     ].sort((a, b) => pinnedFirst(b) - pinnedFirst(a) || b.at - a.at);
+    if (order === 'recent') {
+      // Por data; com mais páginas por carregar, só o que é mais novo do que a última publicação carregada
+      const regular = posts.filter(p => !p.top);
+      const boundary = nextCursor && regular.length ? Math.min(...regular.map(p => time(p.createdAt))) : -Infinity;
+      const all = MIX_ORDER.flatMap(k => buckets[k]).filter(item => item.at >= boundary).sort((a, b) => b.at - a.at);
+      return { featured: top, stream: all, pending: hidden };
+    }
     return { featured: top, stream: mixFeed(buckets, !!nextCursor), pending: hidden };
-  }, [posts, nextCursor, extras, cutoff, members]);
+  }, [posts, nextCursor, extras, cutoff, members, order, saved, savedPosts]);
+
+  // Guardadas que não estão nas páginas carregadas vêm uma a uma (no máximo 50)
+  useEffect(() => {
+    if (order !== 'saved') return;
+    const loaded = new Set(posts.map(p => p.id));
+    const missing = saved.filter(id => !loaded.has(id)).slice(0, 50);
+    let alive = true;
+    Promise.allSettled(missing.map(id => api.getPost(id))).then(results => {
+      if (alive) setSavedPosts(results.flatMap(r => (r.status === 'fulfilled' && r.value?.data ? [r.value.data as Post] : [])));
+    });
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [order]);
+
+  const toggleSave = (postId: string) => {
+    const next = saved.includes(postId) ? saved.filter(id => id !== postId) : [postId, ...saved].slice(0, 200);
+    setSaved(next);
+    localStorage.setItem(savedKey, JSON.stringify(next));
+    notify(next.includes(postId) ? 'Publicação guardada' : 'Publicação removida das guardadas', 'success');
+  };
 
   shownUntil.current = Math.max(0, ...stream.map(item => item.at));
 
@@ -338,7 +381,10 @@ const Feed = () => {
   };
 
   /* ─── Ações ─── */
-  const patchPost = (postId: string, change: (p: Post) => Post) => setPosts(prev => prev.map(p => (p.id === postId ? change(p) : p)));
+  const patchPost = (postId: string, change: (p: Post) => Post) => {
+    setPosts(prev => prev.map(p => (p.id === postId ? change(p) : p)));
+    setSavedPosts(prev => prev && prev.map(p => (p.id === postId ? change(p) : p)));
+  };
   // Substitui (ou, com null, retira) um item de uma das listas do feed
   const patchList = <K extends keyof Extras>(list: K, id: string, change: (item: Extras[K][number]) => Extras[K][number] | null) =>
     setExtras(prev => ({
@@ -390,6 +436,7 @@ const Feed = () => {
     try {
       await api.deletePost(postId);
       setPosts(prev => prev.filter(p => p.id !== postId));
+      setSavedPosts(prev => prev && prev.filter(p => p.id !== postId));
       notify('Publicação excluída', 'success');
     } catch (err: any) {
       notify(err.message || 'Não foi possível excluir');
@@ -541,18 +588,6 @@ const Feed = () => {
     }
   };
 
-  const invite = async () => {
-    if (!user?.churchId) return;
-    try {
-      const res = await api.getChurchInvite(user.churchId);
-      await navigator.clipboard.writeText(`${window.location.origin}/convite/${res.data.code}`);
-      notify('Link de convite copiado. Quem entrar por ele fica na sua comunidade.', 'success');
-    } catch {
-      // Sem acesso à área de transferência: o link está no Painel do líder
-      navigate('/painel/lideranca');
-    }
-  };
-
   if (!user?.churchId) {
     return (
       <div className="page is-narrow">
@@ -576,13 +611,14 @@ const Feed = () => {
   const upcoming = extras.events
     .filter(e => time(e.startDate) >= Date.now())
     .sort((a, b) => time(a.startDate) - time(b.startDate))
-    .slice(0, 3);
+    .slice(0, 2);
 
   const renderItem = (item: Item) => {
     switch (item.kind) {
       case 'post':
         return <PostCard key={item.key} post={item.post} me={me} onDonated={handleDonated} onOpenImage={setViewer} onComment={handleAddComment}
-          onReact={handleReact} onPin={handlePin} onDelete={handleDeletePost} onDeleteComment={handleDeleteComment} />;
+          onReact={handleReact} onPin={handlePin} onDelete={handleDeletePost} onDeleteComment={handleDeleteComment}
+          saved={saved.includes(item.post.id)} onSave={toggleSave} />;
       case 'prayer':
         return <PrayerCard key={item.key} prayer={item.prayer} me={me} onPray={handlePray} onAnswered={handleAnswered} onDelete={handleDeletePrayer} />;
       case 'devotional':
@@ -603,18 +639,36 @@ const Feed = () => {
       <h1 className="visually-hidden">Feed</h1>
 
       <div className="feed-main">
-        <section className="composer-entry" aria-label="Publicar">
+        {people.length > 0 && (
+          <section className="card people-card" aria-labelledby="people-title">
+            <div className="card-head">
+              <h2 id="people-title">Pessoas da comunidade</h2>
+              <Link className="section-link" to="/users">Ver todas</Link>
+            </div>
+            <div className="people-strip">
+              {people.slice(0, 7).map(m => (
+                <Link key={m.id} to={`/profile/${m.id}`} className="person" title={m.name} aria-label={m.name}>
+                  <Avatar name={m.name} profileImage={m.profileImage} size={82} />
+                  <span className="person-name" aria-hidden="true">{firstName(m.name)}</span>
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
+
+        <section className="card composer-entry" aria-label="Publicar">
           <div className="composer-entry-row">
-            <Avatar name={user.name} profileImage={user.profileImage} size={40} />
+            <Avatar name={user.name} profileImage={user.profileImage} size={54} />
             <button type="button" className="composer-trigger" onClick={() => openComposer()}>
               O que você quer compartilhar, {firstName(user.name)}?
             </button>
+            <button type="button" className="uk-button uk-button-primary composer-publish" onClick={() => openComposer()}>Publicar</button>
           </div>
           <div className="composer-chips">
-            <button type="button" className="ghost-btn" onClick={() => openComposer('photo')}><Icon name="image" /> Foto</button>
-            <button type="button" className="ghost-btn" onClick={() => openComposer('video')}><Icon name="videos" /> Vídeo</button>
-            <button type="button" className="ghost-btn" onClick={() => openComposer('prayer')}><Icon name="praying" /> Oração</button>
-            <button type="button" className="ghost-btn" onClick={() => openComposer('donation')}><Icon name="gift" /> Doação</button>
+            <button type="button" className="ghost-btn" onClick={() => openComposer('photo')}><Icon name="image" size={22} /> Foto</button>
+            <button type="button" className="ghost-btn" onClick={() => openComposer('video')}><Icon name="videos" size={22} /> Vídeo</button>
+            <button type="button" className="ghost-btn" onClick={() => openComposer('prayer')}><Icon name="praying" size={22} /> Oração</button>
+            <button type="button" className="ghost-btn" onClick={() => openComposer('donation')}><Icon name="gift" size={22} /> Doação</button>
           </div>
         </section>
 
@@ -632,32 +686,18 @@ const Feed = () => {
           <Icon name="chevron-right" size={18} className="faint" />
         </Link>
 
-        {(people.length > 0 || isLeader) && (
-          <section aria-labelledby="people-title">
-            <div className="people-strip-head">
-              <h2 id="people-title">Pessoas da comunidade</h2>
-              <Link className="section-link" to="/users">Ver todas</Link>
-            </div>
-            <div className="people-strip">
-              {isLeader && (
-                <button type="button" className="person" onClick={invite} title="Copiar o link de convite da comunidade">
-                  <span className="person-add"><Icon name="user-plus" size={22} /></span>
-                  <span className="person-name">Convidar</span>
-                </button>
-              )}
-              {people.slice(0, 20).map(m => (
-                <Link key={m.id} to={`/profile/${m.id}`} className="person" title={m.name} aria-label={m.name}>
-                  <Avatar name={m.name} profileImage={m.profileImage} size={56} />
-                  <span className="person-name" aria-hidden="true">{firstName(m.name)}</span>
-                </Link>
-              ))}
-            </div>
-          </section>
-        )}
-
         <section aria-labelledby="posts-title">
-          <div className="feed-heading" style={{ marginBottom: '10px' }}>
-            <h2 id="posts-title">{featured.length && !loading ? 'Em destaque' : 'Publicações'}</h2>
+          <div className="feed-heading">
+            <h2 id="posts-title">Publicações</h2>
+            <label className="feed-sort">
+              <span className="visually-hidden">Ordenar as publicações</span>
+              <select value={order} onChange={e => setOrder(e.target.value as FeedOrder)}>
+                <option value="recent">Mais recentes</option>
+                <option value="relevant">Mais relevantes</option>
+                <option value="saved">Guardadas</option>
+              </select>
+              <Icon name="chevron-down" size={18} />
+            </label>
           </div>
 
           {loading ? (
@@ -670,6 +710,10 @@ const Feed = () => {
                   Promise.allSettled([loadPosts('replace'), loadExtras()]).then(([r]) => { setLoadError(r.status === 'rejected'); setLoading(false); });
                 }}>Tentar de novo</button>} />
             </div>
+          ) : empty && order === 'saved' ? (
+            <div className="card">
+              <EmptyState icon="bookmark" title="Nenhuma publicação guardada" text="Toque no marcador de uma publicação para a encontrar aqui." />
+            </div>
           ) : empty ? (
             <div className="card">
               <EmptyState icon="pencil" title="Ainda não há nada no feed" text="Comece a conversa: compartilhe uma foto, um vídeo, um versículo ou um pedido de oração."
@@ -678,12 +722,9 @@ const Feed = () => {
           ) : (
             <>
               {featured.map(renderItem)}
-              {featured.length > 0 && stream.length > 0 && (
-                <div className="feed-heading" style={{ margin: '28px 0 10px' }}><h2>Publicações</h2></div>
-              )}
               {stream.map(renderItem)}
               <div ref={sentinel} />
-              {nextCursor ? (
+              {order === 'saved' ? null : nextCursor ? (
                 <div className="feed-end">
                   <button type="button" className="uk-button uk-button-default" onClick={loadMore} disabled={loadingMore}>
                     {loadingMore ? <><span uk-spinner="ratio: 0.5"></span> Carregando…</> : 'Carregar mais'}
@@ -700,10 +741,16 @@ const Feed = () => {
       <aside className="feed-rail" aria-label="Na sua comunidade">
         {community && (
           <div className="rail-section">
-            <div className="rail-community-name">{community.name}</div>
+            <h2 className="rail-community-name">{community.name}</h2>
             <div className="rail-community-meta">
-              {plural(community.memberCount || 0, 'membro', 'membros')} · <Link to="/comunidade">Ver comunidade</Link>
+              {plural(community.memberCount || members.length, 'membro', 'membros')} · <Link to="/comunidade">Ver comunidade</Link>
             </div>
+            {members.length > 0 && (
+              <div className="rail-avatars" aria-hidden="true">
+                {members.slice(0, 8).map(m => <Avatar key={m.id} name={m.name} profileImage={m.profileImage} size={46} />)}
+                {(community.memberCount || members.length) > 8 && <span className="rail-avatars-more">+{(community.memberCount || members.length) - 8}</span>}
+              </div>
+            )}
           </div>
         )}
 
@@ -719,10 +766,11 @@ const Feed = () => {
             <div className="chat-peek-list" aria-live="polite">
               {chat.messages.map(m => (
                 <div key={m.id} className={`chat-peek-msg${chat.fresh.has(m.id) ? ' is-new msg-in' : ''}`}>
-                  <Avatar name={m.user.name} profileImage={m.user.profileImage} size={28} />
+                  <Avatar name={m.user.name} profileImage={m.user.profileImage} size={42} />
                   <div className="chat-peek-body">
                     <div className="chat-peek-who">
                       <strong>{m.user.id === user.id ? 'Você' : m.user.name}</strong>
+                      <span aria-hidden="true">·</span>
                       <time dateTime={m.createdAt}>{timeAgo(m.createdAt)}</time>
                     </div>
                     <div className="chat-peek-text">{m.content}</div>
@@ -731,8 +779,8 @@ const Feed = () => {
               ))}
             </div>
           )}
-          <Link to="/chat" className="uk-button uk-button-primary" style={{ width: '100%' }}>
-            <Icon name="chat" size={18} /> Abrir o chat
+          <Link to="/chat" className="uk-button uk-button-primary rail-chat-btn">
+            <Icon name="chat" size={20} /> Abrir o chat <Icon name="arrow-right" size={20} />
           </Link>
         </section>
 
@@ -744,7 +792,7 @@ const Feed = () => {
           {upcoming.length === 0 ? (
             <p className="rail-item-meta" style={{ whiteSpace: 'normal' }}>Nenhum encontro marcado.</p>
           ) : upcoming.map(e => (
-            <Link key={e.id} to="/events" className="rail-item">
+            <Link key={e.id} to="/events" className="rail-item rail-event">
               <DateChip date={e.startDate} />
               <span className="rail-item-body">
                 <span className="rail-item-title" style={{ display: 'block' }}>{e.title}</span>
@@ -757,18 +805,17 @@ const Feed = () => {
         {active.length > 0 && (
           <div className="rail-section">
             <div className="rail-head">
-              <h2>Mais ativos</h2>
-              <Link className="section-link" to="/users">Membros</Link>
+              <h2>Pessoas da comunidade</h2>
             </div>
             {active.map(m => (
-              <div key={m.userId} className="rail-item">
-                <Link to={`/profile/${m.userId}`} aria-hidden="true" tabIndex={-1}><Avatar name={m.name} profileImage={m.profileImage} size={36} /></Link>
+              <div key={m.userId} className="rail-item rail-person">
+                <Link to={`/profile/${m.userId}`} aria-hidden="true" tabIndex={-1}><Avatar name={m.name} profileImage={m.profileImage} size={52} /></Link>
                 <span className="rail-item-body">
                   <Link to={`/profile/${m.userId}`} className="rail-item-title" style={{ display: 'block', color: 'var(--text)' }}>{m.name}</Link>
                   <span className="rail-item-meta" style={{ display: 'block' }}>{plural(m.posts, 'publicação', 'publicações')} · {plural(m.comments, 'comentário', 'comentários')}</span>
                 </span>
                 <button type="button" className="action-btn" aria-label={`Enviar mensagem para ${m.name}`} title="Enviar mensagem" onClick={() => startConversation(m.userId)}>
-                  <Icon name="messages" />
+                  <Icon name="messages" size={24} />
                 </button>
               </div>
             ))}

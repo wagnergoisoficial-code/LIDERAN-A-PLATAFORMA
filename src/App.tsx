@@ -176,7 +176,7 @@ const SearchBox: React.FC<{ open: boolean; setOpen: (open: boolean) => void; tog
             value={query}
             onChange={e => search(e.target.value)}
             onFocus={() => { if (results) setShowResults(true); }}
-            placeholder="Buscar"
+            placeholder="Buscar na Lidera"
             aria-label="Buscar pessoas, publicações e encontros"
             aria-expanded={showResults}
             aria-controls="search-results"
@@ -310,7 +310,7 @@ const Notifications: React.FC = () => {
     <div className="menu-wrap">
       <button ref={button} type="button" className={`icon-btn${ringing ? ' is-ringing' : ''}`} aria-label={label} title="Notificações"
         aria-haspopup="dialog" aria-expanded={open} onClick={() => { if (!open) load(); setOpen(v => !v); }}>
-        <Icon name="bell" />
+        <Icon name="bell" size={22} />
         {unreadCount > 0 && <span key={unreadCount} className="icon-btn-badge" aria-hidden="true">{badgeText(unreadCount)}</span>}
       </button>
 
@@ -359,7 +359,7 @@ const AccountMenu: React.FC = () => {
     <div className="menu-wrap header-account">
       <button ref={button} type="button" className="avatar-btn" aria-label={`Conta de ${user?.name}`} title="Sua conta"
         aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(v => !v)}>
-        <Avatar name={user?.name || ''} profileImage={user?.profileImage} size={36} />
+        <Avatar name={user?.name || ''} profileImage={user?.profileImage} size={44} />
       </button>
 
       {open && (
@@ -400,7 +400,7 @@ const Header: React.FC<{ items: NavItem[]; guardian: boolean }> = ({ items, guar
   return (
     <header className="app-header">
       <div className="app-header-inner">
-        <Link to="/" className="brand" aria-label="ICHURCH, ir para o início">ICHURCH</Link>
+        <Link to="/" className="brand" aria-label="Lidera, ir para o início">lidera</Link>
         {!guardian && <SearchBox open={searchOpen} setOpen={setSearchOpen} toggle={searchToggle} />}
 
         <nav className="main-nav" aria-label="Principal">
@@ -409,7 +409,7 @@ const Header: React.FC<{ items: NavItem[]; guardian: boolean }> = ({ items, guar
             return (
               <Link key={item.to} to={item.to} className={`main-nav-link${active ? ' is-active' : ''}`} aria-current={active ? 'page' : undefined}
                 onClick={() => { if (active && item.to === '/') window.scrollTo({ top: 0, behavior: 'smooth' }); }}>
-                <Icon name={item.icon} size={20} />
+                <Icon name={item.icon} size={22} />
                 {item.label}
                 {!!item.badge && <span className="nav-badge" aria-label={`${item.badge} não lidas`}>{badgeText(item.badge)}</span>}
               </Link>
@@ -511,7 +511,7 @@ const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   return (
     <ComposerProvider>
-      <div className={`app${immersive ? ' is-immersive' : ''}${isPanelPath(location.pathname) ? ' is-wide' : ''}`}>
+      <div className={`app${immersive ? ' is-immersive' : ''}${isPanelPath(location.pathname) ? ' is-wide' : ''}${!guardian && location.pathname === '/' ? ' is-feed' : ''}`}>
         <a className="skip-link" href="#conteudo">Pular para o conteúdo</a>
         <Header items={items} guardian={guardian} />
         <main id="conteudo" className="app-main" tabIndex={-1}>{children}</main>

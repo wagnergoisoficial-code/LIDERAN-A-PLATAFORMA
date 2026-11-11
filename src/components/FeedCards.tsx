@@ -6,7 +6,8 @@ import { backgroundColor, fitsColor, textSize } from '../lib/backgrounds';
 import { pop, burst } from '../lib/motion';
 import Avatar from './Avatar';
 import Icon, { IconName } from './Icon';
-import MoreMenu, { MenuAction } from './MoreMenu';
+import UIkit from 'uikit';
+import MoreMenu, { MenuAction, useDismiss } from './MoreMenu';
 import AnimatedNumber from './AnimatedNumber';
 import DateChip from './DateChip';
 import { sendReport } from './ReportButton';
@@ -74,7 +75,7 @@ interface ItemHeadProps {
 
 const ItemHead: React.FC<ItemHeadProps> = ({ id, person, linkProfile, at, label, extra = [], actions, menuLabel }) => {
   const name = person?.name || 'Liderança da comunidade';
-  const avatar = <Avatar name={name} profileImage={person?.profileImage} size={40} />;
+  const avatar = <Avatar name={name} profileImage={person?.profileImage} size={52} />;
   const profile = person && linkProfile ? `/profile/${person.id}` : null;
   return (
     <header className="post-head">
@@ -141,7 +142,7 @@ const TextCard: React.FC<{ color: string; text: string; sub?: string | null }> =
 
 /* ─── Publicação e doação ───────────────────────────────────── */
 const REACTIONS: { type: keyof PostReactions; icon: IconName; label: string }[] = [
-  { type: 'amen', icon: 'amen', label: 'Amém' },
+  { type: 'amen', icon: 'amen', label: 'Curtir' },
   { type: 'praying', icon: 'praying', label: 'Orando' },
   { type: 'heart', icon: 'heart', label: 'Amor' },
   { type: 'fire', icon: 'fire', label: 'Fogo' },
@@ -158,9 +159,49 @@ interface PostCardProps {
   onDelete: (postId: string) => void;
   onDeleteComment: (postId: string, commentId: string) => void;
   onOpenImage: (src: string) => void;
+  // Guardar (só no feed)
+  saved?: boolean;
+  onSave?: (postId: string) => void;
 }
 
-export const PostCard: React.FC<PostCardProps> = ({ post, me, onComment, onReact, onPin, onDelete, onDeleteComment, onDonated, onOpenImage }) => {
+// Curtir é a reação principal; as outras abrem por cima ao pairar, ao manter o dedo ou com Tab
+const ReactionBar: React.FC<{ mine: string[]; onReact: (type: keyof PostReactions, hasReacted: boolean) => void }> = ({ mine, onReact }) => {
+  const [open, setOpen] = useState(false);
+  const wrap = useRef<HTMLDivElement>(null);
+  const timer = useRef<number>(0);
+  const longPress = useRef(false);
+  useDismiss(open, () => setOpen(false), [wrap]);
+  const liked = mine.includes('amen');
+
+  const react = (type: keyof PostReactions, target: HTMLElement) => {
+    const on = mine.includes(type);
+    if (!on) { pop(target); burst(target, { count: 6 }); }
+    onReact(type, on);
+    setOpen(false);
+  };
+
+  return (
+    <div ref={wrap} className={`like-wrap${open ? ' is-open' : ''}`}>
+      <button type="button" className={`reaction-btn${liked ? ' is-on' : ''}`} aria-pressed={liked}
+        onTouchStart={() => { longPress.current = false; timer.current = window.setTimeout(() => { longPress.current = true; setOpen(true); }, 450); }}
+        onTouchMove={() => clearTimeout(timer.current)}
+        onTouchEnd={e => { clearTimeout(timer.current); if (longPress.current) e.preventDefault(); }}
+        onClick={e => react('amen', e.currentTarget)}>
+        <Icon name="amen" size={22} /> Curtir
+      </button>
+      <div className="reaction-picker" role="group" aria-label="Reações">
+        {REACTIONS.map(r => (
+          <button key={r.type} type="button" className={`reaction-pick${mine.includes(r.type) ? ' is-on' : ''}`} aria-pressed={mine.includes(r.type)}
+            aria-label={r.label} title={r.label} onClick={e => react(r.type, e.currentTarget)}>
+            <Icon name={r.icon} size={24} />
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+export const PostCard: React.FC<PostCardProps> = ({ post, me, onComment, onReact, onPin, onDelete, onDeleteComment, onDonated, onOpenImage, saved, onSave }) => {
   const [commentText, setCommentText] = useState('');
   const [sending, setSending] = useState(false);
   const [showComments, setShowComments] = useState(false);
@@ -186,6 +227,19 @@ export const PostCard: React.FC<PostCardProps> = ({ post, me, onComment, onReact
   const reactions = post.reactions ?? EMPTY_REACTIONS;
   const myReactions = post.myReactions ?? [];
   const commentsCount = post.comments.length;
+  const reacted = REACTIONS.filter(r => reactions[r.type] > 0);
+
+  // Partilha do sistema (telemóvel); sem ela, o texto vai para a área de transferência
+  const share = async () => {
+    const text = [post.content?.trim(), post.imageUrl].filter(Boolean).join('\n\n');
+    try {
+      if (navigator.share) await navigator.share({ text });
+      else {
+        await navigator.clipboard.writeText(text);
+        UIkit.notification({ message: 'Texto copiado: é só colar onde quiser compartilhar', status: 'success', pos: 'top-right' });
+      }
+    } catch { /* partilha cancelada */ }
+  };
   // Texto curto sem foto (e que não seja doação): aparece sobre a cor escolhida
   const color = birthday ? backgroundColor('rosa', post.id)
     : !post.imageUrl && !donation && fitsColor(post.content) ? backgroundColor(post.background, post.id) : null;
@@ -261,18 +315,36 @@ export const PostCard: React.FC<PostCardProps> = ({ post, me, onComment, onReact
         <p className="post-note">Doação de outra comunidade: pode ver e denunciar, mas não comentar.</p>
       ) : (
         <>
-          <div className="post-actions">
-            {REACTIONS.map(r => (
-              <Toggle key={r.type} on={myReactions.includes(r.type)} icon={r.icon} label={r.label} count={reactions[r.type]}
-                onToggle={() => onReact(post.id, r.type, myReactions.includes(r.type))} />
-            ))}
-            <button type="button" className={`reaction-btn comment-toggle${showComments ? ' is-on' : ''}`} onClick={toggleComments}
-              aria-expanded={showComments} aria-controls={`comments-${post.id}`}
-              aria-label={commentsCount ? plural(commentsCount, 'comentário', 'comentários') : 'Comentar'}>
-              <Icon name="comment" size={20} />
-              {commentsCount > 0 && <span className="reaction-count" aria-hidden="true"><AnimatedNumber value={commentsCount} /></span>}
-              <span className="comment-toggle-label" aria-hidden="true">{commentsCount === 0 ? 'Comentar' : commentsCount === 1 ? 'comentário' : 'comentários'}</span>
+          {(reacted.length > 0 || commentsCount > 0) && (
+            <div className="post-stats">
+              {reacted.map(r => (
+                <span key={r.type} className={`post-stat is-${r.type}`}>
+                  <span className="post-stat-icon" aria-hidden="true"><Icon name={r.icon} size={r.type === 'amen' ? 11 : 17} strokeWidth={r.type === 'amen' ? 2.5 : 1.75} /></span>
+                  <span className="visually-hidden">{r.label}:</span>
+                  <AnimatedNumber value={reactions[r.type]} />
+                </span>
+              ))}
+              {commentsCount > 0 && (
+                <button type="button" className="post-stat is-comments" onClick={toggleComments} aria-label={`Ver ${plural(commentsCount, 'comentário', 'comentários')}`}>
+                  <Icon name="comment" size={17} /> <AnimatedNumber value={commentsCount} />
+                </button>
+              )}
+            </div>
+          )}
+
+          <div className="post-actions is-bar">
+            <ReactionBar mine={myReactions} onReact={(type, on) => onReact(post.id, type, on)} />
+            <button type="button" className={`reaction-btn${showComments ? ' is-on' : ''}`} onClick={toggleComments}
+              aria-expanded={showComments} aria-controls={`comments-${post.id}`}>
+              <Icon name="comment" size={22} /> Comentar
             </button>
+            <button type="button" className="reaction-btn" onClick={share}><Icon name="share" size={22} /> Compartilhar</button>
+            {onSave && (
+              <button type="button" className={`reaction-btn post-save${saved ? ' is-on' : ''}`} aria-pressed={!!saved}
+                aria-label="Guardar publicação" title={saved ? 'Guardada' : 'Guardar'} onClick={() => onSave(post.id)}>
+                <Icon name="bookmark" size={22} />
+              </button>
+            )}
           </div>
 
           {showComments && (

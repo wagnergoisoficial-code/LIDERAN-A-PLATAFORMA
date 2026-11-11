@@ -461,6 +461,8 @@ export const api = {
     return res.blob();
   },
 
+  getPost: (id: string) => request(`/posts/${id}`),
+
   // Painéis por cargo (sempre na comunidade ativa)
   setCargo: (memberId: string, cargo: string | null) =>
     request(`/panel/cargos/${memberId}`, { method: 'PUT', body: JSON.stringify({ cargo }) }),

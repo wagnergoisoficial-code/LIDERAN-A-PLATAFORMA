@@ -30,7 +30,7 @@ const AuthLayout = ({ title, subtitle, footer, children }: AuthLayoutProps) => (
 
       <main className="auth-panel">
         <div className="auth-form">
-          <span className="auth-brand">ICHURCH</span>
+          <span className="auth-brand">lidera</span>
           <h1 className="auth-title">{title}</h1>
           <p className="auth-subtitle">{subtitle}</p>
           {children}
