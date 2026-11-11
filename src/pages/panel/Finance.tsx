@@ -10,7 +10,7 @@ import EmptyState from '../../components/EmptyState';
 
 const notify = (message: string, status: 'success' | 'danger' = 'danger') => UIkit.notification({ message, status, pos: 'top-right' });
 
-const CATEGORIES = ['Dízimo', 'Oferta', 'Contribuição', 'Evento', 'Material', 'Transporte', 'Alimentação', 'Outro'];
+const CATEGORIES = ['Oferta', 'Contribuição', 'Campanha', 'Evento', 'Material', 'Transporte', 'Alimentação', 'Outro'];
 const money = (cents: number) => (cents / 100).toLocaleString('pt-MZ', { style: 'currency', currency: 'MZN' });
 // As datas dos lançamentos são dias (sem hora): lêem-se em UTC para não mudarem de dia
 const dateOnly = (iso: string) => new Date(iso).toLocaleDateString('pt-BR', { timeZone: 'UTC' });
@@ -19,7 +19,7 @@ const today = () => new Date().toLocaleDateString('en-CA');
 
 interface Entry { id: string; kind: 'entrada' | 'saida'; category: string; amountCents: number; date: string; description?: string | null; memberId?: string | null; createdById: string }
 
-const EMPTY = { kind: 'entrada', category: 'Dízimo', amount: '', date: '', memberId: '', description: '' };
+const EMPTY = { kind: 'entrada', category: 'Oferta', amount: '', date: '', memberId: '', description: '' };
 
 /** Tesouraria: lançamentos do mês, saldo e exportação. Os jovens não veem nada disto. */
 const Finance = () => {
@@ -111,7 +111,7 @@ const Finance = () => {
       {data === null ? (
         <div className="card loading-block"><span uk-spinner="ratio: 0.8"></span></div>
       ) : entries.length === 0 ? (
-        <div className="card"><EmptyState icon="wallet" title="Nenhum lançamento neste mês" text='Registre dízimos, ofertas e despesas em "Novo lançamento".' /></div>
+        <div className="card"><EmptyState icon="wallet" title="Nenhum lançamento neste mês" text='Registre ofertas, contribuições e despesas em "Novo lançamento".' /></div>
       ) : (
         <div className="card table-scroll">
           <table className="data-table">
