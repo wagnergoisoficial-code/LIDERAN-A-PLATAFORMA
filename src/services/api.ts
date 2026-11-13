@@ -478,6 +478,10 @@ export const api = {
     if (!res.ok) throw new Error('Não foi possível abrir o arquivo');
     return res.blob();
   },
+  getRollCalls: () => request('/panel/attendance'),
+  saveRollCall: (data: any, id?: string) =>
+    request(id ? `/panel/attendance/${id}` : '/panel/attendance', { method: id ? 'PUT' : 'POST', body: JSON.stringify(data) }),
+  deleteRollCall: (id: string) => request(`/panel/attendance/${id}`, { method: 'DELETE' }),
   getSongs: () => request('/panel/songs'),
   saveSong: (data: any, id?: string) =>
     request(id ? `/panel/songs/${id}` : '/panel/songs', { method: id ? 'PUT' : 'POST', body: JSON.stringify(data) }),

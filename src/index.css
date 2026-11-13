@@ -3131,3 +3131,78 @@ a.thread-title:hover { color: var(--text); }
 
 /* Pedido da data de nascimento no feed (uma vez) */
 .birthday-ask { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 16px; padding: 14px 16px; }
+
+/* ─── SECRETARIA ────────────────────────────────────────────── */
+/* Duas colunas no ecrã largo (chamadas e participação) */
+.panel-split { display: grid; gap: 24px; }
+@media (min-width: 1200px) { .panel-split { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); align-items: start; } }
+
+/* Chamada: cada jovem é uma caixa de marcar com o rosto e o nome */
+.roll-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px; max-height: 50vh; overflow-y: auto; }
+
+.roll-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: 48px;
+  padding: 6px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.roll-item.is-on { border-color: var(--accent); background: var(--bg-surface); font-weight: 600; }
+.roll-item input { flex: none; width: 18px; height: 18px; margin: 0; accent-color: var(--accent); }
+.roll-item:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Calendário anual: os doze meses lado a lado */
+.year-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+.year-month { min-height: 120px; padding: 14px 16px 10px; }
+.year-month.is-current { box-shadow: inset 0 0 0 2px var(--accent); }
+.year-month-name { margin: 0 0 6px; font-size: 16px; font-weight: 700; }
+.year-empty { margin: 0; color: var(--text-faint); font-size: 14px; }
+
+.year-event {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: calc(100% + 12px);
+  margin: 0 -6px;
+  padding: 8px 6px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+}
+
+button.year-event { cursor: pointer; }
+button.year-event:hover { background: var(--bg-surface); }
+.year-day { flex: none; width: 28px; font-size: 18px; font-weight: 700; line-height: 1.2; text-align: center; font-variant-numeric: tabular-nums; }
+.year-event-title { display: block; font-size: 15px; font-weight: 600; line-height: 1.3; overflow-wrap: anywhere; }
+.year-event-meta { display: block; margin-top: 1px; color: var(--text-muted); font-size: 13px; }
+
+/* Livro de atas */
+.ata-row + .ata-row { border-top: 1px solid var(--border); }
+.ata-date { flex: none; width: 92px; color: var(--text-muted); font-size: 14px; font-variant-numeric: tabular-nums; }
+.ata-body { display: block; flex: 1; min-width: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.ata-body:hover .list-row-title { text-decoration: underline; }
+
+.ata-excerpt {
+  display: -webkit-box;
+  overflow: hidden;
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.45;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.ata-text { color: var(--text); font-size: 15px; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+@media (max-width: 639px) { .ata-date { width: auto; } .ata-row { flex-wrap: wrap; } }

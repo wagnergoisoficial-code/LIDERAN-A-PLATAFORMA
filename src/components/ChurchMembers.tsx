@@ -24,6 +24,16 @@ interface ChurchMembersProps {
 const emptyForm = { name: '', email: '', password: '', confirmPassword: '', birthDate: '', title: '', location: '' };
 const notify = (message: string, status: 'success' | 'danger' = 'danger') => UIkit.notification({ message, status, pos: 'top-right' });
 
+// "12/04/1998 · 28 anos" (a data de nascimento não tem hora: lê-se em UTC)
+const bornLabel = (birthDate?: string | null) => {
+  if (!birthDate) return '—';
+  const birth = new Date(birthDate);
+  const now = new Date();
+  const age = now.getFullYear() - birth.getUTCFullYear()
+    - (now.getMonth() < birth.getUTCMonth() || (now.getMonth() === birth.getUTCMonth() && now.getDate() < birth.getUTCDate()) ? 1 : 0);
+  return `${birth.toLocaleDateString('pt-BR', { timeZone: 'UTC' })} · ${age} anos`;
+};
+
 const ADD_FIELDS = [
   { label: 'Nome', name: 'name', type: 'text', placeholder: 'Nome completo', required: true, autoComplete: 'off' },
   { label: 'E-mail', name: 'email', type: 'email', placeholder: 'email@exemplo.com', required: true, autoComplete: 'off' },
@@ -114,6 +124,7 @@ const ChurchMembers: React.FC<ChurchMembersProps> = ({ churchId, canChangeRoles,
               <tr>
                 <th scope="col">Nome</th>
                 <th scope="col">E-mail</th>
+                <th scope="col">Nascimento</th>
                 <th scope="col">Situação</th>
                 <th scope="col"><span className="visually-hidden">Ações</span></th>
               </tr>
@@ -131,6 +142,7 @@ const ChurchMembers: React.FC<ChurchMembersProps> = ({ churchId, canChangeRoles,
                     </Link>
                   </td>
                   <td className="muted">{member.email}</td>
+                  <td className="muted" style={{ whiteSpace: 'nowrap' }}>{bornLabel(member.birthDate)}</td>
                   <td>
                     <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px' }}>
                       {member.status && member.status !== 'active'

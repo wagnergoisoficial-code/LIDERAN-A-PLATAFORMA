@@ -25,10 +25,12 @@ import Reports from './pages/Reports';
 import Messages from './pages/Messages';
 import Bible from './pages/Bible';
 import GuardianHome from './pages/GuardianHome';
-import PanelLayout, { PanelHome, PanelGuard, PanelMembers } from './pages/panel/PanelLayout';
+import PanelLayout, { PanelHome, PanelGuard } from './pages/panel/PanelLayout';
 import Cargos from './pages/panel/Cargos';
-import Birthdays from './pages/panel/Birthdays';
-import Documents from './pages/panel/Documents';
+import Cadastro from './pages/panel/Cadastro';
+import Attendance from './pages/panel/Attendance';
+import AnnualCalendar from './pages/panel/AnnualCalendar';
+import Minutes from './pages/panel/Minutes';
 import Finance from './pages/panel/Finance';
 import Songs from './pages/panel/Songs';
 import { hasPanel, panelLabel } from './lib/cargos';
@@ -549,9 +551,13 @@ export default function App() {
         <Route path="lideranca" element={<PanelGuard area="lideranca"><Dashboard /></PanelGuard>} />
         <Route path="cargos" element={<PanelGuard area="lideranca"><Cargos /></PanelGuard>} />
         <Route path="relatorios" element={<PanelGuard area="lideranca"><Reports /></PanelGuard>} />
-        <Route path="membros" element={<PanelGuard area="secretario"><PanelMembers /></PanelGuard>} />
-        <Route path="aniversarios" element={<PanelGuard area="secretario"><Birthdays /></PanelGuard>} />
-        <Route path="documentos" element={<PanelGuard area="secretario"><Documents /></PanelGuard>} />
+        <Route path="membros" element={<PanelGuard area="secretario"><Cadastro view="jovens" /></PanelGuard>} />
+        <Route path="membros/aniversarios" element={<PanelGuard area="secretario"><Cadastro view="aniversarios" /></PanelGuard>} />
+        <Route path="presenca" element={<PanelGuard area="secretario"><Attendance /></PanelGuard>} />
+        <Route path="calendario" element={<PanelGuard area="secretario"><AnnualCalendar /></PanelGuard>} />
+        <Route path="atas" element={<PanelGuard area="secretario"><Minutes /></PanelGuard>} />
+        <Route path="aniversarios" element={<Navigate to="/painel/membros/aniversarios" replace />} />
+        <Route path="documentos" element={<Navigate to="/painel/atas" replace />} />
         <Route path="tesouraria" element={<PanelGuard area="tesoureiro"><Finance /></PanelGuard>} />
         <Route path="repertorio" element={<PanelGuard area="regente"><Songs /></PanelGuard>} />
       </Route>

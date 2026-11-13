@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import Avatar from '../../components/Avatar';
-import PageHeader from '../../components/PageHeader';
 import EmptyState from '../../components/EmptyState';
 
 const MONTHS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
@@ -19,7 +18,7 @@ const nextBirthday = (birthDate: string, today: Date) => {
   return thisYear >= today ? thisYear : at(today.getFullYear() + 1);
 };
 
-/** Secretaria: aniversariantes por mês, a começar pelo atual, e quem ainda não tem data. */
+/** Cadastro → Aniversariantes: por mês, a começar pelo atual, e quem ainda não tem data. */
 const Birthdays = () => {
   const { user } = useAuth();
   const [members, setMembers] = useState<any[] | null>(null);
@@ -39,7 +38,7 @@ const Birthdays = () => {
 
   return (
     <div>
-      <PageHeader title="Aniversariantes" subtitle="Na véspera de cada aniversário, o feed publica um aviso para a comunidade dar os parabéns." />
+      <p className="form-hint" style={{ margin: '0 0 16px' }}>Na véspera de cada aniversário, o feed publica um aviso para a comunidade dar os parabéns.</p>
       {members === null ? (
         <div className="card loading-block"><span uk-spinner="ratio: 0.8"></span></div>
       ) : people.length === 0 ? (

@@ -1,11 +1,8 @@
 import React from 'react';
 import { NavLink, Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { useCommunity } from '../../lib/community';
 import { Area, canOpen, isLeader, panelLabel } from '../../lib/cargos';
 import Icon, { IconName } from '../../components/Icon';
-import ChurchMembers from '../../components/ChurchMembers';
-import PageHeader from '../../components/PageHeader';
 
 interface Group { area: Area; title: string; links: { to: string; label: string; icon: IconName }[] }
 
@@ -16,10 +13,12 @@ const GROUPS: Group[] = [
     { to: '/painel/cargos', label: 'Cargos', icon: 'badge' },
     { to: '/painel/relatorios', label: 'Relatórios', icon: 'reports' },
   ] },
+  // Só quatro documentos, para evitar burocracia
   { area: 'secretario', title: 'Secretaria', links: [
-    { to: '/painel/membros', label: 'Membros', icon: 'users' },
-    { to: '/painel/aniversarios', label: 'Aniversariantes', icon: 'cake' },
-    { to: '/painel/documentos', label: 'Documentos', icon: 'file-text' },
+    { to: '/painel/membros', label: 'Cadastro dos jovens', icon: 'users' },
+    { to: '/painel/presenca', label: 'Controle de presença', icon: 'list' },
+    { to: '/painel/calendario', label: 'Calendário anual', icon: 'calendar' },
+    { to: '/painel/atas', label: 'Livro de atas', icon: 'file-text' },
   ] },
   { area: 'tesoureiro', title: 'Tesouraria', links: [
     { to: '/painel/tesouraria', label: 'Lançamentos', icon: 'wallet' },
@@ -72,20 +71,6 @@ export const PanelGuard: React.FC<{ area: Area; children: React.ReactNode }> = (
   const { user } = useAuth();
   if (!canOpen(user, area) || (area !== 'lideranca' && !user?.churchId)) return <Navigate to="/painel" replace />;
   return <>{children}</>;
-};
-
-/** Secretaria: cadastro e dados dos membros (a moderação fica com a liderança). */
-export const PanelMembers = () => {
-  const { user } = useAuth();
-  const { community } = useCommunity();
-  const leader = isLeader(user);
-  return (
-    <div>
-      <PageHeader title="Membros" subtitle="Cadastre novos membros e mantenha os dados em dia." />
-      <ChurchMembers churchId={user!.churchId!} churchName={community?.name || ''}
-        canChangeRoles={leader && (!!community?.isOwner || user?.role === 'admin')} editOnly={!leader} />
-    </div>
-  );
 };
 
 export default PanelLayout;
