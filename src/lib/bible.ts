@@ -1,7 +1,7 @@
-// Bíblia: tradução João Ferreira de Almeida (reimpressão de 1911, domínio público). O texto vai com a
-// app, um ficheiro por livro em public/bible-data/almeida/<n.º do livro>.json com [[versículos do cap. 1], ...]:
-// o bible-api.com deixou de ter o português, e assim a leitura não depende de serviços de fora.
-const SOURCE = '/bible-data/almeida';
+// Bíblia Livre (português do Brasil, licença Creative Commons Atribuição 3.0 Brasil). O texto vai com a app,
+// um ficheiro por livro em public/bible-data/livre/<n.º do livro>.json com [[versículos do cap. 1], ...]
+// (null = versículo que a tradução não numera): assim a leitura não depende de serviços de fora.
+const SOURCE = '/bible-data/livre';
 
 export interface BibleBook { id: string; name: string; chapters: number; testament: 'AT' | 'NT' }
 export interface Verse { verse: number; text: string }
@@ -12,8 +12,8 @@ const BOOKS: [string, string, number][] = [
   ['1KI', '1 Reis', 22], ['2KI', '2 Reis', 25], ['1CH', '1 Crônicas', 29], ['2CH', '2 Crônicas', 36], ['EZR', 'Esdras', 10],
   ['NEH', 'Neemias', 13], ['EST', 'Ester', 10], ['JOB', 'Jó', 42], ['PSA', 'Salmos', 150], ['PRO', 'Provérbios', 31],
   ['ECC', 'Eclesiastes', 12], ['SNG', 'Cânticos', 8], ['ISA', 'Isaías', 66], ['JER', 'Jeremias', 52], ['LAM', 'Lamentações', 5],
-  ['EZK', 'Ezequiel', 48], ['DAN', 'Daniel', 12], ['HOS', 'Oséias', 14], ['JOL', 'Joel', 3], ['AMO', 'Amós', 9],
-  ['OBA', 'Obadias', 1], ['JON', 'Jonas', 4], ['MIC', 'Miquéias', 7], ['NAM', 'Naum', 3], ['HAB', 'Habacuque', 3],
+  ['EZK', 'Ezequiel', 48], ['DAN', 'Daniel', 12], ['HOS', 'Oseias', 14], ['JOL', 'Joel', 3], ['AMO', 'Amós', 9],
+  ['OBA', 'Obadias', 1], ['JON', 'Jonas', 4], ['MIC', 'Miqueias', 7], ['NAM', 'Naum', 3], ['HAB', 'Habacuque', 3],
   ['ZEP', 'Sofonias', 3], ['HAG', 'Ageu', 2], ['ZEC', 'Zacarias', 14], ['MAL', 'Malaquias', 4],
   ['MAT', 'Mateus', 28], ['MRK', 'Marcos', 16], ['LUK', 'Lucas', 24], ['JHN', 'João', 21], ['ACT', 'Atos', 28],
   ['ROM', 'Romanos', 16], ['1CO', '1 Coríntios', 16], ['2CO', '2 Coríntios', 13], ['GAL', 'Gálatas', 6], ['EPH', 'Efésios', 6],
@@ -26,7 +26,7 @@ const BOOKS: [string, string, number][] = [
 export const BIBLE_BOOKS: BibleBook[] = BOOKS.map(([id, name, chapters], i) => ({ id, name, chapters, testament: i < 39 ? 'AT' : 'NT' }));
 export const findBook = (id?: string) => BIBLE_BOOKS.find(b => b.id === id?.toUpperCase());
 
-const books = new Map<string, Promise<string[][]>>();
+const books = new Map<string, Promise<(string | null)[][]>>();
 
 // Um livro de cada vez; fica em memória (e na cache do navegador) para os capítulos seguintes
 const loadBook = (book: string) => {
@@ -40,9 +40,9 @@ const loadBook = (book: string) => {
 };
 
 export const loadChapter = async (book: string, chapter: number): Promise<Verse[]> => {
-  const texts = (await loadBook(book))[chapter - 1];
+  const texts: (string | null)[] | undefined = (await loadBook(book))[chapter - 1];
   if (!texts) throw new Error('Capítulo não encontrado.');
-  return texts.map((text, i) => ({ verse: i + 1, text }));
+  return texts.flatMap((text, i) => (text ? [{ verse: i + 1, text }] : []));
 };
 
 // Onde a pessoa parou de ler

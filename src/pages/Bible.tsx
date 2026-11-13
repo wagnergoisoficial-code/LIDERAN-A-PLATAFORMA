@@ -8,11 +8,19 @@ import EmptyState from '../components/EmptyState';
 import Icon from '../components/Icon';
 
 const canSpeak = typeof window !== 'undefined' && 'speechSynthesis' in window;
+const notify = (message: string, status: 'success' | 'danger' = 'danger') => UIkit.notification({ message, status, pos: 'top-right', timeout: 6000 });
 
-// Voz em português do aparelho (europeu primeiro, mais próximo do de Moçambique; depois do Brasil)
+// Dentro do WhatsApp, Instagram ou Facebook (Android) não há leitura em voz alta: abre a mesma página no Chrome
+const openInChrome = () => {
+  const { host, pathname, search, href } = window.location;
+  window.location.href = `intent://${host}${pathname}${search}#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=${encodeURIComponent(href)};end`;
+};
+
+// Voz brasileira do aparelho, a mais natural que houver (as "aprimoradas" do iPhone, a do Google no Android)
 const portugueseVoice = () => {
   const voices = window.speechSynthesis.getVoices();
-  return voices.find(v => v.lang.replace('_', '-') === 'pt-PT') || voices.find(v => v.lang.replace('_', '-') === 'pt-BR')
+  const brazilian = voices.filter(v => v.lang.replace('_', '-').toLowerCase() === 'pt-br');
+  return brazilian.find(v => /google|natural|enhanced|premium|aprimorad|melhorad/i.test(v.name)) || brazilian[0]
     || voices.find(v => v.lang.toLowerCase().startsWith('pt'));
 };
 
@@ -36,6 +44,7 @@ const Bible = () => {
   const run = useRef(0);
   // No fim do capítulo, a leitura continua no seguinte
   const keepReading = useRef(false);
+  const started = useRef(false);
 
   const stop = () => {
     run.current += 1;
@@ -80,19 +89,37 @@ const Bible = () => {
 
   // Um versículo por vez (as falas longas cortam-se em alguns navegadores), a marcar o que está a ser lido
   const listen = (list: Verse[], from = 1) => {
+    if (!canSpeak) {
+      if (/Android/i.test(navigator.userAgent)) {
+        notify('Dentro desta app a leitura em voz alta não funciona. A abrir no Chrome…', 'success');
+        setTimeout(openInChrome, 1200);
+      } else {
+        notify('Este navegador não lê em voz alta. Abra a Lidera no Safari ou no Chrome.');
+      }
+      return;
+    }
     const synth = window.speechSynthesis;
+    // No Chrome do Android, falar logo a seguir a cancelar perde a primeira frase: espera um instante
+    const busy = synth.speaking || synth.pending;
     synth.cancel();
     const id = ++run.current;
     const voice = portugueseVoice();
     const queue = list.filter(v => v.verse >= from);
     queue.forEach((v, i) => {
       const speech = new SpeechSynthesisUtterance(i === 0 && from === 1 ? `${book.name}, capítulo ${chapter}. ${v.text}` : v.text);
-      speech.lang = voice?.lang || 'pt-PT';
+      speech.lang = voice?.lang || 'pt-BR';
       if (voice) speech.voice = voice;
       speech.onstart = () => {
         if (run.current !== id) return;
+        started.current = true;
         setReading(v.verse);
         document.getElementById(`v${v.verse}`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      };
+      // Aparelho sem voz instalada (ou leitura recusada): avisa em vez de ficar calado
+      speech.onerror = event => {
+        if (run.current !== id || event.error === 'interrupted' || event.error === 'canceled') return;
+        stop();
+        notify('Não foi possível ler em voz alta. Confira a voz do telemóvel em Definições → Acessibilidade → Conversão de texto em voz.');
       };
       if (i === queue.length - 1) {
         speech.onend = () => {
@@ -101,8 +128,16 @@ const Bible = () => {
           if (next) { keepReading.current = true; go(next.book, next.chapter); }
         };
       }
-      synth.speak(speech);
+      if (busy) setTimeout(() => { if (run.current === id) synth.speak(speech); }, 120);
+      else synth.speak(speech);
     });
+    // Há telemóveis em que a voz nunca arranca e não dá erro: ao fim de alguns segundos, explica
+    started.current = false;
+    setTimeout(() => {
+      if (run.current !== id || started.current) return;
+      stop();
+      notify('A leitura não começou. Confira se o telemóvel tem voz em português em Definições → Acessibilidade → Conversão de texto em voz.');
+    }, 6000);
   };
   const chosen = (verses || []).filter(v => selected.includes(v.verse));
   const ref = selected.length ? reference(book.name, chapter, selected) : '';
@@ -111,15 +146,15 @@ const Bible = () => {
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(quote);
-      UIkit.notification({ message: 'Versículo copiado', status: 'success', pos: 'top-right' });
+      notify('Versículo copiado', 'success');
     } catch {
-      UIkit.notification({ message: 'Não foi possível copiar', status: 'danger', pos: 'top-right' });
+      notify('Não foi possível copiar');
     }
   };
 
   return (
     <div className="page is-narrow">
-      <PageHeader title="Bíblia" subtitle="João Ferreira de Almeida. Toque em Ouvir para escutar, ou num versículo para compartilhar no feed." />
+      <PageHeader title="Bíblia" subtitle="Bíblia Livre, em português do Brasil. Toque em Ouvir para escutar, ou num versículo para compartilhar no feed." />
 
       <div className="bible-bar">
         <label className="visually-hidden" htmlFor="bible-book">Livro</label>
@@ -150,7 +185,7 @@ const Bible = () => {
       <article className="bible-text" aria-labelledby="bible-heading" aria-busy={!verses && !error}>
         <div className="bible-heading-row">
           <h2 id="bible-heading" className="bible-heading">{book.name} {chapter}</h2>
-          {canSpeak && verses && (reading !== null ? (
+          {verses && (reading !== null ? (
             <button type="button" className="uk-button uk-button-default uk-button-small" onClick={stop}>
               <Icon name="stop" size={16} /> Parar
             </button>
@@ -195,7 +230,10 @@ const Bible = () => {
           )}
         </nav>
       </article>
-      <p className="bible-note">Tradução João Ferreira de Almeida, reimpressão de 1911 (domínio público). O áudio usa a voz do aparelho.</p>
+      <p className="bible-note">
+        <a href="https://sites.google.com/site/biblialivre" target="_blank" rel="noreferrer">Bíblia Livre</a>, licença{' '}
+        <a href="https://creativecommons.org/licenses/by/3.0/br/" target="_blank" rel="noreferrer">Creative Commons Atribuição 3.0 Brasil</a>. O áudio usa a voz do aparelho.
+      </p>
 
       {selected.length > 0 && (
         <div className="bible-actions" role="region" aria-label="Versículos escolhidos">
