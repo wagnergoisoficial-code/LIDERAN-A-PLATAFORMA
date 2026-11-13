@@ -25,6 +25,8 @@
   --accent-text:    #006af5;
   --accent-light:   #eef3fe;
   --danger:         #d92d20;
+  /* Contadores de notificações e mensagens: vivos */
+  --badge:          #e11d48;
   --danger-dark:    #b42318;
   --danger-light:   #fef3f2;
   --success:        #15803d;
@@ -242,8 +244,8 @@ a:hover { color: var(--accent-dark); text-decoration: underline; }
   height: 18px;
   padding: 0 5px;
   border-radius: 9px;
-  background: var(--text);
-  color: var(--bg);
+  background: var(--badge);
+  color: #fff;
   font-size: 11px;
   font-weight: 700;
   line-height: 18px;
@@ -292,8 +294,8 @@ a:hover { color: var(--accent-dark); text-decoration: underline; }
   padding: 0 5px;
   border: 2px solid var(--bg);
   border-radius: 9px;
-  background: var(--text);
-  color: var(--bg);
+  background: var(--badge);
+  color: #fff;
   font-size: 10px;
   font-weight: 700;
   line-height: 14px;
@@ -1507,6 +1509,25 @@ hr, .uk-hr { margin: 16px 0; border: 0; border-top: 1px solid var(--border); }
 /* ─── FEED ──────────────────────────────────────────────────── */
 /* Medidas da referência: feed de 793 px e coluna de 391 px, com 33 px entre eles */
 .app.is-feed .app-main { max-width: 1265px; padding-top: 18px; }
+
+/* Telemóvel: o feed vai de ponta a ponta do ecrã, sem cartões (no computador e no tablet ficam os cartões) */
+@media (max-width: 639px) {
+  .app.is-feed .app-main { padding-top: 8px; }
+  .feed-main > * + * { margin-top: 8px !important; }
+  .feed-main .card,
+  .feed-main .post,
+  .feed-main .chat-peek-row {
+    margin-right: calc(var(--gutter) * -1);
+    margin-left: calc(var(--gutter) * -1);
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .feed-main .post + .post { margin-top: 8px; }
+  .feed-main .post-media,
+  .feed-main .post-video,
+  .feed-main .text-card { width: 100%; margin-right: 0; margin-left: 0; border-radius: 0; }
+  .feed-heading { margin: 14px 0 8px; }
+}
 
 .feed-layout {
   display: grid;

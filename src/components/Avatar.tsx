@@ -10,6 +10,22 @@ interface AvatarProps {
 
 const NAMED_SIZES = { small: 32, medium: 44, large: 64 };
 
+// Sem foto: as iniciais sobre uma cor viva, sempre a mesma para a mesma pessoa
+const COLORS: [string, string][] = [
+  ['#dc2626', '#fff'], // vermelho
+  ['#db2777', '#fff'], // rosa
+  ['#c2410c', '#fff'], // laranja
+  ['#facc15', '#3f2d00'], // amarelo (letras escuras para se lerem)
+  ['#15803d', '#fff'], // verde
+  ['#0f766e', '#fff'], // verde-água
+  ['#2563eb', '#fff'], // azul
+];
+const colorFor = (name: string) => {
+  let hash = 0;
+  for (const ch of name) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+  return COLORS[hash % COLORS.length];
+};
+
 const getInitials = (name: string): string => {
   if (!name) return '?';
   const parts = name.trim().split(/\s+/);
@@ -48,8 +64,8 @@ const Avatar: React.FC<AvatarProps> = ({ name: nameProp, profileImage, size = 'm
         display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'var(--bg-elevated)',
-        color: 'var(--text-muted)',
+        background: colorFor(name)[0],
+        color: colorFor(name)[1],
         fontSize: Math.max(11, Math.round(px * 0.36)),
         fontWeight: 600,
         letterSpacing: '0.02em',
