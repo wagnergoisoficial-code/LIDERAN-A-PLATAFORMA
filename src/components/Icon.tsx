@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-  ArrowLeft, ArrowRight, ArrowUp, Award, BadgeCheck, Forward, Ban, Cake, Download, Music, Wallet, BicepsFlexed, Bell, BookOpen, Bookmark, Calendar, Camera, ChartColumn,
+  ArrowLeft, ArrowRight, ArrowUp, Award, BadgeCheck, Forward, Square, Volume2, Ban, Cake, Download, Music, Wallet, BicepsFlexed, Bell, BookOpen, Bookmark, Calendar, Camera, ChartColumn,
   Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, CirclePlay, Clock, Copy, Ellipsis, ExternalLink, FileText,
   Flag, Flame, Gift, Globe, HandHeart, Heart, House, Image, Info, LayoutDashboard, Link, ListChecks, Lock, LockOpen,
   LogOut, MapPin, MessageCircle, MessagesSquare, Moon, Pencil, Pin, PinOff, Play, Plus, Search, Send, ShieldCheck, ThumbsUp,
@@ -76,6 +76,8 @@ const ICONS = {
   book: BookOpen,
   bookmark: Bookmark,
   share: Forward,
+  audio: Volume2,
+  stop: Square,
   award: Award,
   send: Send,
   reply: Send,

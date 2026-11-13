@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, Component } from 'react';
 import { Routes, Route, Navigate, Link, useLocation, useNavigate } from 'react-router-dom';
+import { flushSync } from 'react-dom';
 import { useAuth } from './context/AuthContext';
 import { useTheme } from './context/ThemeContext';
 import { api, UNREAD_MESSAGES_EVENT } from './services/api';
@@ -392,18 +393,66 @@ const AccountMenu: React.FC = () => {
 };
 
 /* ─── Cabeçalho ─────────────────────────────────────────────── */
-const Header: React.FC<{ items: NavItem[]; guardian: boolean }> = ({ items, guardian }) => {
+/* ─── Quadradinhos do cabeçalho (telemóvel): a comunidade e o painel ─── */
+const AppsMenu: React.FC = () => {
+  const { user } = useAuth();
+  const location = useLocation();
+  const [open, setOpen] = useState(false);
+  const button = useRef<HTMLButtonElement>(null);
+  const menu = useRef<HTMLDivElement>(null);
+
+  const close = (refocus = true) => {
+    setOpen(false);
+    if (refocus) button.current?.focus();
+  };
+
+  useDismiss(open, () => close(), [button, menu]);
+  useEffect(() => { setOpen(false); }, [location.pathname]);
+  useEffect(() => { if (open) menu.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus(); }, [open]);
+  const active = isCommunityPath(location.pathname) || isPanelPath(location.pathname);
+
+  return (
+    <div className="menu-wrap hide-wide">
+      <button ref={button} type="button" className={`icon-btn${active ? ' is-active' : ''}`} aria-label="Comunidade" title="Comunidade"
+        aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(v => !v)}>
+        <Icon name="dashboard" />
+      </button>
+      {open && (
+        <div ref={menu} className="menu is-end scale-in" role="menu" aria-label="Comunidade" style={{ minWidth: '240px' }}
+          onKeyDown={e => { moveFocus(e, menu.current); if (e.key === 'Tab') close(false); }}>
+          <Link to="/comunidade" role="menuitem" className="menu-item"><Icon name="users" size={18} /> Comunidade</Link>
+          <Link to="/events" role="menuitem" className="menu-item"><Icon name="calendar" size={18} /> Agenda</Link>
+          <Link to="/users" role="menuitem" className="menu-item"><Icon name="user" size={18} /> Membros</Link>
+          {hasPanel(user) && (
+            <>
+              <div className="menu-divider" role="separator"></div>
+              <Link to="/painel" role="menuitem" className="menu-item"><Icon name="dashboard" size={18} /> {panelLabel(user)}</Link>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+interface SearchControl {
+  open: boolean;
+  setOpen: (open: boolean) => void;
+  // Quem abriu a pesquisa recebe o foco ao fechar (ícone do cabeçalho ou "Buscar" em baixo)
+  opener: React.RefObject<HTMLButtonElement | null>;
+  openFrom: (button: HTMLButtonElement) => void;
+}
+
+const Header: React.FC<{ items: NavItem[]; guardian: boolean; search: SearchControl }> = ({ items, guardian, search }) => {
   const { user } = useAuth();
   const location = useLocation();
   const { openComposer } = useComposer();
-  const [searchOpen, setSearchOpen] = useState(false);
-  const searchToggle = useRef<HTMLButtonElement>(null);
 
   return (
     <header className="app-header">
       <div className="app-header-inner">
         <Link to="/" className="brand" aria-label="Lidera, ir para o início">lidera</Link>
-        {!guardian && <SearchBox open={searchOpen} setOpen={setSearchOpen} toggle={searchToggle} />}
+        {!guardian && <SearchBox open={search.open} setOpen={search.setOpen} toggle={search.opener} />}
 
         <nav className="main-nav" aria-label="Principal">
           {items.map(item => {
@@ -421,8 +470,8 @@ const Header: React.FC<{ items: NavItem[]; guardian: boolean }> = ({ items, guar
 
         <div className="header-actions">
           {!guardian && (
-            <button ref={searchToggle} type="button" className="icon-btn search-toggle" aria-label="Buscar" aria-expanded={searchOpen}
-              onClick={() => setSearchOpen(true)}>
+            <button type="button" className="icon-btn search-toggle" aria-label="Buscar" aria-expanded={search.open}
+              onClick={e => search.openFrom(e.currentTarget)}>
               <Icon name="search" />
             </button>
           )}
@@ -432,10 +481,11 @@ const Header: React.FC<{ items: NavItem[]; guardian: boolean }> = ({ items, guar
             </button>
           )}
           {hasPanel(user) && (
-            <Link to="/painel" className={`icon-btn${isPanelPath(location.pathname) ? ' is-active' : ''}`} aria-label={panelLabel(user)} title={panelLabel(user)}>
+            <Link to="/painel" className={`icon-btn hide-compact${isPanelPath(location.pathname) ? ' is-active' : ''}`} aria-label={panelLabel(user)} title={panelLabel(user)}>
               <Icon name="dashboard" />
             </Link>
           )}
+          {!guardian && <AppsMenu />}
           <Notifications />
           <AccountMenu />
         </div>
@@ -445,7 +495,7 @@ const Header: React.FC<{ items: NavItem[]; guardian: boolean }> = ({ items, guar
 };
 
 /* ─── Barra de baixo (telemóvel e tablet) ───────────────────── */
-const BottomNav: React.FC<{ items: NavItem[]; guardian: boolean }> = ({ items, guardian }) => {
+const BottomNav: React.FC<{ items: NavItem[]; guardian: boolean; search: SearchControl }> = ({ items, guardian, search }) => {
   const { user } = useAuth();
   const location = useLocation();
   const { openComposer } = useComposer();
@@ -474,12 +524,16 @@ const BottomNav: React.FC<{ items: NavItem[]; guardian: boolean }> = ({ items, g
     return <nav className="bottom-nav" aria-label="Principal" style={{ '--nav-items': 2 } as React.CSSProperties}>{items.map(link)}{profile}</nav>;
   }
 
-  // Feed, Comunidade, Publicar, Bíblia, Mensagens (o perfil está no avatar, no cabeçalho)
-  const [feed, community, bible, messages] = items;
+  // Feed, Buscar, Publicar, Bíblia, Mensagens (a comunidade está nos quadradinhos e o perfil no avatar, no cabeçalho)
+  const [feed, , bible, messages] = items;
   return (
     <nav className="bottom-nav" aria-label="Principal">
       {link(feed)}
-      {link(community)}
+      <button type="button" className={`bottom-nav-link${search.open ? ' is-active' : ''}`} aria-expanded={search.open}
+        onClick={e => search.openFrom(e.currentTarget)}>
+        <span className="bottom-nav-icon"><Icon name="search" size={24} strokeWidth={search.open ? 2 : 1.75} /></span>
+        <span className="bottom-nav-label">Buscar</span>
+      </button>
       <button type="button" className="bottom-nav-link" onClick={() => openComposer()}>
         <span className="bottom-nav-icon"><span className="bottom-nav-publish"><Icon name="plus" size={22} strokeWidth={2.25} /></span></span>
         <span className="bottom-nav-label">Publicar</span>
@@ -499,6 +553,20 @@ const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Página nova começa no topo (o feed repõe a posição dele quando se volta)
   useLayoutEffect(() => { window.scrollTo(0, 0); }, [location.pathname]);
 
+  // A pesquisa abre por cima do cabeçalho; o foco vai já no toque (senão o teclado não abre no iPhone)
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchOpener = useRef<HTMLButtonElement | null>(null);
+  const search: SearchControl = {
+    open: searchOpen,
+    setOpen: setSearchOpen,
+    opener: searchOpener,
+    openFrom: button => {
+      searchOpener.current = button;
+      flushSync(() => setSearchOpen(true));
+      document.querySelector<HTMLInputElement>('.header-search input')?.focus();
+    },
+  };
+
   const items: NavItem[] = guardian
     ? [{ to: '/', label: 'Meus filhos', icon: 'users', active: p => p === '/' }]
     : [
@@ -515,9 +583,9 @@ const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     <ComposerProvider>
       <div className={`app${immersive ? ' is-immersive' : ''}${isPanelPath(location.pathname) ? ' is-wide' : ''}${!guardian && location.pathname === '/' ? ' is-feed' : ''}`}>
         <a className="skip-link" href="#conteudo">Pular para o conteúdo</a>
-        <Header items={items} guardian={guardian} />
+        <Header items={items} guardian={guardian} search={search} />
         <main id="conteudo" className="app-main" tabIndex={-1}>{children}</main>
-        <BottomNav items={items} guardian={guardian} />
+        <BottomNav items={items} guardian={guardian} search={search} />
       </div>
     </ComposerProvider>
   );

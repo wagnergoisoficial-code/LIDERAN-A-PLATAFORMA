@@ -1,6 +1,7 @@
-// Bíblia: tradução João Ferreira de Almeida (domínio público), lida de bible-api.com capítulo a
-// capítulo. A lista de livros vai com a app; os capítulos já lidos ficam guardados no navegador.
-const SOURCE = 'https://bible-api.com/data/almeida';
+// Bíblia: tradução João Ferreira de Almeida (reimpressão de 1911, domínio público). O texto vai com a
+// app, um ficheiro por livro em public/bible-data/almeida/<n.º do livro>.json com [[versículos do cap. 1], ...]:
+// o bible-api.com deixou de ter o português, e assim a leitura não depende de serviços de fora.
+const SOURCE = '/bible-data/almeida';
 
 export interface BibleBook { id: string; name: string; chapters: number; testament: 'AT' | 'NT' }
 export interface Verse { verse: number; text: string }
@@ -25,20 +26,23 @@ const BOOKS: [string, string, number][] = [
 export const BIBLE_BOOKS: BibleBook[] = BOOKS.map(([id, name, chapters], i) => ({ id, name, chapters, testament: i < 39 ? 'AT' : 'NT' }));
 export const findBook = (id?: string) => BIBLE_BOOKS.find(b => b.id === id?.toUpperCase());
 
-const cacheKey = (book: string, chapter: number) => `lidera:biblia:${book}:${chapter}`;
-const memory = new Map<string, Verse[]>();
+const books = new Map<string, Promise<string[][]>>();
+
+// Um livro de cada vez; fica em memória (e na cache do navegador) para os capítulos seguintes
+const loadBook = (book: string) => {
+  if (!books.has(book)) {
+    const nr = BIBLE_BOOKS.findIndex(b => b.id === book) + 1;
+    books.set(book, fetch(`${SOURCE}/${nr}.json`)
+      .then(res => { if (!res.ok) throw new Error('Não foi possível abrir este livro.'); return res.json(); })
+      .catch(err => { books.delete(book); throw err; }));
+  }
+  return books.get(book)!;
+};
 
 export const loadChapter = async (book: string, chapter: number): Promise<Verse[]> => {
-  const key = cacheKey(book, chapter);
-  const kept = memory.get(key) || JSON.parse(sessionStorage.getItem(key) || 'null');
-  if (kept) return kept;
-  const res = await fetch(`${SOURCE}/${book}/${chapter}`);
-  if (!res.ok) throw new Error(res.status === 429 ? 'Muitos pedidos seguidos. Espere alguns segundos.' : 'Não foi possível carregar o capítulo.');
-  const data = await res.json();
-  const verses: Verse[] = (data.verses || []).map((v: { verse: number; text: string }) => ({ verse: v.verse, text: v.text.trim() }));
-  memory.set(key, verses);
-  try { sessionStorage.setItem(key, JSON.stringify(verses)); } catch { /* sem espaço: fica só em memória */ }
-  return verses;
+  const texts = (await loadBook(book))[chapter - 1];
+  if (!texts) throw new Error('Capítulo não encontrado.');
+  return texts.map((text, i) => ({ verse: i + 1, text }));
 };
 
 // Onde a pessoa parou de ler

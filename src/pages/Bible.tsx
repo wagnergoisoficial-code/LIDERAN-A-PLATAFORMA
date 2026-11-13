@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import UIkit from 'uikit';
 import { BIBLE_BOOKS, findBook, loadChapter, lastPlace, savePlace, reference, Verse } from '../lib/bible';
@@ -7,8 +7,17 @@ import PageHeader from '../components/PageHeader';
 import EmptyState from '../components/EmptyState';
 import Icon from '../components/Icon';
 
+const canSpeak = typeof window !== 'undefined' && 'speechSynthesis' in window;
+
+// Voz em português do aparelho (europeu primeiro, mais próximo do de Moçambique; depois do Brasil)
+const portugueseVoice = () => {
+  const voices = window.speechSynthesis.getVoices();
+  return voices.find(v => v.lang.replace('_', '-') === 'pt-PT') || voices.find(v => v.lang.replace('_', '-') === 'pt-BR')
+    || voices.find(v => v.lang.toLowerCase().startsWith('pt'));
+};
+
 // Leitura da Bíblia: livro e capítulo no endereço (/biblia/JHN/3); tocar num versículo
-// escolhe-o para compartilhar no feed ou copiar
+// escolhe-o para compartilhar no feed ou copiar; "Ouvir" lê o capítulo em voz alta
 const Bible = () => {
   const params = useParams<{ book?: string; chapter?: string }>();
   const navigate = useNavigate();
@@ -21,17 +30,40 @@ const Bible = () => {
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<number[]>([]);
   const [attempt, setAttempt] = useState(0);
+  // Versículo a ser lido em voz alta (null: parado)
+  const [reading, setReading] = useState<number | null>(null);
+  // Cada leitura tem um número: o que chega de uma leitura já parada é ignorado
+  const run = useRef(0);
+  // No fim do capítulo, a leitura continua no seguinte
+  const keepReading = useRef(false);
+
+  const stop = () => {
+    run.current += 1;
+    keepReading.current = false;
+    if (canSpeak) window.speechSynthesis.cancel();
+    setReading(null);
+  };
+
+  useEffect(() => () => { if (canSpeak) window.speechSynthesis.cancel(); }, []);
 
   useEffect(() => {
     let alive = true;
+    const continuing = keepReading.current;
+    keepReading.current = false;
+    if (!continuing) stop();
     setVerses(null);
     setError(null);
     setSelected([]);
     savePlace(book.id, chapter);
     loadChapter(book.id, chapter)
-      .then(list => { if (alive) setVerses(list); })
+      .then(list => {
+        if (!alive) return;
+        setVerses(list);
+        if (continuing) listen(list);
+      })
       .catch(err => { if (alive) setError(err.message || 'Não foi possível carregar o capítulo.'); });
     return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [book.id, chapter, attempt]);
 
   const go = (bookId: string, chapterNumber: number) => {
@@ -45,6 +77,33 @@ const Bible = () => {
   const label = (place: { book: string; chapter: number }) => `${findBook(place.book)!.name} ${place.chapter}`;
 
   const toggle = (verse: number) => setSelected(prev => (prev.includes(verse) ? prev.filter(v => v !== verse) : [...prev, verse]));
+
+  // Um versículo por vez (as falas longas cortam-se em alguns navegadores), a marcar o que está a ser lido
+  const listen = (list: Verse[], from = 1) => {
+    const synth = window.speechSynthesis;
+    synth.cancel();
+    const id = ++run.current;
+    const voice = portugueseVoice();
+    const queue = list.filter(v => v.verse >= from);
+    queue.forEach((v, i) => {
+      const speech = new SpeechSynthesisUtterance(i === 0 && from === 1 ? `${book.name}, capítulo ${chapter}. ${v.text}` : v.text);
+      speech.lang = voice?.lang || 'pt-PT';
+      if (voice) speech.voice = voice;
+      speech.onstart = () => {
+        if (run.current !== id) return;
+        setReading(v.verse);
+        document.getElementById(`v${v.verse}`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      };
+      if (i === queue.length - 1) {
+        speech.onend = () => {
+          if (run.current !== id) return;
+          setReading(null);
+          if (next) { keepReading.current = true; go(next.book, next.chapter); }
+        };
+      }
+      synth.speak(speech);
+    });
+  };
   const chosen = (verses || []).filter(v => selected.includes(v.verse));
   const ref = selected.length ? reference(book.name, chapter, selected) : '';
   const quote = `"${chosen.map(v => v.text).join(' ')}"\n${ref}`;
@@ -60,7 +119,7 @@ const Bible = () => {
 
   return (
     <div className="page is-narrow">
-      <PageHeader title="Bíblia" subtitle="João Ferreira de Almeida. Toque num versículo para compartilhar no feed." />
+      <PageHeader title="Bíblia" subtitle="João Ferreira de Almeida. Toque em Ouvir para escutar, ou num versículo para compartilhar no feed." />
 
       <div className="bible-bar">
         <label className="visually-hidden" htmlFor="bible-book">Livro</label>
@@ -89,7 +148,19 @@ const Bible = () => {
       </div>
 
       <article className="bible-text" aria-labelledby="bible-heading" aria-busy={!verses && !error}>
-        <h2 id="bible-heading" className="bible-heading">{book.name} {chapter}</h2>
+        <div className="bible-heading-row">
+          <h2 id="bible-heading" className="bible-heading">{book.name} {chapter}</h2>
+          {canSpeak && verses && (reading !== null ? (
+            <button type="button" className="uk-button uk-button-default uk-button-small" onClick={stop}>
+              <Icon name="stop" size={16} /> Parar
+            </button>
+          ) : (
+            <button type="button" className="uk-button uk-button-default uk-button-small" title="Ouvir o capítulo com a voz do aparelho"
+              onClick={() => listen(verses, selected.length ? Math.min(...selected) : 1)}>
+              <Icon name="audio" size={18} /> Ouvir
+            </button>
+          ))}
+        </div>
         {error ? (
           <EmptyState icon="warning" title={error} text="Verifique a conexão com a internet."
             action={<button type="button" className="uk-button uk-button-default" onClick={() => setAttempt(a => a + 1)}>Tentar de novo</button>} />
@@ -99,7 +170,7 @@ const Bible = () => {
           <p className="bible-verses">
             {verses.map(v => (
               <span key={v.verse}>
-                <span role="button" tabIndex={0} className="bible-verse" aria-pressed={selected.includes(v.verse)}
+                <span id={`v${v.verse}`} role="button" tabIndex={0} className={`bible-verse${reading === v.verse ? ' is-reading' : ''}`} aria-pressed={selected.includes(v.verse)}
                   aria-label={`Versículo ${v.verse}: ${v.text}`}
                   onClick={() => toggle(v.verse)}
                   onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(v.verse); } }}>
@@ -124,7 +195,7 @@ const Bible = () => {
           )}
         </nav>
       </article>
-      <p className="bible-note">Tradução João Ferreira de Almeida (domínio público), via bible-api.com.</p>
+      <p className="bible-note">Tradução João Ferreira de Almeida, reimpressão de 1911 (domínio público). O áudio usa a voz do aparelho.</p>
 
       {selected.length > 0 && (
         <div className="bible-actions" role="region" aria-label="Versículos escolhidos">
