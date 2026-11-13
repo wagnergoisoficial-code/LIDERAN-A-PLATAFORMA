@@ -107,6 +107,31 @@ describe('secretaria', () => {
     expect((await call('GET', '/panel/documents', s.ana.token)).status).toBe(403);
     expect((await call('POST', '/panel/documents', s.ana.token, form)).status).toBe(403);
   });
+
+  test('faz a chamada e corrige-a; só conta gente da comunidade', async () => {
+    const date = '2026-11-08';
+    expect((await call('POST', '/panel/attendance', s.ana.token, { date, title: 'Culto de jovens', presentIds: [] })).status).toBe(403);
+    const created = await call('POST', '/panel/attendance', s.bia.token, { date, title: 'Culto de jovens', presentIds: [s.ana.id, s.caio.id] });
+    expect(created.status).toBe(201);
+    expect([...created.data.presentIds].sort()).toEqual([s.ana.id, s.caio.id].sort());
+
+    const fixed = await call('PUT', `/panel/attendance/${created.data.id}`, s.bia.token, { date, title: 'Culto de jovens', presentIds: [s.ana.id] });
+    expect(fixed.data.presentIds).toEqual([s.ana.id]);
+    expect((await call('POST', '/panel/attendance', s.bia.token, { date, title: 'Ensaio', presentIds: ['de-outra-comunidade'] })).status).toBe(400);
+    expect((await call('GET', '/panel/attendance', s.leader.token)).data).toHaveLength(1);
+    expect((await call('DELETE', `/panel/attendance/${created.data.id}`, s.bia.token)).status).toBe(200);
+  });
+
+  test('a ata sem tipo entra no livro de atas, com texto longo', async () => {
+    const form = new FormData();
+    form.append('title', 'Reunião de planeamento');
+    form.append('date', '2026-11-10');
+    form.append('notes', 'Decidimos que o retiro será em março. '.repeat(400));
+    const ata = await call('POST', '/panel/documents', s.bia.token, form);
+    expect(ata.status).toBe(201);
+    expect(ata.data.kind).toBe('ata');
+    expect(ata.data.notes.length).toBeGreaterThan(10000);
+  });
 });
 
 describe('regência', () => {

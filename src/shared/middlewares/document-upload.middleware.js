@@ -10,10 +10,11 @@ const isPdf = (buffer) => buffer.length > 4 && buffer.subarray(0, 5).toString('a
 const reject = (res, message) => res.status(400).json({ success: false, message, statusCode: 400 });
 
 // Expõe req.documents: [{ kind, mimeType, data }], com kind = nome do campo
-const documentUpload = (FIELDS) => {
+// fieldSize: tamanho máximo de cada campo de texto (o texto de uma ata precisa de mais)
+const documentUpload = (FIELDS, { fieldSize = 10 * 1024 } = {}) => {
   const upload = multer({
     storage: multer.memoryStorage(),
-    limits: { fileSize: config.file.maxFileSize, files: FIELDS.length, fields: 20, fieldSize: 10 * 1024 },
+    limits: { fileSize: config.file.maxFileSize, files: FIELDS.length, fields: 20, fieldSize },
   });
   return (req, res, next) => upload.fields(FIELDS.map((name) => ({ name, maxCount: 1 })))(req, res, async (err) => {
     if (err instanceof multer.MulterError) {

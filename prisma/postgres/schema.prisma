@@ -41,6 +41,7 @@ model Church {
   financeEntries FinanceEntry[]
   documents      ChurchDocument[]
   songs          Song[]
+  rollCalls      RollCall[]
 
   @@map("churches")
 }
@@ -95,6 +96,7 @@ model User {
   messages           Message[]
   postReactions      PostReaction[]
   eventAttendances   EventAttendance[]
+  rollCallPresences  RollCallPresence[]
   prayers            Prayer[]
   pollVotes          PollVote[]
   notifications      Notification[]
@@ -729,4 +731,31 @@ model Song {
 
   @@index([churchId])
   @@map("songs")
+}
+
+// Secretaria: controle de presença, uma chamada por encontro
+model RollCall {
+  id          String   @id @default(cuid())
+  date        DateTime // dia do encontro
+  title       String   // ex.: "Culto de jovens"
+  createdById String
+  createdAt   DateTime @default(now())
+
+  churchId    String
+  church      Church   @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  present     RollCallPresence[]
+
+  @@index([churchId, date])
+  @@map("roll_calls")
+}
+
+model RollCallPresence {
+  rollCallId String
+  rollCall   RollCall @relation(fields: [rollCallId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([rollCallId, userId])
+  @@index([userId])
+  @@map("roll_call_presences")
 }

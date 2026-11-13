@@ -14,6 +14,9 @@ const DOCUMENT_SELECT = {
   mimeType: true, size: true, createdById: true, createdAt: true,
 };
 
+const ROLL_CALL_INCLUDE = { present: { select: { userId: true } } };
+const formatRollCall = (r) => ({ id: r.id, date: r.date, title: r.title, createdById: r.createdById, presentIds: r.present.map((p) => p.userId) });
+
 const prisma = () => getPrismaClient();
 
 // Texto opcional (ou obrigatório) com limite de tamanho; label leva o artigo: "o título"
@@ -154,16 +157,19 @@ module.exports = {
     return prisma().churchDocument.findMany({ where: { churchId: church.id }, select: DOCUMENT_SELECT, orderBy: { createdAt: 'desc' }, take: 1000 });
   },
 
+  // O livro de atas: sem tipo, o documento é uma ata
   async createDocument(user, body = {}, file = null) {
     const church = await panelChurch(user, 'secretario');
-    if (!DOCUMENT_KINDS.includes(body.kind)) throw new ValidationError('Escolha o tipo de documento');
+    const kind = body.kind || 'ata';
+    if (!DOCUMENT_KINDS.includes(kind)) throw new ValidationError('Escolha o tipo de documento');
     return prisma().churchDocument.create({
       data: {
-        kind: body.kind,
+        kind,
         title: text(body.title, 120, 'o título', true),
         date: dateOf(body.date),
         memberId: await memberOf(church.id, body.memberId),
-        notes: text(body.notes, 2000, 'as observações'),
+        // O texto de uma ata (presentes, assuntos e decisões) pode ser longo
+        notes: text(body.notes, 20000, 'o texto'),
         mimeType: file?.mimeType || null,
         size: file ? file.data.length : null,
         data: file?.data || null,
@@ -185,6 +191,48 @@ module.exports = {
     const church = await panelChurch(user, 'secretario');
     const { count } = await prisma().churchDocument.deleteMany({ where: { id, churchId: church.id } });
     if (!count) throw new NotFoundError('Documento não encontrado');
+  },
+
+  /* ─── Secretaria: controle de presença ─── */
+  async listRollCalls(user) {
+    const church = await panelChurch(user, 'secretario');
+    const rows = await prisma().rollCall.findMany({
+      where: { churchId: church.id },
+      include: ROLL_CALL_INCLUDE,
+      orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
+      take: 300,
+    });
+    return rows.map(formatRollCall);
+  },
+
+  // Cria ou corrige uma chamada; a lista de presentes substitui a anterior
+  async saveRollCall(user, body = {}, id = null) {
+    const church = await panelChurch(user, 'secretario');
+    const data = { date: dateOf(body.date, true), title: text(body.title, 80, 'o encontro', true) };
+    const ids = [...new Set((Array.isArray(body.presentIds) ? body.presentIds : []).map(String))];
+    const members = ids.length
+      ? await prisma().user.findMany({ where: { id: { in: ids }, churchId: church.id }, select: { id: true } })
+      : [];
+    if (members.length !== ids.length) throw new ValidationError('Há pessoas na chamada que não são desta comunidade');
+
+    return prisma().$transaction(async (tx) => {
+      let rollCallId = id;
+      if (id) {
+        const { count } = await tx.rollCall.updateMany({ where: { id, churchId: church.id }, data });
+        if (!count) throw new NotFoundError('Chamada não encontrada');
+        await tx.rollCallPresence.deleteMany({ where: { rollCallId: id } });
+      } else {
+        rollCallId = (await tx.rollCall.create({ data: { ...data, createdById: user.id, churchId: church.id } })).id;
+      }
+      if (members.length) await tx.rollCallPresence.createMany({ data: members.map((m) => ({ rollCallId, userId: m.id })) });
+      return formatRollCall(await tx.rollCall.findUnique({ where: { id: rollCallId }, include: ROLL_CALL_INCLUDE }));
+    });
+  },
+
+  async removeRollCall(user, id) {
+    const church = await panelChurch(user, 'secretario');
+    const { count } = await prisma().rollCall.deleteMany({ where: { id, churchId: church.id } });
+    if (!count) throw new NotFoundError('Chamada não encontrada');
   },
 
   /* ─── Regência: repertório ─── */

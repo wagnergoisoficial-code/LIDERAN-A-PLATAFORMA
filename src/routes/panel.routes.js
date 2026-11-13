@@ -36,7 +36,7 @@ router.delete('/finance/:id', handle(async (req, res) => {
 router.get('/documents', handle(async (req, res) => {
   res.json({ success: true, data: await service.listDocuments(req.user) });
 }));
-router.post('/documents', onlySecretary, documentUpload(['file']), handle(async (req, res) => {
+router.post('/documents', onlySecretary, documentUpload(['file'], { fieldSize: 80 * 1024 }), handle(async (req, res) => {
   const document = await service.createDocument(req.user, req.body, req.documents[0]);
   res.status(201).json({ success: true, message: 'Documento guardado', data: document });
 }));
@@ -52,6 +52,20 @@ router.get('/documents/:id/file', handle(async (req, res) => {
 router.delete('/documents/:id', handle(async (req, res) => {
   await service.removeDocument(req.user, req.params.id);
   res.json({ success: true, message: 'Documento apagado' });
+}));
+
+router.get('/attendance', handle(async (req, res) => {
+  res.json({ success: true, data: await service.listRollCalls(req.user) });
+}));
+router.post('/attendance', handle(async (req, res) => {
+  res.status(201).json({ success: true, message: 'Chamada registrada', data: await service.saveRollCall(req.user, req.body) });
+}));
+router.put('/attendance/:id', handle(async (req, res) => {
+  res.json({ success: true, message: 'Chamada atualizada', data: await service.saveRollCall(req.user, req.body, req.params.id) });
+}));
+router.delete('/attendance/:id', handle(async (req, res) => {
+  await service.removeRollCall(req.user, req.params.id);
+  res.json({ success: true, message: 'Chamada apagada' });
 }));
 
 router.get('/songs', handle(async (req, res) => {
