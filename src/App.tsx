@@ -35,6 +35,7 @@ import Minutes from './pages/panel/Minutes';
 import Finance from './pages/panel/Finance';
 import Songs from './pages/panel/Songs';
 import { hasPanel, panelLabel } from './lib/cargos';
+import { Badges, BadgeContext, NO_BADGES } from './lib/badges';
 
 class ErrorBoundary extends Component<{ children: React.ReactNode }, { error: Error | null }> {
   constructor(props: any) {
@@ -107,13 +108,31 @@ const isPanelPath = (path: string) => path.startsWith('/painel');
 interface NavItem { to: string; label: string; icon: IconName; active: (path: string) => boolean; badge?: number }
 
 /* ─── Mensagens privadas por ler ────────────────────────────── */
-const useUnreadMessages = (enabled: boolean) => {
+// O que a pessoa já viu no feed e no chat da comunidade (a primeira vez conta a partir de agora)
+// shortcut: o "visto" fica neste aparelho (localStorage); passar para a conta se ele quiser os números iguais em todos
+const seenKey = (what: 'feed' | 'chat', userId: string) => `lidera:visto:${what}:${userId}`;
+const markSeen = (what: 'feed' | 'chat', userId: string) => localStorage.setItem(seenKey(what, userId), new Date().toISOString());
+const seenAt = (what: 'feed' | 'chat', userId: string) => {
+  if (!localStorage.getItem(seenKey(what, userId))) markSeen(what, userId);
+  return localStorage.getItem(seenKey(what, userId))!;
+};
+
+/* ─── Números dos ícones: Feed (novidades) e Mensagens (privadas por ler + chat da comunidade) ─── */
+const useBadgeCounts = (userId: string | null): Badges => {
   const location = useLocation();
-  const [unread, setUnread] = useState(0);
+  const path = location.pathname;
+  const previous = useRef(path);
+  const [counts, setCounts] = useState<Badges>(NO_BADGES);
+
   // Ao mudar de página, ao ler uma conversa e a cada 30 s (com o separador visível)
   useEffect(() => {
-    if (!enabled) return;
-    const load = () => api.getUnreadMessages().then(res => setUnread(res.data?.total || 0)).catch(() => {});
+    if (!userId) return;
+    // Quem está no feed (ou no chat), ou acabou de sair dele, já viu o que lá havia
+    for (const [what, route] of [['feed', '/'], ['chat', '/chat']] as const) {
+      if (path === route || previous.current === route) markSeen(what, userId);
+    }
+    previous.current = path;
+    const load = () => api.getBadges(seenAt('chat', userId), seenAt('feed', userId)).then(res => setCounts(res.data || NO_BADGES)).catch(() => {});
     load();
     const timer = setInterval(() => { if (document.visibilityState === 'visible') load(); }, 30000);
     window.addEventListener(UNREAD_MESSAGES_EVENT, load);
@@ -121,8 +140,10 @@ const useUnreadMessages = (enabled: boolean) => {
       clearInterval(timer);
       window.removeEventListener(UNREAD_MESSAGES_EVENT, load);
     };
-  }, [enabled, location.pathname]);
-  return unread;
+  }, [userId, path]);
+
+  // Na própria página o número não aparece
+  return { messages: counts.messages, chat: path === '/chat' ? 0 : counts.chat, feed: path === '/' ? 0 : counts.feed };
 };
 
 const badgeText = (n: number) => (n > 9 ? '9+' : String(n));
@@ -548,7 +569,7 @@ const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
   const location = useLocation();
   const guardian = user?.role === 'guardian';
-  const unread = useUnreadMessages(!guardian);
+  const badges = useBadgeCounts(guardian ? null : user?.id || null);
 
   // Página nova começa no topo (o feed repõe a posição dele quando se volta)
   useLayoutEffect(() => { window.scrollTo(0, 0); }, [location.pathname]);
@@ -570,16 +591,17 @@ const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const items: NavItem[] = guardian
     ? [{ to: '/', label: 'Meus filhos', icon: 'users', active: p => p === '/' }]
     : [
-        { to: '/', label: 'Feed', icon: 'home', active: p => p === '/' || p === '/posts' },
+        { to: '/', label: 'Feed', icon: 'home', active: p => p === '/' || p === '/posts', badge: badges.feed },
         { to: '/comunidade', label: 'Comunidade', icon: 'users', active: isCommunityPath },
         { to: '/biblia', label: 'Bíblia', icon: 'book', active: p => p.startsWith('/biblia') },
-        { to: '/messages', label: 'Mensagens', icon: 'messages', active: p => p === '/messages' || p === '/chat', badge: unread },
+        { to: '/messages', label: 'Mensagens', icon: 'messages', active: p => p === '/messages' || p === '/chat', badge: badges.messages + badges.chat },
       ];
 
   // Conversa aberta no telemóvel: ocupa o ecrã todo
   const immersive = location.pathname === '/chat' || (location.pathname === '/messages' && new URLSearchParams(location.search).has('c'));
 
   return (
+    <BadgeContext.Provider value={badges}>
     <ComposerProvider>
       <div className={`app${immersive ? ' is-immersive' : ''}${isPanelPath(location.pathname) ? ' is-wide' : ''}${!guardian && location.pathname === '/' ? ' is-feed' : ''}`}>
         <a className="skip-link" href="#conteudo">Pular para o conteúdo</a>
@@ -588,6 +610,7 @@ const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         <BottomNav items={items} guardian={guardian} search={search} />
       </div>
     </ComposerProvider>
+    </BadgeContext.Provider>
   );
 };
 

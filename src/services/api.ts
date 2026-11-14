@@ -406,8 +406,9 @@ export const api = {
   getConversations: () =>
     request('/conversations'),
 
-  getUnreadMessages: () =>
-    request('/conversations/unread'),
+  // Números dos ícones (Mensagens e Feed) desde o que a pessoa já viu
+  getBadges: (chatSince: string, feedSince: string) =>
+    request(`/badges?chatSince=${encodeURIComponent(chatSince)}&feedSince=${encodeURIComponent(feedSince)}`),
 
   startConversation: (userId: string) =>
     request('/conversations', { method: 'POST', body: JSON.stringify({ userId }) }),

@@ -1515,8 +1515,7 @@ hr, .uk-hr { margin: 16px 0; border: 0; border-top: 1px solid var(--border); }
   .app.is-feed .app-main { padding-top: 8px; }
   .feed-main > * + * { margin-top: 8px !important; }
   .feed-main .card,
-  .feed-main .post,
-  .feed-main .chat-peek-row {
+  .feed-main .post {
     margin-right: calc(var(--gutter) * -1);
     margin-left: calc(var(--gutter) * -1);
     border-radius: 0;
@@ -1545,9 +1544,6 @@ hr, .uk-hr { margin: 16px 0; border: 0; border-top: 1px solid var(--border); }
   .feed-rail { display: none; }
 }
 
-@media (min-width: 1100px) {
-  .below-rail { display: none !important; }
-}
 
 /* Pessoas da comunidade: avatares grandes com o nome por baixo */
 .people-card { padding-bottom: 16px; }
@@ -2047,19 +2043,6 @@ button.post-stat:hover { color: var(--text); text-decoration: underline; }
   vertical-align: 1px;
 }
 
-.chat-peek-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
-  background: var(--bg);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-card);
-  color: var(--text);
-}
-
-.chat-peek-row:hover { color: var(--text); text-decoration: none; background: var(--bg-surface); }
-.chat-peek-row .chat-peek-text { display: block; margin: 0; padding: 0; background: none; color: var(--text-muted); white-space: nowrap; text-overflow: ellipsis; }
 
 /* Vídeo do YouTube dentro da publicação: a capa vira o leitor ao tocar */
 .post-video {

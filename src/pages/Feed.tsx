@@ -4,7 +4,7 @@ import UIkit from 'uikit';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useCommunity, FEED_CHANGED_EVENT, FeedKind } from '../lib/community';
-import { timeOnly, timeAgo, shortTime, firstName, plural } from '../lib/format';
+import { timeOnly, timeAgo, firstName, plural } from '../lib/format';
 import { celebrate } from '../lib/motion';
 import Avatar from '../components/Avatar';
 import Icon from '../components/Icon';
@@ -123,6 +123,19 @@ const BirthDateAsk = () => {
       </span>
     </form>
   );
+};
+
+// Ecrã largo (coluna da direita visível); no telemóvel o chat está nas Mensagens
+const useWide = () => {
+  const query = '(min-width: 1100px)';
+  const [wide, setWide] = useState(() => window.matchMedia(query).matches);
+  useEffect(() => {
+    const list = window.matchMedia(query);
+    const change = () => setWide(list.matches);
+    list.addEventListener('change', change);
+    return () => list.removeEventListener('change', change);
+  }, []);
+  return wide;
 };
 
 interface FeedCache { key: string; posts: Post[]; nextCursor: string | null; extras: Extras; members: Member[]; scrollY: number }
@@ -288,7 +301,8 @@ const Feed = () => {
   }, [nextCursor, loadMore]);
 
   const membersById = useMemo(() => new Map(members.map(m => [m.id, m])), [members]);
-  const chat = useChatPeek(!!user?.churchId);
+  const wide = useWide();
+  const chat = useChatPeek(!!user?.churchId && wide);
 
   // Fixados e devocionais do dia no topo; o resto misturado (ver mixFeed). O que chegou depois do
   // último instante mostrado fica de fora até a pessoa tocar em "novidades".
@@ -605,7 +619,6 @@ const Feed = () => {
   }
 
   const me = { id: user.id, name: user.name, role: user.role, churchId: user.churchId, profileImage: user.profileImage };
-  const lastChat = chat.messages?.[chat.messages.length - 1];
   const person = (id: string): Person | null => membersById.get(id) || null;
   const people = members.filter(m => m.id !== user.id);
   const upcoming = extras.events
@@ -673,18 +686,6 @@ const Feed = () => {
         </section>
 
         {!user.birthDate && user.role !== 'admin' && <BirthDateAsk />}
-
-        <Link to="/chat" className="chat-peek-row below-rail" aria-label={`Chat da comunidade${lastChat ? `. Última mensagem de ${lastChat.user.name}: ${lastChat.content}` : ''}`}>
-          <span className="group-avatar"><Icon name="chat" /></span>
-          <span style={{ flex: 1, minWidth: 0 }}>
-            <span className="list-row-title"><span>Chat da comunidade</span></span>
-            <span key={lastChat?.id} className={`chat-peek-text${lastChat && chat.fresh.has(lastChat.id) ? ' fade-in' : ''}`}>
-              {lastChat ? `${lastChat.user.id === user.id ? 'Você' : firstName(lastChat.user.name)}: ${lastChat.content}` : 'Ainda sem mensagens. Comece a conversa!'}
-            </span>
-          </span>
-          {lastChat && <time className="faint" style={{ fontSize: '12px', flexShrink: 0 }} dateTime={lastChat.createdAt}>{shortTime(lastChat.createdAt)}</time>}
-          <Icon name="chevron-right" size={18} className="faint" />
-        </Link>
 
         <section aria-labelledby="posts-title">
           <div className="feed-heading">

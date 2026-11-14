@@ -11,14 +11,24 @@ interface AvatarProps {
 const NAMED_SIZES = { small: 32, medium: 44, large: 64 };
 
 // Sem foto: as iniciais sobre uma cor viva, sempre a mesma para a mesma pessoa
+// (as claras levam letras escuras, para se lerem)
 const COLORS: [string, string][] = [
   ['#dc2626', '#fff'], // vermelho
+  ['#e11d48', '#fff'], // carmim
   ['#db2777', '#fff'], // rosa
+  ['#f9a8d4', '#500724'], // rosa-claro
   ['#c2410c', '#fff'], // laranja
-  ['#facc15', '#3f2d00'], // amarelo (letras escuras para se lerem)
+  ['#fb923c', '#431407'], // laranja-claro
+  ['#92400e', '#fff'], // castanho
+  ['#facc15', '#3f2d00'], // amarelo
+  ['#a3e635', '#1a2e05'], // lima
   ['#15803d', '#fff'], // verde
+  ['#047857', '#fff'], // esmeralda
   ['#0f766e', '#fff'], // verde-água
+  ['#0e7490', '#fff'], // ciano
+  ['#0369a1', '#fff'], // azul-céu
   ['#2563eb', '#fff'], // azul
+  ['#475569', '#fff'], // ardósia
 ];
 const colorFor = (name: string) => {
   let hash = 0;

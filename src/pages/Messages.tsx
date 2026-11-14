@@ -4,6 +4,7 @@ import UIkit from 'uikit';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useCommunity } from '../lib/community';
+import { useBadges } from '../lib/badges';
 import { shortTime, fullDate } from '../lib/format';
 import Avatar from '../components/Avatar';
 import Icon from '../components/Icon';
@@ -25,6 +26,7 @@ interface DirectMessage { id: string; content: string; createdAt: string; sender
 const Messages = () => {
   const { user } = useAuth();
   const { community } = useCommunity();
+  const { chat: chatNew } = useBadges();
   const [params, setParams] = useSearchParams();
   const activeId = params.get('c');
 
@@ -182,8 +184,11 @@ const Messages = () => {
                 <span className="group-avatar"><Icon name="users" /></span>
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <span className="conversation-name"><span className="truncate">Chat da comunidade</span></span>
-                  <span className="conversation-preview" style={{ display: 'block' }}>Grupo com todos de {community.name}</span>
+                  <span className="conversation-preview" style={{ display: 'block' }}>
+                    {chatNew ? `${chatNew === 1 ? '1 mensagem nova' : `${chatNew > 9 ? '9+' : chatNew} mensagens novas`}` : `Grupo com todos de ${community.name}`}
+                  </span>
                 </span>
+                {chatNew > 0 && <span className="nav-badge" aria-hidden="true">{chatNew > 9 ? '9+' : chatNew}</span>}
               </Link>
             )}
             {loadingList ? (
