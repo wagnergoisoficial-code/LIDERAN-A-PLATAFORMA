@@ -183,6 +183,23 @@ describe('feed', () => {
   });
 });
 
+describe('números dos ícones', () => {
+  test('conta o que é novo desde a última visita, sem contar o que a própria pessoa publica', async () => {
+    const since = new Date().toISOString();
+    await new Promise((r) => setTimeout(r, 20));
+    await call('POST', '/posts', s.leader.token, { content: 'Aviso novo da liderança' });
+    await call('POST', '/chat/messages', s.leader.token, { content: 'Boa noite, família!' });
+    await call('POST', '/posts', s.ana.token, { content: 'A minha própria publicação' });
+
+    const ana = (await call('GET', `/badges?chatSince=${since}&feedSince=${since}`, s.ana.token)).data;
+    expect(ana.feed).toBe(1);
+    expect(ana.chat).toBe(1);
+    expect(ana.messages).toBe(0);
+    // Sem datas (primeira visita), não conta nada
+    expect((await call('GET', '/badges', s.ana.token)).data).toEqual({ messages: 0, chat: 0, feed: 0 });
+  });
+});
+
 describe('data de nascimento', () => {
   test('o próprio define uma vez, só se for maior', async () => {
     const minor = new Date(Date.now() - 10 * 365 * DAY).toISOString().slice(0, 10);
