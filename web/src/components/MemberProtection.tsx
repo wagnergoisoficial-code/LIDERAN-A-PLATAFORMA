@@ -1,0 +1,214 @@
+import React, { useRef, useState } from 'react';
+import UIkit from 'uikit';
+import { api } from '../services/api';
+import { useAuth } from '../context/AuthContext';
+import GuardianFields, { EMPTY_GUARDIAN, GuardianDraft, guardianPayload, relationshipLabel } from './GuardianFields';
+import Icon from './Icon';
+import Modal from './Modal';
+
+interface Guardian {
+  id: string;
+  name: string;
+  email: string;
+  relationship?: string | null;
+  authorizedAt?: string | null;
+  authorizationMethod?: string | null;
+  proofUrl?: string | null;
+}
+
+export interface ProtectedMember {
+  id: string;
+  name: string;
+  role?: string;
+  isMinor?: boolean;
+  status?: string;
+  suspendedUntil?: string | null;
+  statusReason?: string | null;
+  guardians?: Guardian[];
+}
+
+const SUSPENSION_DAYS = [1, 3, 7, 15, 30, 90];
+
+const formatDate = (value?: string | null) => (value ? new Date(value).toLocaleDateString('pt-BR') : '');
+
+export const statusLabel = (member: ProtectedMember) => {
+  if (member.status === 'pending_authorization') return 'Aguarda autorização dos pais';
+  if (member.status === 'suspended') return member.suspendedUntil ? `Conta suspensa até ${formatDate(member.suspendedUntil)}` : 'Conta suspensa';
+  if (member.status === 'blocked') return 'Conta bloqueada';
+  return 'Conta ativa';
+};
+
+const methodLabel = (method?: string | null) =>
+  method === 'guardian_app' ? 'pelo responsável na app' : method === 'leader_confirmation' ? 'confirmada pelo líder' : '';
+
+interface MemberProtectionProps {
+  churchId: string;
+  member: ProtectedMember;
+  canChangeRole?: boolean;
+  onClose: () => void;
+  onChanged: (member: ProtectedMember) => void;
+}
+
+// Painel do líder: estado da conta, autorização dos pais, responsáveis e moderação de um membro
+const MemberProtection: React.FC<MemberProtectionProps> = ({ churchId, member, canChangeRole, onClose, onChanged }) => {
+  const { user } = useAuth();
+  const [busy, setBusy] = useState(false);
+  const [proof, setProof] = useState<File | null>(null);
+  const proofInput = useRef<HTMLInputElement>(null);
+  const [days, setDays] = useState(7);
+  const [reason, setReason] = useState('');
+  const [addingGuardian, setAddingGuardian] = useState(false);
+  const [guardian, setGuardian] = useState<GuardianDraft>({ ...EMPTY_GUARDIAN });
+
+  const run = async (action: () => Promise<any>, success: string) => {
+    setBusy(true);
+    try {
+      const res = await action();
+      if (res?.data) onChanged(res.data);
+      UIkit.notification({ message: success, status: 'success', pos: 'top-right' });
+      return true;
+    } catch (err: any) {
+      UIkit.notification({ message: err.message || 'Não foi possível concluir', status: 'danger', pos: 'top-right' });
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const authorize = () => run(() => api.authorizeMinor(churchId, member.id, proof), 'Autorização registrada: a conta está ativa');
+
+  const moderate = (action: 'suspend' | 'block' | 'reactivate') => {
+    const question = action === 'suspend'
+      ? `Suspender ${member.name} por ${days} ${days === 1 ? 'dia' : 'dias'}?`
+      : action === 'block' ? `Bloquear ${member.name}? A pessoa não poderá entrar até ser reativada.` : null;
+    if (question && !confirm(question)) return;
+    run(
+      () => api.moderateMember(churchId, member.id, { action, days: action === 'suspend' ? days : undefined, reason: reason || undefined }),
+      action === 'suspend' ? 'Membro suspenso' : action === 'block' ? 'Membro bloqueado' : 'Membro reativado'
+    ).then(ok => { if (ok) setReason(''); });
+  };
+
+  const addGuardian = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const ok = await run(() => api.addGuardian(churchId, member.id, guardianPayload(guardian)), 'Responsável vinculado ao membro');
+    if (ok) {
+      setAddingGuardian(false);
+      setGuardian({ ...EMPTY_GUARDIAN });
+    }
+  };
+
+  const restricted = member.status === 'suspended' || member.status === 'blocked';
+  const isLeader = member.role === 'leader';
+  const showRole = canChangeRole && member.id !== user?.id && member.role !== 'admin' && !member.isMinor && member.status === 'active';
+
+  const changeRole = () => {
+    const question = isLeader
+      ? `Tirar a liderança de ${member.name}? Continua membro da comunidade.`
+      : `Tornar ${member.name} líder? Vai poder gerenciar os membros, ler as conversas privadas e moderar a comunidade.`;
+    if (confirm(question)) run(() => api.setMemberRole(churchId, member.id, isLeader ? 'member' : 'leader'), isLeader ? 'Deixou de ser líder' : 'Agora é líder');
+  };
+
+  return (
+    <Modal title={`Proteção e acesso de ${member.name}`} onClose={onClose} width={560}>
+        <div className="protection-row" style={{ fontSize: '14px' }}>
+          <span className="uk-label">{statusLabel(member)}</span>
+          {member.isMinor && <span className="uk-label">Menor de idade</span>}
+          {member.statusReason && <span style={{ color: 'var(--text-muted)' }}>Motivo: {member.statusReason}</span>}
+        </div>
+
+        {member.status === 'pending_authorization' && (
+          <div className="protection-section">
+            <div className="list-label" style={{ margin: 0 }}>Autorização dos pais</div>
+            <p className="form-hint" style={{ margin: 0 }}>
+              Confirme depois de receber a autorização assinada do responsável. A foto do termo é opcional.
+            </p>
+            <input ref={proofInput} type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }}
+              onChange={e => setProof(e.target.files?.[0] || null)} />
+            <div className="protection-row">
+              <button type="button" className="uk-button uk-button-default" onClick={() => proofInput.current?.click()} disabled={busy}>
+                <Icon name="image" size={18} /> {proof ? 'Trocar foto' : 'Anexar foto do termo'}
+              </button>
+              <button className="uk-button uk-button-success" onClick={authorize} disabled={busy}>
+                <Icon name="check" size={18} /> Confirmar autorização
+              </button>
+            </div>
+            {proof && <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Foto anexada: {proof.name}</span>}
+          </div>
+        )}
+
+        {member.isMinor && (
+          <div className="protection-section">
+            <div className="list-label" style={{ margin: 0 }}>Responsáveis</div>
+            {(member.guardians || []).length === 0 ? (
+              <p className="form-hint" style={{ margin: 0 }}>Nenhum responsável vinculado a este menor.</p>
+            ) : (
+              (member.guardians || []).map(g => (
+                <div key={g.id} style={{ fontSize: '14px' }}>
+                  <strong style={{ color: 'var(--text)' }}>{g.name}</strong>
+                  <span style={{ color: 'var(--text-muted)' }}> · {relationshipLabel(g.relationship)} · {g.email}</span>
+                  <div style={{ fontSize: '12px', color: 'var(--text-faint)' }}>
+                    {g.authorizedAt
+                      ? `Autorização em ${formatDate(g.authorizedAt)} ${methodLabel(g.authorizationMethod)}`.trim()
+                      : 'Ainda sem autorização registrada'}
+                    {g.proofUrl && <> · <a href={g.proofUrl} target="_blank" rel="noreferrer">ver termo</a></>}
+                  </div>
+                </div>
+              ))
+            )}
+            {addingGuardian ? (
+              <form onSubmit={addGuardian} style={{ display: 'grid', gap: '10px' }}>
+                <GuardianFields value={guardian} onChange={setGuardian} intro="O responsável passa a poder ler as conversas privadas deste menor." />
+                <div className="protection-row">
+                  <button type="submit" className="uk-button uk-button-primary uk-button-small" disabled={busy}>Vincular responsável</button>
+                  <button type="button" className="uk-button uk-button-default uk-button-small" onClick={() => setAddingGuardian(false)}>Cancelar</button>
+                </div>
+              </form>
+            ) : (
+              <div>
+                <button className="uk-button uk-button-default uk-button-small" onClick={() => setAddingGuardian(true)}>
+                  <Icon name="plus" size={16} /> Adicionar responsável
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {showRole && (
+          <div className="protection-section">
+            <div className="list-label" style={{ margin: 0 }}>Liderança</div>
+            <p className="form-hint" style={{ margin: 0 }}>
+              {isLeader
+                ? 'É líder desta comunidade: gerencia os membros, lê as conversas privadas e modera.'
+                : 'Os líderes gerenciam os membros, leem as conversas privadas e moderam a comunidade.'}
+            </p>
+            <div>
+              <button className={`uk-button uk-button-small ${isLeader ? 'uk-button-default' : 'uk-button-primary'}`} onClick={changeRole} disabled={busy}>
+                {isLeader ? 'Tirar de líder' : 'Tornar líder'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {member.status !== 'pending_authorization' && (
+          <div className="protection-section">
+            <div className="list-label" style={{ margin: 0 }}>Suspender ou bloquear</div>
+            <input className="form-input" placeholder="Motivo (opcional, fica no histórico)" aria-label="Motivo" value={reason} onChange={e => setReason(e.target.value)} maxLength={500} />
+            <div className="protection-row">
+              <select className="uk-select" value={days} onChange={e => setDays(Number(e.target.value))} style={{ width: 'auto' }} aria-label="Duração da suspensão">
+                {SUSPENSION_DAYS.map(d => <option key={d} value={d}>{d} {d === 1 ? 'dia' : 'dias'}</option>)}
+              </select>
+              <button className="uk-button uk-button-danger" onClick={() => moderate('suspend')} disabled={busy}>Suspender</button>
+              <button className="uk-button uk-button-danger" onClick={() => moderate('block')} disabled={busy}>Bloquear</button>
+              {restricted && (
+                <button className="uk-button uk-button-success" onClick={() => moderate('reactivate')} disabled={busy}>
+                  <Icon name="check" size={18} /> Reativar
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+    </Modal>
+  );
+};
+
+export default MemberProtection;
