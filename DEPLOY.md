@@ -1,6 +1,6 @@
-# Lidera: desenvolvimento e deploy (projeto único)
+# Lidera: desenvolvimento e deploy
 
-O site e a API são um só projeto Next.js. O `server.mjs` arranca um só servidor:
+Um só projeto Next.js. O `server.mjs` arranca um só servidor:
 
 - `/api`, `/uploads`, `/health` e `/api-docs` → a API (Express, em `api/`);
 - tudo o resto → as páginas (React, em `web/src`, entregues pelo Next.js).
@@ -11,33 +11,30 @@ O site e a API são um só projeto Next.js. O `server.mjs` arranca um só servid
 npm install
 cp .env.example .env            # e preencha JWT_SECRET
 npm run prisma:generate         # cliente do Prisma para SQLite
-npm run prisma:migrate          # cria api/prisma/prisma/dev.db (ou copie um dev.db existente para lá)
+npm run prisma:migrate          # cria api/prisma/prisma/dev.db
 npm run dev                     # http://localhost:3000 (páginas e API)
 npm test                        # testes da API
 ```
 
-## Render: passar dos dois serviços (lidera-api + lidera-web) para um (lidera)
+## DigitalOcean (App Platform)
 
-Nada se perde: a base de dados é a mesma.
+1. **Base de dados.** Em *Databases*, crie um PostgreSQL gerido, na mesma região da app.
+2. **App.** Em *Apps → Create App*, escolha o GitHub, este repositório e o ramo `main`. Configure:
+   - Tipo: *Web Service* (Node.js)
+   - Build command: `npm run build`
+   - Run command: `npm start` (aplica as migrações e arranca em modo de produção)
+   - HTTP port: `8080`. A DigitalOcean passa-a na variável `PORT`, e o servidor usa-a.
+   - Health check: HTTP, caminho `/health`
+   - Tamanho: 1 GB de memória ou mais (Next.js, API e tratamento de imagens)
+3. **Variáveis de ambiente da app:**
+   - `DATABASE_URL`: ligue a base de dados à app, e a variável fica `${nome-da-base.DATABASE_URL}`.
+   - `JWT_SECRET`: 48 ou mais caracteres aleatórios, cifrada. Se for o mesmo valor da Render, ninguém perde a sessão na mudança.
+   - `ADMIN_EMAIL` e `ADMIN_PASSWORD`: opcionais, cifradas. Criam o primeiro administrador.
+   - `TRUST_PROXY`: o número de proxies à frente da app. Sem o valor certo, os limites de pedidos e de login ficam partilhados entre todos. Na Render eram 3; na DigitalOcean confirma-se depois do 1.º deploy.
 
-1. **Base de dados.** Em `lidera-db`, mude para um plano pago antes de 29/11/2026: a gratuita expira e é apagada 14 dias depois.
-2. **Novo serviço.** Crie um *Web Service* (Node, região Frankfurt, plano Starter) a partir deste repositório:
-   - Build: `npm ci && npm run build`
-   - Start: `npm start`
-   - Health check: `/health`
-3. **Variáveis do novo serviço:**
-   - `NODE_ENV=production` e `TRUST_PROXY=3`;
-   - `DATABASE_URL`: a ligação interna da `lidera-db`, a mesma da `lidera-api`;
-   - `JWT_SECRET`: **o mesmo valor da `lidera-api`**, para ninguém perder a sessão;
-   - `ADMIN_EMAIL` e `ADMIN_PASSWORD`, se forem usados.
-
-   `CORS_ORIGIN`, `PUBLIC_URL` e `VITE_API_URL` deixam de ser precisos.
-4. **Teste no endereço novo:** login, feed, Bíblia, mensagens, painel e doações. As fotos antigas continuam a vir da `lidera-api`, que ainda está ligada.
-5. **Troca.** Suspenda a `lidera-web` e a `lidera-api`. Logo a seguir, corra uma vez no *Shell* do serviço novo:
-   ```bash
-   node api/scripts/uploads-relativos.js
-   ```
-   Os endereços das fotos já enviadas deixam de apontar para a `lidera-api` e passam a `/uploads/…`, servidos pelo serviço novo. Só mexe nesse domínio e pode correr mais do que uma vez. Confirme as fotos antigas no endereço novo.
-6. **Limpeza.** Apague a `lidera-web` e a `lidera-api` uns dias depois, quando tudo estiver bem.
-
-O `render.yaml` serve para uma instalação nova do zero (cria a base de dados e o serviço).
+   O `npm start` já fixa `NODE_ENV=production`. `CORS_ORIGIN`, `PUBLIC_URL` e `VITE_API_URL` deixam de ser precisos.
+4. **Dados atuais (Render → DigitalOcean), antes de 29/11/2026:**
+   - copie a base `lidera-db` da Render com `pg_dump`, ativando o acesso externo só durante a cópia;
+   - restaure-a na base nova;
+   - depois corra uma vez, na consola da app, `node api/scripts/uploads-relativos.js`. As fotos já enviadas deixam de apontar para a `lidera-api` antiga e passam a `/uploads/…`. Pode correr mais do que uma vez.
+5. **Troca.** Teste o endereço da DigitalOcean: login, feed (fotos antigas incluídas), Bíblia, mensagens, painel e doações. Depois aponte o domínio para lá e desligue os serviços da Render.

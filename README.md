@@ -12,4 +12,4 @@ Um só projeto **Next.js 16**:
 | `public/` | Ficheiros estáticos (o texto da Bíblia Livre) |
 | `server.mjs` | O servidor único: `/api` → API, o resto → Next.js |
 
-Comandos e deploy: ver [DEPLOY.md](DEPLOY.md). O histórico dos repositórios antigos (`mvc` e `fr`) está neste repositório, em `api/` e `web/`.
+Comandos e deploy: ver [DEPLOY.md](DEPLOY.md).
