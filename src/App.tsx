@@ -9,6 +9,7 @@ import Avatar from './components/Avatar';
 import Icon, { IconName } from './components/Icon';
 import { useDismiss, moveFocus } from './components/MoreMenu';
 import { ComposerProvider, useComposer } from './components/Composer';
+import DonateButton from './components/DonateButton';
 import { COMMUNITY_TABS } from './components/SectionTabs';
 
 import Login from './pages/Login';
@@ -34,6 +35,7 @@ import AnnualCalendar from './pages/panel/AnnualCalendar';
 import Minutes from './pages/panel/Minutes';
 import Finance from './pages/panel/Finance';
 import Songs from './pages/panel/Songs';
+import Donations from './pages/panel/Donations';
 import { hasPanel, panelLabel } from './lib/cargos';
 import { Badges, BadgeContext, NO_BADGES } from './lib/badges';
 
@@ -496,6 +498,7 @@ const Header: React.FC<{ items: NavItem[]; guardian: boolean; search: SearchCont
               <Icon name="search" />
             </button>
           )}
+          {!guardian && <DonateButton />}
           {!guardian && (
             <button type="button" className="uk-button uk-button-primary header-publish" onClick={() => openComposer()}>
               <Icon name="plus" size={18} strokeWidth={2} /> Publicar
@@ -650,6 +653,7 @@ export default function App() {
         <Route path="aniversarios" element={<Navigate to="/painel/membros/aniversarios" replace />} />
         <Route path="documentos" element={<Navigate to="/painel/atas" replace />} />
         <Route path="tesouraria" element={<PanelGuard area="tesoureiro"><Finance /></PanelGuard>} />
+        <Route path="doacoes" element={<PanelGuard area="tesoureiro"><Donations /></PanelGuard>} />
         <Route path="repertorio" element={<PanelGuard area="regente"><Songs /></PanelGuard>} />
       </Route>
       <Route path="/dashboard" element={<Navigate to="/painel/lideranca" replace />} />

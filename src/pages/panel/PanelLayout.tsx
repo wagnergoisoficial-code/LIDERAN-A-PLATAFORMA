@@ -22,6 +22,7 @@ const GROUPS: Group[] = [
   ] },
   { area: 'tesoureiro', title: 'Tesouraria', links: [
     { to: '/painel/tesouraria', label: 'Lançamentos', icon: 'wallet' },
+    { to: '/painel/doacoes', label: 'Doações', icon: 'heart' },
   ] },
   { area: 'regente', title: 'Regência', links: [
     { to: '/painel/repertorio', label: 'Repertório', icon: 'music' },

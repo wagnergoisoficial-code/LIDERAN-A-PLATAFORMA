@@ -479,6 +479,14 @@ export const api = {
     if (!res.ok) throw new Error('Não foi possível abrir o arquivo');
     return res.blob();
   },
+  // Doações pela app: todos veem; a tesouraria configura (o QR vai como imagem)
+  getDonations: () => request('/panel/donations'),
+  saveDonations: (data: any) => request('/panel/donations', { method: 'PUT', body: JSON.stringify(data) }),
+  uploadDonationQr: (file: File) => {
+    const form = new FormData();
+    form.append('image', file);
+    return request('/panel/donations/qr', { method: 'POST', body: form, headers: getHeadersWithoutContentType() });
+  },
   getRollCalls: () => request('/panel/attendance'),
   saveRollCall: (data: any, id?: string) =>
     request(id ? `/panel/attendance/${id}` : '/panel/attendance', { method: id ? 'PUT' : 'POST', body: JSON.stringify(data) }),

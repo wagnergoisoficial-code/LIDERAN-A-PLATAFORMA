@@ -3216,3 +3216,47 @@ button.year-event:hover { background: var(--bg-surface); }
 .ata-text { color: var(--text); font-size: 15px; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
 
 @media (max-width: 639px) { .ata-date { width: auto; } .ata-row { flex-wrap: wrap; } }
+
+/* ─── DOAR ──────────────────────────────────────────────────── */
+/* Sempre à vista no cabeçalho, em verde (ação positiva) */
+.uk-button.header-donate { height: 40px; padding: 0 18px; border-radius: 8px; font-size: 16px; gap: 7px; }
+
+@media (max-width: 1023px) {
+  .brand { margin-right: 0; }
+  .uk-button.header-donate { height: 36px; padding: 0 14px; border-radius: 18px; font-size: 15px; gap: 6px; }
+}
+
+@media (max-width: 639px) { .header-actions { gap: 8px; } }
+
+.donate-lead { margin: 0 0 16px; color: var(--text-muted); font-size: 15px; line-height: 1.5; }
+.donate-amounts { display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); gap: 10px; }
+
+.donate-amount {
+  height: 56px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 12px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 18px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: border-color var(--t), background var(--t), color var(--t);
+}
+
+.donate-amount:hover { border-color: var(--control-border); }
+.donate-amount.is-on { border-color: var(--success); background: var(--success); color: #fff; }
+.donate-amount:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.donate-total { margin: 0 0 4px; font-size: 17px; }
+.donate-method { padding: 14px 0; border-bottom: 1px solid var(--border); }
+.donate-method h3 { margin: 0 0 6px; font-size: 16px; font-weight: 700; }
+.donate-details { margin: 0 0 4px; color: var(--text); font-size: 15px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.donate-qr { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin-top: 10px; }
+.donate-qr-img { display: block; width: 200px; max-width: 100%; height: auto; border: 1px solid var(--border); border-radius: 8px; background: #fff; }
+
+.donation-form { margin-bottom: 16px; padding: 16px 20px 20px; }
+
+/* Computador estreito (até 1399 px): menu um pouco mais junto, para a pesquisa não cortar o texto */
+@media (min-width: 1024px) and (max-width: 1399px) { .main-nav-link { padding: 0 12px; } }

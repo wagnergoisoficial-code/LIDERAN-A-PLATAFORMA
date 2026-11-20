@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import UIkit from 'uikit';
 import { api } from '../../services/api';
+import { loadDonations } from '../../lib/donations';
+import { money as formatMoney } from '../../lib/format';
 import { useAuth } from '../../context/AuthContext';
 import Icon from '../../components/Icon';
 import Modal from '../../components/Modal';
@@ -11,7 +13,6 @@ import EmptyState from '../../components/EmptyState';
 const notify = (message: string, status: 'success' | 'danger' = 'danger') => UIkit.notification({ message, status, pos: 'top-right' });
 
 const CATEGORIES = ['Oferta', 'Contribuição', 'Campanha', 'Evento', 'Material', 'Transporte', 'Alimentação', 'Outro'];
-const money = (cents: number) => (cents / 100).toLocaleString('pt-MZ', { style: 'currency', currency: 'MZN' });
 // As datas dos lançamentos são dias (sem hora): lêem-se em UTC para não mudarem de dia
 const dateOnly = (iso: string) => new Date(iso).toLocaleDateString('pt-BR', { timeZone: 'UTC' });
 const thisMonth = () => new Date().toISOString().slice(0, 7);
@@ -29,12 +30,16 @@ const Finance = () => {
   const [members, setMembers] = useState<any[]>([]);
   const [form, setForm] = useState<typeof EMPTY | null>(null);
   const [saving, setSaving] = useState(false);
+  // A moeda é a das Doações (Painel → Tesouraria → Doações)
+  const [currency, setCurrency] = useState('USD');
+  const money = (cents: number) => formatMoney(cents / 100, currency);
 
   const load = useCallback(() => {
     api.getFinance(month).then(res => setData(res.data)).catch((err: any) => { setData({ entries: [], balanceCents: 0 }); notify(err.message || 'Não foi possível carregar os lançamentos'); });
   }, [month]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { loadDonations().then(config => setCurrency(config.currency)); }, []);
   useEffect(() => {
     api.getChurchMembers(user!.churchId!).then(res => setMembers(res.data || [])).catch(() => setMembers([]));
   }, [user]);
@@ -162,7 +167,7 @@ const Finance = () => {
               <datalist id="fin-categories">{CATEGORIES.map(c => <option key={c} value={c} />)}</datalist>
             </div>
             <div>
-              <label className="form-label" htmlFor="fin-amount">Valor (MT)</label>
+              <label className="form-label" htmlFor="fin-amount">Valor ({currency})</label>
               <input id="fin-amount" className="form-input" type="number" inputMode="decimal" min="0.01" step="0.01" required value={form.amount} onChange={set('amount')} />
             </div>
             <div>

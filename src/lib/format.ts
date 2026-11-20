@@ -49,3 +49,7 @@ export const listDays = (days?: string[] | null) => {
   if (list.length <= 1) return list.join('');
   return `${list.slice(0, -1).join(', ')} e ${list[list.length - 1]}`;
 };
+
+/** "US$ 20,00", "R$ 5" (decimals = 0 nos botões de valor). */
+export const money = (value: number, currency = 'USD', decimals = 2) =>
+  value.toLocaleString('pt-BR', { style: 'currency', currency, minimumFractionDigits: decimals, maximumFractionDigits: decimals });
