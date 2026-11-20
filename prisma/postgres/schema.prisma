@@ -21,6 +21,8 @@ model Church {
   cultosDias String?             // Dias de culto (JSON: ["segunda", "quarta", "domingo"])
   leaderID  String?              // ID do líder que criou
   inviteCode String?  @unique     // Link de convite: quem se regista com ele entra nesta comunidade
+  // Doações pela app (JSON): moeda, mensagem e formas de doar (contas, chave Pix, imagem do QR Code)
+  donationConfig String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

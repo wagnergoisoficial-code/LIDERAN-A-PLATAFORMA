@@ -81,6 +81,31 @@ describe('tesouraria', () => {
   });
 });
 
+describe('doações', () => {
+  test('todos veem as formas de doar; só a tesouraria e a liderança configuram', async () => {
+    expect((await call('GET', '/panel/donations', s.bia.token)).data).toEqual({ currency: 'USD', message: null, methods: [] });
+    const config = {
+      currency: 'BRL',
+      message: 'Obrigado por contribuir!',
+      methods: [
+        { label: 'Pix', pixKey: 'igreja@exemplo.com', pixName: 'Igreja Teste', pixCity: 'Sao Paulo' },
+        { label: 'Conta bancária', details: 'Banco X · Ag. 0001 · CC 12345-6' },
+      ],
+    };
+    expect((await call('PUT', '/panel/donations', s.bia.token, config)).status).toBe(403);
+    const saved = await call('PUT', '/panel/donations', s.ana.token, config);
+    expect(saved.status).toBe(200);
+    expect(saved.data.methods[0].id).toBeTruthy();
+    expect((await call('GET', '/panel/donations', s.bia.token)).data.methods).toHaveLength(2);
+
+    const bad = (change) => call('PUT', '/panel/donations', s.ana.token, { ...config, ...change });
+    expect((await bad({ currency: 'XYZ' })).status).toBe(400);
+    expect((await bad({ methods: [{ label: 'Pix', pixKey: 'x@y.com' }] })).status).toBe(400);
+    expect((await bad({ methods: [{ label: 'QR', qrUrl: 'https://outro-site.com/qr.png' }] })).status).toBe(400);
+    expect((await bad({ methods: [{ label: 'Vazio' }] })).status).toBe(400);
+  });
+});
+
 describe('secretaria', () => {
   test('cadastra e edita membros e guarda documentos com arquivo', async () => {
     expect((await call('PUT', `/panel/cargos/${s.bia.id}`, s.leader.token, { cargo: 'secretario' })).status).toBe(200);

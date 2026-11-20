@@ -1,4 +1,6 @@
+const crypto = require('crypto');
 const { getPrismaClient } = require('../../config/database');
+const { isUploadUrl } = require('../../shared/utils/url.util');
 const { ValidationError, NotFoundError, ForbiddenError } = require('../../shared/errors/AppError');
 const { requireChurch, canManageChurch, hasCargo, CARGOS } = require('../../shared/utils/church.util');
 const { isMinor } = require('../../shared/utils/minor.util');
@@ -13,6 +15,10 @@ const DOCUMENT_SELECT = {
   id: true, kind: true, title: true, date: true, memberId: true, notes: true,
   mimeType: true, size: true, createdById: true, createdAt: true,
 };
+
+// Doações: moedas aceites e a configuração de quem ainda não configurou nada
+const CURRENCIES = ['USD', 'BRL', 'MZN', 'EUR', 'AOA', 'CVE'];
+const NO_DONATIONS = { currency: 'USD', message: null, methods: [] };
 
 const ROLL_CALL_INCLUDE = { present: { select: { userId: true } } };
 const formatRollCall = (r) => ({ id: r.id, date: r.date, title: r.title, createdById: r.createdById, presentIds: r.present.map((p) => p.userId) });
@@ -69,6 +75,27 @@ const memberOf = async (churchId, memberId) => {
   const member = await prisma().user.findFirst({ where: { id: String(memberId), churchId }, select: { id: true } });
   if (!member) throw new ValidationError('Membro não encontrado nesta comunidade');
   return member.id;
+};
+
+// Uma forma de doar: dados da conta, chave Pix (gera o QR com o valor) e/ou a imagem de um QR Code
+const donationMethod = (m = {}) => {
+  const method = {
+    id: typeof m.id === 'string' && /^[\w-]{1,40}$/.test(m.id) ? m.id : crypto.randomUUID(),
+    label: text(m.label, 60, 'o nome da forma de doar', true),
+    details: text(m.details, 500, 'os dados da conta'),
+    pixKey: text(m.pixKey, 100, 'a chave Pix'),
+    pixName: text(m.pixName, 25, 'o nome do recebedor'),
+    pixCity: text(m.pixCity, 15, 'a cidade'),
+    qrUrl: m.qrUrl ? String(m.qrUrl) : null,
+  };
+  if (method.qrUrl && !isUploadUrl(method.qrUrl)) throw new ValidationError('Imagem do QR Code inválida');
+  if (method.pixKey && (!method.pixName || !method.pixCity)) {
+    throw new ValidationError('Para gerar o QR Pix, indique o nome do recebedor e a cidade');
+  }
+  if (!method.details && !method.pixKey && !method.qrUrl) {
+    throw new ValidationError(`Indique os dados da conta, a chave Pix ou o QR Code de "${method.label}"`);
+  }
+  return method;
 };
 
 const songData = (body) => ({
@@ -191,6 +218,29 @@ module.exports = {
     const church = await panelChurch(user, 'secretario');
     const { count } = await prisma().churchDocument.deleteMany({ where: { id, churchId: church.id } });
     if (!count) throw new NotFoundError('Documento não encontrado');
+  },
+
+  /* ─── Doações pela app ─── */
+  // Todos os membros veem as formas de doar da comunidade
+  async getDonations(user) {
+    const church = await prisma().church.findUnique({ where: { id: requireChurch(user) }, select: { donationConfig: true } });
+    if (!church) throw new NotFoundError('Comunidade não encontrada');
+    try {
+      return { ...NO_DONATIONS, ...JSON.parse(church.donationConfig || '{}') };
+    } catch {
+      return NO_DONATIONS;
+    }
+  },
+
+  // A tesouraria e a liderança escolhem a moeda e as formas de doar
+  async saveDonations(user, body = {}) {
+    const church = await panelChurch(user, 'tesoureiro');
+    if (!CURRENCIES.includes(body.currency)) throw new ValidationError('Escolha a moeda');
+    const methods = Array.isArray(body.methods) ? body.methods : [];
+    if (methods.length > 8) throw new ValidationError('No máximo 8 formas de doar');
+    const config = { currency: body.currency, message: text(body.message, 300, 'a mensagem'), methods: methods.map(donationMethod) };
+    await prisma().church.update({ where: { id: church.id }, data: { donationConfig: JSON.stringify(config) } });
+    return config;
   },
 
   /* ─── Secretaria: controle de presença ─── */

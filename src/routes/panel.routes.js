@@ -2,6 +2,7 @@ const express = require('express');
 const service = require('../modules/panels/panel.service');
 const authMiddleware = require('../shared/middlewares/auth.middleware');
 const { documentUpload } = require('../shared/middlewares/document-upload.middleware');
+const { uploadImageMiddleware } = require('../shared/middlewares/upload.middleware');
 
 // Painéis por cargo (liderança, secretaria, tesouraria, regência), sempre na comunidade ativa
 const router = express.Router();
@@ -14,6 +15,7 @@ const handle = (fn) => async (req, res, next) => {
 };
 // Confirma o cargo antes de receber o arquivo
 const onlySecretary = (req, res, next) => service.panelChurch(req.user, 'secretario').then(() => next(), next);
+const onlyTreasurer = (req, res, next) => service.panelChurch(req.user, 'tesoureiro').then(() => next(), next);
 
 router.use(authMiddleware);
 
@@ -52,6 +54,19 @@ router.get('/documents/:id/file', handle(async (req, res) => {
 router.delete('/documents/:id', handle(async (req, res) => {
   await service.removeDocument(req.user, req.params.id);
   res.json({ success: true, message: 'Documento apagado' });
+}));
+
+// Doações pela app: GET para todos os membros; configurar só a tesouraria e a liderança
+router.get('/donations', handle(async (req, res) => {
+  res.json({ success: true, data: await service.getDonations(req.user) });
+}));
+router.put('/donations', handle(async (req, res) => {
+  res.json({ success: true, message: 'Formas de doar guardadas', data: await service.saveDonations(req.user, req.body) });
+}));
+// Imagem do QR Code de uma forma de doar: devolve o endereço para guardar na configuração
+router.post('/donations/qr', onlyTreasurer, uploadImageMiddleware, handle(async (req, res) => {
+  if (!req.uploadedImageUrl) return res.status(400).json({ success: false, message: 'Envie a imagem do QR Code', statusCode: 400 });
+  res.status(201).json({ success: true, data: { url: req.uploadedImageUrl } });
 }));
 
 router.get('/attendance', handle(async (req, res) => {
