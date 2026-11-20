@@ -22,7 +22,6 @@ const upload = multer({
 
 const reject = (res, message) => res.status(400).json({ success: false, message, statusCode: 400 });
 
-const publicBaseUrl = (req) => config.app.publicUrl || `${req.protocol}://${req.get('host')}`;
 
 // Reprocessa a imagem: corrige a orientação, limita o tamanho, converte para WebP e
 // descarta metadados (incluindo localização GPS). Ficheiros disfarçados falham aqui.
@@ -70,7 +69,8 @@ const uploadImageMiddleware = (req, res, next) => {
         },
         select: { id: true },
       });
-      req.uploadedImageUrl = `${publicBaseUrl(req)}/uploads/${saved.id}`;
+      // Sem PUBLIC_URL fica relativo (/uploads/<id>): o site e a API estão no mesmo endereço
+      req.uploadedImageUrl = `${config.app.publicUrl}/uploads/${saved.id}`;
       next();
     } catch (error) {
       next(error);

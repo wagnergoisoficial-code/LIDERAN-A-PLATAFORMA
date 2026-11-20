@@ -1,3 +1,5 @@
+> **Agora faz parte do projeto único Lidera (Next.js).** Para instalar, correr e pôr no ar, siga o [README](../README.md) e o [DEPLOY.md](../DEPLOY.md) da raiz; os comandos abaixo referem-se ao repositório antigo da API.
+
 # Youth Church Portal - Backend API
 
 Production-ready SaaS backend for a Youth Church Portal using Node.js, Express, PostgreSQL, and Prisma.

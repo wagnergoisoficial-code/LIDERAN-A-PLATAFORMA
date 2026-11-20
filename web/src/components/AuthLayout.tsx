@@ -17,8 +17,8 @@ const AuthLayout = ({ title, subtitle, footer, children }: AuthLayoutProps) => (
       <div className="auth-art">
         {/* lazy: escondida no telemóvel, assim nem chega a ser descarregada */}
         <img
-          src={jovens840}
-          srcSet={`${jovens480} 480w, ${jovens840} 840w`}
+          src={jovens840.src}
+          srcSet={`${jovens480.src} 480w, ${jovens840.src} 840w`}
           sizes="420px"
           width={840}
           height={1050}

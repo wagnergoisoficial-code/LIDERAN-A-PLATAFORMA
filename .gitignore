@@ -1,7 +1,10 @@
 # Dependências e artefactos
 node_modules/
+.next/
+next-env.d.ts
 coverage/
 *.log
+*.tsbuildinfo
 .DS_Store
 
 # Segredos: use .env.example como modelo
@@ -10,7 +13,7 @@ coverage/
 !.env.example
 
 # Base de dados local (SQLite) e ficheiros enviados
-prisma/prisma/*.db
-prisma/prisma/*.db-journal
-uploads/*
-!uploads/.gitkeep
+api/prisma/prisma/*.db
+api/prisma/prisma/*.db-journal
+api/uploads/*
+!api/uploads/.gitkeep

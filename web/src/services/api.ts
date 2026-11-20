@@ -2,8 +2,8 @@
  * API Service following the Youth Church Portal integration guide
  */
 
-// Em produção vem de VITE_API_URL (definida no build); localmente aponta para o backend de desenvolvimento
-const BASE_URL = (import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:3000/api' : '/api')).replace(/\/+$/, '');
+// A API está no mesmo servidor que as páginas (server.mjs): o endereço é relativo
+const BASE_URL = (process.env.NEXT_PUBLIC_API_URL || '/api').replace(/\/+$/, '');
 
 export const TOKEN_KEY = 'auth_token';
 export const USER_KEY = 'auth_user';

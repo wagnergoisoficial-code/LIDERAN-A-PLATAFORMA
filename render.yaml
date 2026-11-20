@@ -1,0 +1,46 @@
+# Blueprint da Render para uma instalação nova: base de dados PostgreSQL + a Lidera (páginas e API
+# num só serviço). Para passar dos dois serviços antigos para este, siga o DEPLOY.md (não recria a base).
+# Referência: https://render.com/docs/blueprint-spec
+#
+# Uso comercial: o serviço não pode adormecer e a base de dados não pode expirar, por isso os planos
+# são pagos. Confirme os nomes e preços dos planos no painel antes de aplicar.
+
+databases:
+  - name: lidera-db
+    plan: basic-256mb
+    region: frankfurt
+    databaseName: lidera
+    user: lidera
+    # Lista vazia: a base de dados só é acessível pela rede privada da Render
+    ipAllowList: []
+
+services:
+  - type: web
+    name: lidera
+    runtime: node
+    plan: starter
+    region: frankfurt
+    branch: main
+    buildCommand: npm ci && npm run build
+    # Aplica as migrações pendentes e arranca o servidor único (páginas + API)
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Na Render há 3 proxies à frente do serviço (testado em 30/10/2026). Com menos, o servidor lê o IP
+      # de um proxy e os limites de pedidos e de login ficam partilhados entre utilizadores.
+      - key: TRUST_PROXY
+        value: "3"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: lidera-db
+          property: connectionString
+      # Numa mudança, use o mesmo valor da API antiga: assim ninguém perde a sessão
+      - key: JWT_SECRET
+        sync: false
+      # Primeiro administrador (criado no arranque se ainda não existir)
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false

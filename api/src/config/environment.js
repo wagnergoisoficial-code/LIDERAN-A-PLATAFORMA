@@ -23,7 +23,8 @@ const config = {
     // Em desenvolvimento qualquer origem é aceite; em produção só as listadas em CORS_ORIGIN
     corsOrigins: parseOrigins(process.env.CORS_ORIGIN),
     // URL pública da API (usada nos links das imagens). A Render define RENDER_EXTERNAL_URL.
-    publicUrl: (process.env.PUBLIC_URL || process.env.RENDER_EXTERNAL_URL || '').replace(/\/+$/, ''),
+    // Vazio: os endereços das imagens ficam relativos (/uploads/…), porque o site e a API estão no mesmo endereço
+    publicUrl: (process.env.PUBLIC_URL || '').replace(/\/+$/, ''),
     // Atrás do proxy da Render/DigitalOcean o IP real chega em X-Forwarded-For
     trustProxy: process.env.TRUST_PROXY ? Number(process.env.TRUST_PROXY) : isProduction ? 1 : 0,
   },
@@ -39,7 +40,7 @@ const config = {
   },
 
   file: {
-    uploadDir: process.env.UPLOAD_DIR || './uploads',
+    uploadDir: process.env.UPLOAD_DIR || require('path').join(__dirname, '..', '..', 'uploads'),
     maxFileSize: parseInt(process.env.MAX_FILE_SIZE || '5242880', 10),
   },
 
@@ -82,11 +83,11 @@ config.validateForProduction = () => {
   }
 
   if (!config.app.corsOrigins.length) {
-    warnings.push('CORS_ORIGIN não está definida: nenhum site poderá usar a API pelo navegador');
+    warnings.push('CORS_ORIGIN não está definida: só o próprio site (no mesmo endereço) usa a API pelo navegador');
   }
 
   if (!config.app.publicUrl) {
-    warnings.push('PUBLIC_URL não está definida: os links das imagens usarão o endereço do pedido');
+    warnings.push('PUBLIC_URL não está definida: os links das imagens ficam relativos (/uploads/…), como deve ser no projeto único');
   }
 
   if (config.admin.email && (!config.admin.password || config.admin.password.length < 12)) {

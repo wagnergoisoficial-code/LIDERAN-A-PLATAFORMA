@@ -1,7 +1,11 @@
+const http = require('http');
 const bcrypt = require('bcrypt');
 const App = require('./app');
 const config = require('./config/environment');
 const { getPrismaClient, disconnectPrisma } = require('./config/database');
+
+// Endereços da API. No projeto único (server.mjs), o resto são páginas e vai para o Next.js.
+const API_PATH = /^\/(api(-docs(\.json)?)?|uploads|health)(\/|\?|$)/i;
 
 class Server {
   constructor() {
@@ -9,7 +13,10 @@ class Server {
     this.httpServer = null;
   }
 
-  async start() {
+  // pages: quem responde às páginas (o Next.js); sem ele, o servidor é só a API, como antes.
+  // onShutdown: o que fechar antes de desligar (o Next.js)
+  async start({ pages, onShutdown } = {}) {
+    this.onShutdown = onShutdown;
     try {
       // Produção mal configurada não chega a aceitar pedidos
       const warnings = config.validateForProduction();
@@ -18,7 +25,9 @@ class Server {
       await this.ensureAdmin();
 
       this.app = new App();
-      this.httpServer = this.app.getApp().listen(config.app.port, () => {
+      const api = this.app.getApp();
+      const handler = pages ? (req, res) => (API_PATH.test(req.url) ? api(req, res) : pages(req, res)) : api;
+      this.httpServer = http.createServer(handler).listen(config.app.port, () => {
         console.log(
           `✅ Server running on port ${config.app.port} (${config.app.nodeEnv})`
         );
@@ -51,6 +60,7 @@ class Server {
     const shutdown = async (signal) => {
       console.log(`\n📍 ${signal} received, shutting down gracefully...`);
 
+      if (this.onShutdown) await this.onShutdown().catch(() => {});
       if (this.httpServer) {
         this.httpServer.close(async () => {
           console.log('✅ HTTP server closed');

@@ -1,17 +1,3 @@
+# Lidera: páginas (React)
 
-
-# Run and deploy your AI Studio app
-
-This contains everything you need to run your app locally.
-
-
-## Run Locally
-
-**Prerequisites:**  Node.js
-
-
-1. Install dependencies:
-   `npm install`
-
-2. Run the app:
-   `npm run dev`
+As páginas e componentes do site, entregues pelo Next.js do projeto (ver o [README](../README.md) e o [DEPLOY.md](../DEPLOY.md) na raiz).
