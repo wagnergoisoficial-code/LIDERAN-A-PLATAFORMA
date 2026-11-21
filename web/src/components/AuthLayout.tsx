@@ -14,7 +14,7 @@ interface AuthLayoutProps {
 }
 
 const HEADLINE = 'A comunidade jovem que te conecta com';
-const ENDINGS = ['sua igreja.', 'seus amigos.', 'quem ora por você.', 'sua geração.'];
+const ENDINGS = ['seus irmãos da igreja.', 'quem ora por você.', 'sua geração.'];
 const FEATURES = [
   'Peça oração e veja quem está orando por você.',
   'Confirme presença nos encontros com um toque.',
@@ -93,7 +93,7 @@ const AuthVisual = ({ cta }: { cta?: AuthLayoutProps['cta'] }) => {
           <Rotator items={ENDINGS} tick={ending} className="auth-rotator auth-visual-ending" />
         </h2>
         <p className="auth-visual-text">
-          Feed, pedidos de oração, encontros e conversas da sua igreja em um só lugar. Simples, rápido e perto de quem importa.
+          Feed, pedidos de oração, encontros e conversas da sua igreja, em um só lugar.
         </p>
         {cta && (
           <Link className="auth-visual-cta" to={cta.to}>
@@ -101,6 +101,11 @@ const AuthVisual = ({ cta }: { cta?: AuthLayoutProps['cta'] }) => {
             <Icon name="chevron-right" size={18} strokeWidth={2} />
           </Link>
         )}
+        <p className="auth-visual-live">
+          <span className="auth-live-dot" aria-hidden="true" />
+          <span className="visually-hidden">{FEATURES[0]}</span>
+          <Rotator items={FEATURES} tick={feature} className="auth-rotator" />
+        </p>
       </div>
 
       <div className="auth-stage" aria-hidden="true">
@@ -108,7 +113,7 @@ const AuthVisual = ({ cta }: { cta?: AuthLayoutProps['cta'] }) => {
           <img
             src={jovens840.src}
             srcSet={`${jovens480.src} 480w, ${jovens840.src} 840w`}
-            sizes="(max-width: 899px) 160px, 560px"
+            sizes="(max-width: 899px) 200px, 840px"
             width={840}
             height={1050}
             alt=""
@@ -123,12 +128,6 @@ const AuthVisual = ({ cta }: { cta?: AuthLayoutProps['cta'] }) => {
           </div>
         </div>
       </div>
-
-      <p className="auth-visual-live">
-        <span className="auth-live-dot" aria-hidden="true" />
-        <span className="visually-hidden">{FEATURES[0]}</span>
-        <Rotator items={FEATURES} tick={feature} className="auth-rotator" />
-      </p>
     </aside>
   );
 };
