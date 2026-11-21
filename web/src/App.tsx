@@ -202,7 +202,7 @@ const SearchBox: React.FC<{ open: boolean; setOpen: (open: boolean) => void; tog
             value={query}
             onChange={e => search(e.target.value)}
             onFocus={() => { if (results) setShowResults(true); }}
-            placeholder="Buscar na Lidera"
+            placeholder="Buscar na Fourux"
             aria-label="Buscar pessoas, publicações e encontros"
             aria-expanded={showResults}
             aria-controls="search-results"
@@ -474,7 +474,7 @@ const Header: React.FC<{ items: NavItem[]; guardian: boolean; search: SearchCont
   return (
     <header className="app-header">
       <div className="app-header-inner">
-        <Link to="/" className="brand" aria-label="Lidera, ir para o início">lidera</Link>
+        <Link to="/" className="brand" aria-label="Fourux, ir para o início">fourux</Link>
         {!guardian && <SearchBox open={search.open} setOpen={search.setOpen} toggle={search.opener} />}
 
         <nav className="main-nav" aria-label="Principal">

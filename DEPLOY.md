@@ -1,4 +1,4 @@
-# Lidera: desenvolvimento e deploy
+# Fourux: desenvolvimento e deploy
 
 Um só projeto Next.js. O `server.mjs` arranca um só servidor:
 

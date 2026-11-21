@@ -94,7 +94,7 @@ const Bible = () => {
         notify('Dentro desta app a leitura em voz alta não funciona. A abrir no Chrome…', 'success');
         setTimeout(openInChrome, 1200);
       } else {
-        notify('Este navegador não lê em voz alta. Abra a Lidera no Safari ou no Chrome.');
+        notify('Este navegador não lê em voz alta. Abra a Fourux no Safari ou no Chrome.');
       }
       return;
     }

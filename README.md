@@ -1,4 +1,4 @@
-# Lidera
+# Fourux
 
 A rede social da juventude da igreja: feed, chat, mensagens, Bíblia com áudio, agenda, doações e os painéis da liderança, da secretaria, da tesouraria e da regência.
 

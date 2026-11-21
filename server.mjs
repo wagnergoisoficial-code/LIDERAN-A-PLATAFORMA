@@ -1,4 +1,4 @@
-// Um só servidor para a Lidera: a API de sempre (Express, em api/) responde em /api, /uploads,
+// Um só servidor para a Fourux: a API de sempre (Express, em api/) responde em /api, /uploads,
 // /health e /api-docs; tudo o resto são as páginas, servidas pelo Next.js.
 import { createRequire } from 'node:module';
 import next from 'next';

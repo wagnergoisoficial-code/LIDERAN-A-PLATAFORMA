@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import '../web/src/index.css';
 
 export const metadata: Metadata = {
-  title: 'Lidera',
+  title: 'Fourux',
   description: 'A rede social da juventude da igreja: feed, chat, Bíblia e agenda da comunidade.',
 };
 

@@ -1,7 +1,7 @@
 {
   "name": "lidera",
   "version": "2.0.0",
-  "description": "Lidera: rede social da juventude da igreja. Um só projeto Next.js com a API Express (api/) e as páginas React (web/).",
+  "description": "Fourux: rede social da juventude da igreja. Um só projeto Next.js com a API Express (api/) e as páginas React (web/).",
   "private": true,
   "scripts": {
     "dev": "NODE_ENV=development nodemon --watch api/src --watch server.mjs server.mjs",

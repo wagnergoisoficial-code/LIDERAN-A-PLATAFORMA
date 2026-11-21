@@ -19,7 +19,7 @@ const FEATURES = [
   'Peça oração e veja quem está orando por você.',
   'Confirme presença nos encontros com um toque.',
   'Leia o devocional do dia com sua comunidade.',
-  'Converse com o grupo sem sair da Lidera.',
+  'Converse com o grupo sem sair da Fourux.',
 ];
 const REACTIONS = ['heart', 'praying', 'amen', 'fire', 'heart', 'strong'] as const;
 
@@ -76,8 +76,8 @@ const AuthVisual = ({ cta }: { cta?: AuthLayoutProps['cta'] }) => {
   useEffect(() => () => cancelAnimationFrame(frame.current), []);
 
   return (
-    <aside className="auth-visual" ref={ref} onPointerMove={follow} aria-label="Sobre a Lidera">
-      <span className="auth-visual-brand" aria-hidden="true">lidera</span>
+    <aside className="auth-visual" ref={ref} onPointerMove={follow} aria-label="Sobre a Fourux">
+      <span className="auth-visual-brand" aria-hidden="true">fourux</span>
       <div className="auth-visual-copy">
         <h2 className="auth-visual-title">
           <span className="visually-hidden">{`${HEADLINE} ${ENDINGS[0]}`}</span>
@@ -143,13 +143,13 @@ const AuthLayout = ({ title, subtitle, cta, children }: AuthLayoutProps) => {
   return (
     <div className={`auth${intro.current ? ' is-intro' : ''}`}>
       <main className="auth-side">
-        <span className="auth-brand">lidera</span>
+        <span className="auth-brand">fourux</span>
         <div className="auth-form">
           <h1 className="auth-title">{title}</h1>
           <p className="auth-subtitle">{subtitle}</p>
           {children}
         </div>
-        <p className="auth-legal">© {new Date().getFullYear()} Lidera. Todos os direitos reservados.</p>
+        <p className="auth-legal">© {new Date().getFullYear()} Fourux. Todos os direitos reservados.</p>
       </main>
       <AuthVisual cta={cta} />
     </div>

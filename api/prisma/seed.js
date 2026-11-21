@@ -35,11 +35,11 @@ async function main() {
   const existing = await prisma.user.findUnique({ where: { email: 'leader@church.com' }, select: { churchId: true } });
   const churchId = existing?.churchId || (await prisma.church.upsert({
     where: { id: 'seed_church_lidera' },
-    update: { name: 'Comunidade Lidera', title: 'Comunidade Lidera' },
+    update: { name: 'Comunidade Fourux', title: 'Comunidade Fourux' },
     create: {
       id: 'seed_church_lidera',
-      name: 'Comunidade Lidera',
-      title: 'Comunidade Lidera',
+      name: 'Comunidade Fourux',
+      title: 'Comunidade Fourux',
       description: 'Comunidade principal criada para testes da plataforma.',
     },
   })).id;
