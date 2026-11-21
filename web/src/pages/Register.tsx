@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import UIkit from 'uikit';
 import AuthLayout, { PasswordInput } from '../components/AuthLayout';
+import { celebrate, shake } from '../lib/motion';
 
 // Mesma regra do backend
 const PASSWORD_RULE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
@@ -17,16 +18,20 @@ const Register = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPasswords, setShowPasswords] = useState(false);
   const [loading, setLoading] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
+  const submitRef = useRef<HTMLButtonElement>(null);
   const navigate = useNavigate();
   const { login } = useAuth();
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!PASSWORD_RULE.test(password)) {
+      shake(formRef.current);
       UIkit.notification({ message: PASSWORD_HINT, status: 'danger', pos: 'top-right' });
       return;
     }
     if (password !== confirmPassword) {
+      shake(formRef.current);
       UIkit.notification({ message: 'As senhas não conferem', status: 'danger', pos: 'top-right' });
       return;
     }
@@ -35,10 +40,12 @@ const Register = () => {
       const response = await api.register({ name, email, birthDate, password, confirmPassword });
       if (response.success) {
         login(response.data.user, response.data.token);
+        celebrate(submitRef.current);
         UIkit.notification({ message: 'Conta criada com sucesso!', status: 'success', pos: 'top-right' });
         navigate('/painel/lideranca');
       }
     } catch (err: any) {
+      shake(formRef.current);
       UIkit.notification({ message: err.message || 'Erro ao criar conta', status: 'danger', pos: 'top-right' });
     } finally {
       setLoading(false);
@@ -48,10 +55,15 @@ const Register = () => {
   return (
     <AuthLayout
       title="Criar conta"
-      subtitle="Crie sua conta de líder. Para abrir a comunidade, você vai enviar os dados da sua igreja e documentos para verificação."
-      footer={<>Já tem uma conta? <Link to="/login">Entrar</Link>. Recebeu um convite de um líder? Use o link que ele enviou.</>}
+      subtitle={<>Já tem uma conta? <Link to="/login">Entrar</Link></>}
+      cta={{ to: '/login', label: 'Já tenho uma conta' }}
     >
-      <form onSubmit={handleRegister}>
+      <p className="auth-note">
+        Esta é a conta de líder: para abrir a comunidade, você vai enviar os dados da sua igreja e documentos para
+        verificação. Recebeu um convite? Use o link que o seu líder enviou.
+      </p>
+
+      <form onSubmit={handleRegister} ref={formRef}>
         <div className="auth-field">
           <label className="auth-label" htmlFor="register-name">Nome completo</label>
           <input
@@ -59,7 +71,7 @@ const Register = () => {
             name="name"
             className="uk-input"
             type="text"
-            placeholder="Seu nome"
+            placeholder="Digite seu nome completo"
             autoComplete="name"
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -74,7 +86,7 @@ const Register = () => {
             name="email"
             className="uk-input"
             type="email"
-            placeholder="seu@email.com"
+            placeholder="Digite seu e-mail"
             autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -106,6 +118,7 @@ const Register = () => {
             value={password}
             onChange={setPassword}
             visible={showPasswords}
+            placeholder="Crie uma senha"
             onToggle={() => setShowPasswords((visible) => !visible)}
             toggleControls="register-password register-confirm"
             describedBy="register-password-hint"
@@ -124,10 +137,11 @@ const Register = () => {
             value={confirmPassword}
             onChange={setConfirmPassword}
             visible={showPasswords}
+            placeholder="Repita a senha"
           />
         </div>
 
-        <button className="uk-button uk-button-primary auth-submit" type="submit" disabled={loading}>
+        <button className="uk-button uk-button-primary auth-submit" type="submit" disabled={loading} ref={submitRef}>
           {loading ? <><span uk-spinner="ratio: 0.5"></span> Criando...</> : 'Criar conta'}
         </button>
       </form>

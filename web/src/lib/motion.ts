@@ -41,6 +41,15 @@ export function pop(target: Element | null | undefined, scale = 1.28) {
   );
 }
 
+/** Abanão curto de "não" (senha errada, por exemplo). */
+export function shake(target: Element | null | undefined) {
+  if (!target || prefersReducedMotion()) return;
+  (target as HTMLElement).animate(
+    [0, -8, 7, -5, 3, -1, 0].map((x) => ({ transform: `translateX(${x}px)` })),
+    { duration: 420, easing: EASE_OUT }
+  );
+}
+
 /** Pequena explosão de partículas à volta de um elemento (reagir, orar, votar…).
  *  As partículas nascem no contorno do elemento e saem numa elipse à sua volta. */
 export function burst(

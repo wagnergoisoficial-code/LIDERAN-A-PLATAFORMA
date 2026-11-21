@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import UIkit from 'uikit';
 import { api, TOKEN_KEY, USER_KEY } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import AuthLayout, { PasswordInput } from '../components/AuthLayout';
 import { isMinorDate, todayInput } from '../components/GuardianFields';
+import { celebrate, shake } from '../lib/motion';
 
 // Mesma regra do backend
 const PASSWORD_RULE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
@@ -19,6 +20,8 @@ const InviteRegister: React.FC = () => {
   const [form, setForm] = useState({ name: '', email: '', birthDate: '', password: '', confirmPassword: '' });
   const [showPasswords, setShowPasswords] = useState(false);
   const [loading, setLoading] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
+  const submitRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     api.getInvite(code).then(res => setChurch(res.data.church)).catch(() => setInvalid(true));
@@ -30,10 +33,12 @@ const InviteRegister: React.FC = () => {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!PASSWORD_RULE.test(form.password)) {
+      shake(formRef.current);
       UIkit.notification({ message: 'A senha deve ter pelo menos 8 caracteres, com letra maiúscula, minúscula e número', status: 'danger', pos: 'top-right' });
       return;
     }
     if (form.password !== form.confirmPassword) {
+      shake(formRef.current);
       UIkit.notification({ message: 'As senhas não conferem', status: 'danger', pos: 'top-right' });
       return;
     }
@@ -41,9 +46,11 @@ const InviteRegister: React.FC = () => {
     try {
       const res = await api.registerByInvite(code, form);
       login(res.data.user, res.data.token);
+      celebrate(submitRef.current);
       UIkit.notification({ message: `Bem-vindo à ${church?.name || 'comunidade'}!`, status: 'success', pos: 'top-right' });
       navigate('/');
     } catch (err: any) {
+      shake(formRef.current);
       UIkit.notification({ message: err.message || 'Não foi possível criar a conta', status: 'danger', pos: 'top-right' });
     } finally {
       setLoading(false);
@@ -59,17 +66,17 @@ const InviteRegister: React.FC = () => {
 
   if (invalid) {
     return (
-      <AuthLayout title="Convite inválido" subtitle="Este link não funciona mais. Peça um link novo ao seu líder." footer={<Link to="/login">Ir para o início</Link>}>
-        <span />
+      <AuthLayout title="Convite inválido" subtitle="Este link não funciona mais. Peça um link novo ao seu líder.">
+        <Link className="uk-button uk-button-primary auth-submit" to="/login">Ir para o início</Link>
       </AuthLayout>
     );
   }
 
   if (isAuthenticated) {
     return (
-      <AuthLayout title="Você já está conectado" subtitle={`Você está usando a conta de ${user?.name}. Para criar uma conta nova com este convite, saia primeiro.`}
-        footer={<Link to="/">Continuar com minha conta</Link>}>
-        <button className="uk-button uk-button-default auth-submit" type="button" onClick={signOutHere}>Sair e usar o convite</button>
+      <AuthLayout title="Você já está conectado" subtitle={`Você está usando a conta de ${user?.name}. Para criar uma conta nova com este convite, saia primeiro.`}>
+        <button className="uk-button uk-button-primary auth-submit" type="button" onClick={signOutHere}>Sair e usar o convite</button>
+        <p className="auth-alt"><Link to="/">Continuar com minha conta</Link></p>
       </AuthLayout>
     );
   }
@@ -77,18 +84,19 @@ const InviteRegister: React.FC = () => {
   return (
     <AuthLayout
       title="Entrar na comunidade"
-      subtitle={church ? `Você foi convidado para ${church.name}. Crie sua conta para entrar.` : 'Carregando o convite…'}
-      footer={<>Já tem uma conta? <Link to="/login">Entrar</Link></>}
+      subtitle={church
+        ? <>Você foi convidado para <strong>{church.name}</strong>. Já tem uma conta? <Link to="/login">Entrar</Link></>
+        : 'Carregando o convite…'}
     >
-      <form onSubmit={submit}>
+      <form onSubmit={submit} ref={formRef}>
         <div className="auth-field">
           <label className="auth-label" htmlFor="invite-name">Nome completo</label>
-          <input id="invite-name" className="uk-input" type="text" autoComplete="name" placeholder="Seu nome"
+          <input id="invite-name" className="uk-input" type="text" autoComplete="name" placeholder="Digite seu nome completo"
             value={form.name} onChange={e => set('name')(e.target.value)} required />
         </div>
         <div className="auth-field">
           <label className="auth-label" htmlFor="invite-email">E-mail</label>
-          <input id="invite-email" className="uk-input" type="email" autoComplete="email" placeholder="seu@email.com"
+          <input id="invite-email" className="uk-input" type="email" autoComplete="email" placeholder="Digite seu e-mail"
             value={form.email} onChange={e => set('email')(e.target.value)} required />
         </div>
         <div className="auth-field">
@@ -104,14 +112,14 @@ const InviteRegister: React.FC = () => {
         <div className="auth-field">
           <label className="auth-label" htmlFor="invite-password">Senha</label>
           <PasswordInput id="invite-password" name="password" autoComplete="new-password" value={form.password} onChange={set('password')}
-            visible={showPasswords} onToggle={() => setShowPasswords(v => !v)} toggleControls="invite-password invite-confirm" describedBy="invite-password-hint" />
+            visible={showPasswords} placeholder="Crie uma senha" onToggle={() => setShowPasswords(v => !v)} toggleControls="invite-password invite-confirm" describedBy="invite-password-hint" />
           <p className="auth-hint" id="invite-password-hint">Mínimo de 8 caracteres, com letra maiúscula, minúscula e número.</p>
         </div>
         <div className="auth-field">
           <label className="auth-label" htmlFor="invite-confirm">Confirmar senha</label>
-          <PasswordInput id="invite-confirm" name="confirmPassword" autoComplete="new-password" value={form.confirmPassword} onChange={set('confirmPassword')} visible={showPasswords} />
+          <PasswordInput id="invite-confirm" name="confirmPassword" autoComplete="new-password" value={form.confirmPassword} onChange={set('confirmPassword')} visible={showPasswords} placeholder="Repita a senha" />
         </div>
-        <button className="uk-button uk-button-primary auth-submit" type="submit" disabled={loading || !church || minor}>
+        <button className="uk-button uk-button-primary auth-submit" type="submit" disabled={loading || !church || minor} ref={submitRef}>
           {loading ? <><span uk-spinner="ratio: 0.5"></span> Criando...</> : 'Criar conta e entrar'}
         </button>
       </form>

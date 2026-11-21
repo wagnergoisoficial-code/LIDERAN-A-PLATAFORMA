@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { api, RESTRICTED_KEY } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import UIkit from 'uikit';
 import AuthLayout, { PasswordInput } from '../components/AuthLayout';
 import Icon from '../components/Icon';
+import { shake } from '../lib/motion';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -13,6 +14,7 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   // Conta suspensa, bloqueada ou à espera dos pais: o motivo fica visível acima do formulário
   const [notice, setNotice] = useState<string | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
   const navigate = useNavigate();
   const { login } = useAuth();
 
@@ -37,6 +39,7 @@ const Login = () => {
         navigate('/');
       }
     } catch (err: any) {
+      shake(formRef.current);
       if (err.data?.code === 'ACCOUNT_RESTRICTED') setNotice(err.message);
       else UIkit.notification({ message: err.message || 'Erro ao fazer login', status: 'danger', pos: 'top-right' });
     } finally {
@@ -47,8 +50,8 @@ const Login = () => {
   return (
     <AuthLayout
       title="Entrar"
-      subtitle="Entre na sua conta para continuar."
-      footer={<>Não tem uma conta? <Link to="/register">Criar conta</Link></>}
+      subtitle={<>Ainda não tem uma conta? <Link to="/register">Criar conta</Link></>}
+      cta={{ to: '/register', label: 'Criar sua comunidade' }}
     >
       {notice && (
         <div className="error-note auth-notice" role="alert">
@@ -57,7 +60,7 @@ const Login = () => {
         </div>
       )}
 
-      <form onSubmit={handleLogin}>
+      <form onSubmit={handleLogin} ref={formRef}>
         <div className="auth-field">
           <label className="auth-label" htmlFor="login-email">E-mail</label>
           <input
@@ -65,7 +68,7 @@ const Login = () => {
             name="email"
             className="uk-input"
             type="email"
-            placeholder="seu@email.com"
+            placeholder="Digite seu e-mail"
             autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -82,6 +85,7 @@ const Login = () => {
             value={password}
             onChange={setPassword}
             visible={showPassword}
+            placeholder="Digite sua senha"
             onToggle={() => setShowPassword((visible) => !visible)}
           />
         </div>
