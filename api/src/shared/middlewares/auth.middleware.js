@@ -20,7 +20,7 @@ const authMiddleware = async (req, res, next) => {
       where: { id: decoded.id },
       select: {
         id: true, name: true, email: true, role: true, churchId: true, profileImage: true,
-        birthDate: true, age: true, status: true, cargo: true, suspendedUntil: true, leaderVerifiedAt: true,
+        birthDate: true, age: true, status: true, cargo: true, suspendedUntil: true, statusReason: true, leaderVerifiedAt: true,
       },
     });
 

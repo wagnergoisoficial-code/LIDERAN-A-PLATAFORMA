@@ -3,6 +3,8 @@ const authMiddleware = require('../shared/middlewares/auth.middleware');
 const roleMiddleware = require('../shared/middlewares/role.middleware');
 const { getPrismaClient } = require('../config/database');
 const { textContains } = require('../shared/utils/query.util');
+const { notifyUser } = require('../shared/utils/notifier');
+const { NotFoundError, ForbiddenError, ValidationError } = require('../shared/errors/AppError');
 
 // Administração da plataforma: só o administrador (role admin) entra
 const router = express.Router();
@@ -94,6 +96,81 @@ router.get('/users', handle(async (req, res) => {
     }),
   ]);
   res.json({ success: true, data: { users, total, page, pageSize: PAGE_SIZE } });
+}));
+
+// A pessoa a quem o administrador se dirige (o próprio administrador fica de fora)
+const findTarget = async (prisma, id) => {
+  const target = await prisma.user.findUnique({ where: { id }, select: { ...PERSON, churchId: true } });
+  if (!target) throw new NotFoundError('Pessoa não encontrada');
+  if (target.role === 'admin') throw new ForbiddenError('O administrador não pode ser alterado por aqui');
+  return target;
+};
+
+const cleanText = (value, max) => (typeof value === 'string' ? value.trim().slice(0, max) : '');
+
+// Mensagem da administração: chega como notificação, com o texto inteiro
+router.post('/users/:id/message', handle(async (req, res) => {
+  const prisma = getPrismaClient();
+  const target = await findTarget(prisma, req.params.id);
+  const text = cleanText(req.body?.text, 500);
+  if (!text) throw new ValidationError('Escreva a mensagem');
+  await prisma.notification.create({
+    data: { userId: target.id, type: 'admin_message', title: 'Mensagem da administração da Fourux', body: text },
+  });
+  res.status(201).json({ success: true, message: `Mensagem enviada a ${target.name}` });
+}));
+
+// Mesmas durações das suspensões feitas pelas comunidades
+const SUSPENSION_DAYS = [1, 3, 7, 15, 30, 90];
+
+// Suspender, bloquear, reativar ou retirar a verificação de líder. Fica registado para auditoria.
+router.post('/users/:id/moderation', handle(async (req, res) => {
+  const prisma = getPrismaClient();
+  const target = await findTarget(prisma, req.params.id);
+  const { action, days } = req.body || {};
+  const reason = cleanText(req.body?.reason, 500) || null;
+  let data;
+  let until = null;
+  let notice = null;
+
+  if (action === 'suspend') {
+    const n = parseInt(days, 10);
+    if (!SUSPENSION_DAYS.includes(n)) throw new ValidationError(`Escolha a duração da suspensão: ${SUSPENSION_DAYS.join(', ')} dias`);
+    until = new Date(Date.now() + n * 24 * 60 * 60 * 1000);
+    data = { status: 'suspended', suspendedUntil: until, statusReason: reason };
+  } else if (action === 'block') {
+    data = { status: 'blocked', suspendedUntil: null, statusReason: reason };
+  } else if (action === 'reactivate') {
+    if (target.status === 'pending_authorization') {
+      throw new ValidationError('Este menor aguarda a autorização dos pais: a comunidade confirma a autorização');
+    }
+    data = { status: 'active', suspendedUntil: null, statusReason: null };
+    notice = { type: 'account_reactivated', title: 'A sua conta foi reativada', body: 'Já pode usar a Fourux de novo.' };
+  } else if (action === 'revoke_verification') {
+    if (target.role !== 'leader' || !target.leaderVerifiedAt) throw new ValidationError('Esta pessoa não é um líder verificado');
+    if (!reason) throw new ValidationError('Indique o motivo');
+    data = { leaderVerifiedAt: null };
+    notice = { type: 'verification_rejected', title: 'Verificação de líder retirada', body: reason };
+  } else {
+    throw new ValidationError('Ação inválida');
+  }
+
+  const [updated] = await prisma.$transaction([
+    prisma.user.update({ where: { id: target.id }, data, select: { ...PERSON, church: { select: { name: true } } } }),
+    prisma.moderationAction.create({
+      data: { action, reason, until, churchId: target.churchId || null, userId: target.id, actorId: req.user.id },
+    }),
+    // O pedido aprovado passa a recusado, com o motivo: o líder pode enviar um novo
+    ...(action === 'revoke_verification'
+      ? [prisma.leaderVerification.updateMany({
+          where: { userId: target.id },
+          data: { status: 'rejected', reason, reviewedAt: new Date(), reviewedById: req.user.id },
+        })]
+      : []),
+  ]);
+
+  if (notice) await notifyUser(target.id, notice);
+  res.json({ success: true, data: updated });
 }));
 
 module.exports = router;

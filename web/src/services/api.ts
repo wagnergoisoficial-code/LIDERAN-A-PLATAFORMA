@@ -456,6 +456,10 @@ export const api = {
   getAdminOverview: () => request('/admin/overview'),
   getAdminChurches: () => request('/admin/churches'),
   getAdminUsers: (q = '', page = 1) => request(`/admin/users?${new URLSearchParams({ q, page: String(page) })}`),
+  sendAdminMessage: (userId: string, text: string) =>
+    request(`/admin/users/${userId}/message`, { method: 'POST', body: JSON.stringify({ text }) }),
+  moderateAsAdmin: (userId: string, body: { action: 'suspend' | 'block' | 'reactivate' | 'revoke_verification'; days?: number; reason?: string }) =>
+    request(`/admin/users/${userId}/moderation`, { method: 'POST', body: JSON.stringify(body) }),
 
   reviewVerification: (id: string, status: 'approved' | 'rejected', reason?: string) =>
     request(`/leader-verification/${id}`, { method: 'PATCH', body: JSON.stringify({ status, reason }) }),

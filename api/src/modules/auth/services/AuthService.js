@@ -6,7 +6,7 @@ const { ageFrom } = require('../../../shared/utils/minor.util');
 const { assertAccountActive } = require('../../../shared/utils/account-status.util');
 const guardianService = require('../../guardians/guardian.service');
 const RegisterMemberDto = require('../dtos/RegisterMemberDto');
-const { notifyUser } = require('../../../shared/utils/notifier');
+const { notifyUser, notifyUsers } = require('../../../shared/utils/notifier');
 const {
   ConflictError,
   AuthenticationError,
@@ -36,6 +36,15 @@ class AuthService {
       password: hashedPassword,
       role: registerDto.role,
       ...(registerDto.birthDate && { birthDate: registerDto.birthDate, age: ageFrom(registerDto.birthDate) }),
+    });
+
+    const admins = await getPrismaClient().user.findMany({ where: { role: 'admin' }, select: { id: true } });
+    await notifyUsers(admins.map((a) => a.id), {
+      type: 'leader_signup',
+      title: 'Novo líder na Fourux',
+      body: `${user.name} criou uma conta de líder (${user.email})`,
+      linkId: user.id,
+      linkType: 'admin_user',
     });
 
     return this.formatAuthResponse(user, this.signToken(user));

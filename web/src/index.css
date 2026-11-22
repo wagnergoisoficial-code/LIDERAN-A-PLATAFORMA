@@ -3380,6 +3380,8 @@ a.thread-title:hover { color: var(--text); }
 .admin-person-email { color: var(--text-muted); font-size: 13px; }
 
 .admin-search { max-width: 420px; margin-bottom: 16px; }
+.admin-field + .admin-field { margin-top: 16px; }
+.admin-field .form-hint { display: flex; justify-content: space-between; gap: 12px; }
 .admin-pager { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 16px; font-size: 14px; }
 
 /* Entrada da administração: só o formulário, ao centro */

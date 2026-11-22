@@ -104,6 +104,12 @@ const NOTIFICATION_ROUTES: Record<string, string> = {
   panel: '/painel',
 };
 
+// Para o administrador, os avisos de líderes e contas abrem a consola
+const ADMIN_NOTIFICATION_ROUTES: Record<string, string> = {
+  verification: '/admin/lideres',
+  admin_user: '/admin/pessoas',
+};
+
 // Destinos principais: o feed, a comunidade (sobre, agenda e membros) e as mensagens
 const COMMUNITY_PATHS = COMMUNITY_TABS.map(t => t.to);
 const isCommunityPath = (path: string) => COMMUNITY_PATHS.includes(path);
@@ -268,8 +274,9 @@ const SearchBox: React.FC<{ open: boolean; setOpen: (open: boolean) => void; tog
 };
 
 /* ─── Notificações ──────────────────────────────────────────── */
-const Notifications: React.FC = () => {
+export const Notifications: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [open, setOpen] = useState(false);
@@ -325,7 +332,7 @@ const Notifications: React.FC = () => {
       setNotifications(prev => prev.map(item => item.id === n.id ? { ...item, isRead: true } : item));
       setUnreadCount(prev => Math.max(0, prev - 1));
     }
-    const to = n.linkType ? NOTIFICATION_ROUTES[n.linkType] : undefined;
+    const to = n.linkType ? (user?.role === 'admin' && ADMIN_NOTIFICATION_ROUTES[n.linkType]) || NOTIFICATION_ROUTES[n.linkType] : undefined;
     if (to) {
       setOpen(false);
       navigate(to);
@@ -645,7 +652,7 @@ export default function App() {
       <Route path="/register" element={<Register />} />
       <Route path="/convite/:code" element={<InviteRegister />} />
       <Route path="/admin/entrar" element={<AdminLogin />} />
-      <Route path="/admin" element={<AdminLayout />}>
+      <Route path="/admin" element={<AdminLayout bell={<Notifications />} />}>
         <Route index element={<AdminOverview />} />
         <Route path="lideres" element={<AdminLeaders />} />
         <Route path="comunidades" element={<AdminChurches />} />

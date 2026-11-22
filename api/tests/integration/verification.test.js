@@ -215,4 +215,39 @@ describe('administração', () => {
     expect(res.status).toBe(403);
     expect(res.message).toMatch(/único administrador/);
   });
+  test('o administrador é avisado dos líderes novos, dos pedidos e das decisões', async () => {
+    await call('POST', '/auth/register', null, {
+      name: 'Líder Tardio', email: `lt${stamp}@t.com`, password: 'Senha1234', confirmPassword: 'Senha1234',
+    });
+    const types = (await call('GET', '/notifications', s.admin)).data.notifications.map((n) => n.type);
+    expect(types).toEqual(expect.arrayContaining(['leader_signup', 'leader_verification', 'verification_reviewed']));
+  });
+
+  test('o administrador envia mensagens e mexe na conta de um líder', async () => {
+    const id = s.leaderId;
+    expect((await call('POST', `/admin/users/${id}/message`, s.admin, { text: '   ' })).status).toBe(400);
+    expect((await call('POST', `/admin/users/${id}/message`, s.leader, { text: 'Olá' })).status).toBe(403);
+    expect((await call('POST', `/admin/users/${id}/message`, s.admin, { text: 'Retire a publicação ofensiva, por favor.' })).status).toBe(201);
+    const inbox = (await call('GET', '/notifications', s.leader)).data.notifications;
+    expect(inbox.find((n) => n.type === 'admin_message').body).toBe('Retire a publicação ofensiva, por favor.');
+
+    const suspended = await call('POST', `/admin/users/${id}/moderation`, s.admin, { action: 'suspend', days: 7, reason: 'Conteúdo impróprio' });
+    expect(suspended.data.status).toBe('suspended');
+    const refused = await call('GET', '/notifications', s.leader);
+    expect(refused.status).toBe(403);
+    expect(refused.message).toMatch(/suspensa até .* Motivo: Conteúdo impróprio/);
+
+    expect((await call('POST', `/admin/users/${id}/moderation`, s.admin, { action: 'reactivate' })).data.status).toBe('active');
+    expect((await call('GET', '/notifications', s.leader)).status).toBe(200);
+
+    expect((await call('POST', `/admin/users/${id}/moderation`, s.admin, { action: 'revoke_verification' })).status).toBe(400);
+    const revoked = await call('POST', `/admin/users/${id}/moderation`, s.admin, { action: 'revoke_verification', reason: 'Documentos falsos' });
+    expect(revoked.data.leaderVerifiedAt).toBeNull();
+    expect((await call('GET', '/leader-verification/me', s.leader)).data).toMatchObject({
+      verified: false, verification: { status: 'rejected', reason: 'Documentos falsos' },
+    });
+
+    const admin = (await call('GET', `/admin/users?q=adm${stamp}`, s.admin)).data.users[0];
+    expect((await call('POST', `/admin/users/${admin.id}/moderation`, s.admin, { action: 'block' })).status).toBe(403);
+  });
 });

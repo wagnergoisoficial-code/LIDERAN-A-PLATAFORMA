@@ -2,6 +2,7 @@ const { getPrismaClient } = require('../../config/database');
 const { AccountRestrictedError } = require('../errors/AppError');
 
 const formatDate = (date) => new Date(date).toLocaleDateString('pt-BR');
+const withReason = (message, reason) => (reason ? `${message} Motivo: ${reason}` : message);
 
 // Garante que a conta pode ser usada. Suspensões vencidas são levantadas automaticamente.
 const assertAccountActive = async (user) => {
@@ -15,15 +16,14 @@ const assertAccountActive = async (user) => {
       });
       return { ...user, status: 'active', suspendedUntil: null, statusReason: null };
     }
-    throw new AccountRestrictedError(
-      user.suspendedUntil
-        ? `Sua conta está suspensa até ${formatDate(user.suspendedUntil)}.`
-        : 'Sua conta está suspensa.'
-    );
+    throw new AccountRestrictedError(withReason(
+      user.suspendedUntil ? `Sua conta está suspensa até ${formatDate(user.suspendedUntil)}.` : 'Sua conta está suspensa.',
+      user.statusReason
+    ));
   }
 
   if (user.status === 'blocked') {
-    throw new AccountRestrictedError('Sua conta foi bloqueada pelo líder da comunidade.');
+    throw new AccountRestrictedError(withReason('Sua conta foi bloqueada.', user.statusReason));
   }
 
   if (user.status === 'pending_authorization') {
