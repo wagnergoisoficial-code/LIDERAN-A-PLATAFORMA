@@ -503,7 +503,7 @@ const Header: React.FC<{ items: NavItem[]; guardian: boolean; search: SearchCont
           {!guardian && <DonateButton />}
           {!guardian && (
             <button type="button" className="uk-button uk-button-primary header-publish" onClick={() => openComposer()}>
-              <Icon name="plus" size={18} strokeWidth={2} /> Publicar
+              Publicar <Icon name="plus" size={18} strokeWidth={2.25} />
             </button>
           )}
           {hasPanel(user) && (

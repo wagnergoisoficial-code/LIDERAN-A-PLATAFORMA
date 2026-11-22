@@ -584,10 +584,8 @@ a:hover { color: var(--accent-dark); text-decoration: underline; }
 .search-item-meta { color: var(--text-faint); font-size: 13px; }
 .search-empty { padding: 20px 12px; color: var(--text-muted); font-size: 14px; text-align: center; }
 
-/* Ecrãs estreitos: a pesquisa é um ícone e abre por cima do cabeçalho */
-.search-toggle { display: none; }
-
-@media (max-width: 1199px) {
+/* A pesquisa é um ícone e abre por cima do cabeçalho */
+@media all {
   .search-toggle { display: inline-flex; }
   .header-search { display: none; }
   .header-search.is-open {
@@ -599,7 +597,7 @@ a:hover { color: var(--accent-dark); text-decoration: underline; }
     gap: 8px;
     max-width: none;
     padding: 0 8px 0 var(--gutter);
-    background: var(--bg);
+    background: var(--hdr-bg);
   }
   .header-search.is-open .header-search-field { position: relative; flex: 1; }
   .header-search.is-open input { font-size: 16px; }
@@ -614,10 +612,7 @@ a:hover { color: var(--accent-dark); text-decoration: underline; }
   }
 }
 
-@media (min-width: 1200px) {
-  .header-search-field { position: relative; }
-  .header-search .search-close { display: none; }
-}
+
 
 /* Telemóvel e tablet: a pesquisa abre pelo "Buscar" da barra de baixo */
 @media (max-width: 1023px) { .header-actions .search-toggle { display: none; } }
@@ -3254,6 +3249,104 @@ a.thread-title:hover { color: var(--text); }
   .auth-title { font-size: 26px; }
   .auth-subtitle { margin-bottom: 24px; }
 }
+
+/* ─── CABEÇALHO ESCURO ──────────────────────────────────────── */
+/* Preto suave, ligações em maiúsculas com o destino ativo sublinhado por baixo do texto,
+   a busca num ícone e "Publicar" em pílula. Igual nos temas claro e escuro. */
+:root {
+  --hdr-bg:     #1b1d22;
+  --hdr-text:   rgba(255, 255, 255, 0.86);
+  --hdr-muted:  rgba(255, 255, 255, 0.6);
+  --hdr-hover:  rgba(255, 255, 255, 0.09);
+  --hdr-line:   rgba(255, 255, 255, 0.28);
+  /* Azul da marca, mais claro para ter contraste AA sobre o preto */
+  --hdr-accent: #6aa5ff;
+}
+
+.app-header { border-bottom-color: transparent; background: var(--hdr-bg); color: var(--hdr-text); }
+.app-header .brand,
+.app-header .brand:hover { color: #fff; }
+.app-header :focus-visible { outline-color: #fff; }
+
+.app-header .icon-btn { color: var(--hdr-text); }
+.app-header .icon-btn:hover,
+.app-header .icon-btn.is-active,
+.app-header .icon-btn[aria-expanded="true"] { background: var(--hdr-hover); color: #fff; }
+.app-header .icon-btn-badge { border-color: var(--hdr-bg); }
+.app-header .avatar-btn[aria-expanded="true"] .avatar-circle,
+.app-header .avatar-btn:hover .avatar-circle { box-shadow: 0 0 0 2px var(--hdr-bg), 0 0 0 4px var(--hdr-line); }
+
+.main-nav-link {
+  padding: 0 18px;
+  color: var(--hdr-text);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transition: color var(--t);
+}
+
+.main-nav-link .icon { display: none; }
+.main-nav-link:hover { color: #fff; }
+.main-nav-link.is-active { color: var(--hdr-accent); }
+
+.main-nav-link.is-active::after {
+  right: 18px;
+  bottom: 16px;
+  left: 18px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--hdr-accent);
+  animation: hdr-underline 360ms var(--ease-out) backwards;
+}
+
+@keyframes hdr-underline { from { transform: scaleX(0.2); opacity: 0; } }
+
+/* Publicar: a ação principal, em pílula, com o + a rodar ao passar o rato */
+.app-header .uk-button.header-publish {
+  height: 40px;
+  margin-right: 4px;
+  padding: 0 18px 0 22px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  gap: 10px;
+}
+
+.header-publish .icon { transition: transform 420ms var(--spring-soft); }
+.header-publish:hover .icon { transform: rotate(90deg); }
+
+/* Doar continua verde, mas em contorno para não competir com Publicar */
+.app-header .uk-button.header-donate {
+  border-color: #3ddc97;
+  border-radius: 999px;
+  background: transparent;
+  color: #3ddc97;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.app-header .uk-button.header-donate:hover,
+.app-header .uk-button.header-donate:focus-visible { background: rgba(61, 220, 151, 0.12); color: #3ddc97; }
+
+/* Botões secundários no cabeçalho (consola do administrador) */
+.app-header .uk-button-default { border-color: var(--hdr-line); background: transparent; color: #fff; }
+.app-header .uk-button-default:hover,
+.app-header .uk-button-default:focus-visible { border-color: #fff; background: var(--hdr-hover); color: #fff; }
+.app-header .admin-badge { border-color: var(--hdr-line); color: var(--hdr-text); }
+
+/* Busca aberta por cima do cabeçalho escuro */
+.app-header .header-search input { border-color: transparent; background: var(--hdr-hover); color: #fff; }
+.app-header .header-search input::placeholder { color: var(--hdr-muted); }
+.app-header .header-search input:focus { border-color: var(--hdr-accent); background: rgba(255, 255, 255, 0.12); }
+.app-header .header-search-icon { color: var(--hdr-muted); }
+.app-header .header-search .icon-btn { color: #fff; }
+.app-header .search-close { color: var(--hdr-text); }
+.app-header .search-close:hover { background: var(--hdr-hover); color: #fff; }
 
 /* ─── ADMINISTRAÇÃO ─────────────────────────────────────────── */
 /* Consola do administrador: reaproveita o cabeçalho da app e o painel com navegação à esquerda */
