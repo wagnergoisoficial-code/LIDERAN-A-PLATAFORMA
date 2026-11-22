@@ -15,6 +15,8 @@ import { COMMUNITY_TABS } from './components/SectionTabs';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import InviteRegister from './pages/InviteRegister';
+import AdminLogin from './pages/admin/AdminLogin';
+import { AdminLayout, AdminOverview, AdminLeaders, AdminChurches, AdminPeople } from './pages/admin/Admin';
 import Feed from './pages/Feed';
 import Posts from './pages/Posts';
 import Community from './pages/Community';
@@ -621,6 +623,8 @@ export default function App() {
   const { isAuthenticated, user } = useAuth();
   const location = useLocation();
   const isAuthPage = location.pathname === '/login' || location.pathname === '/register' || location.pathname.startsWith('/convite/');
+  // A administração tem cabeçalho próprio: fica fora da moldura da app dos membros
+  const standalone = isAuthPage || location.pathname === '/admin' || location.pathname.startsWith('/admin/');
 
   // Conta de responsável: só a área dos filhos e o próprio perfil
   const guardianRoutes = (
@@ -640,6 +644,13 @@ export default function App() {
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/convite/:code" element={<InviteRegister />} />
+      <Route path="/admin/entrar" element={<AdminLogin />} />
+      <Route path="/admin" element={<AdminLayout />}>
+        <Route index element={<AdminOverview />} />
+        <Route path="lideres" element={<AdminLeaders />} />
+        <Route path="comunidades" element={<AdminChurches />} />
+        <Route path="pessoas" element={<AdminPeople />} />
+      </Route>
       <Route path="/painel" element={<PrivateRoute><PanelLayout /></PrivateRoute>}>
         <Route index element={<PanelHome />} />
         <Route path="lideranca" element={<PanelGuard area="lideranca"><Dashboard /></PanelGuard>} />
@@ -675,7 +686,7 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      {isAuthenticated && !isAuthPage ? <AppShell>{routes}</AppShell> : routes}
+      {isAuthenticated && !standalone ? <AppShell>{routes}</AppShell> : routes}
     </ErrorBoundary>
   );
 }

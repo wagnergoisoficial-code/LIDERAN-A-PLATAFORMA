@@ -61,13 +61,13 @@ class UserService {
     return !!user.church && user.church.leaderID === requester.id;
   }
 
-  // Líderes cadastram membros/líderes na sua comunidade; só admins criam admins
+  // Líderes cadastram membros/líderes na sua comunidade. Administrador há um só (criado no arranque)
   async createUser(createUserDto, requester) {
-    const churchId = requireChurch(requester);
-
-    if (createUserDto.role === 'admin' && !isAdmin(requester)) {
-      throw new ForbiddenError('Apenas administradores podem criar outros administradores');
+    if (createUserDto.role === 'admin') {
+      throw new ForbiddenError('A Fourux tem um único administrador');
     }
+
+    const churchId = requireChurch(requester);
 
     const existingUser = await this.userRepository.findByEmail(createUserDto.email);
 

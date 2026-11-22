@@ -183,3 +183,36 @@ describe('link de convite', () => {
     expect((await call('GET', '/invites/nao-existe-este')).status).toBe(404);
   });
 });
+
+describe('administração', () => {
+  test('só o administrador abre a visão geral', async () => {
+    expect((await call('GET', '/admin/overview', s.leader)).status).toBe(403);
+    expect((await call('GET', '/admin/overview')).status).toBe(401);
+
+    const res = await call('GET', '/admin/overview', s.admin);
+    expect(res.status).toBe(200);
+    expect(res.data.counts.people).toBeGreaterThanOrEqual(3);
+    expect(res.data.counts.churches).toBeGreaterThanOrEqual(1);
+    expect(res.data.counts.verifiedLeaders).toBeGreaterThanOrEqual(1);
+    expect(Array.isArray(res.data.pending)).toBe(true);
+    expect(res.data.recent[0]).not.toHaveProperty('password');
+  });
+
+  test('busca de pessoas sem distinguir maiúsculas, e comunidades com líder e membros', async () => {
+    const found = await call('GET', `/admin/users?q=LV${stamp}`, s.admin);
+    expect(found.data.total).toBe(1);
+    expect(found.data.users[0]).toMatchObject({ email: `lv${stamp}@t.com`, role: 'leader' });
+    expect(found.data.users[0]).not.toHaveProperty('password');
+
+    const churches = await call('GET', '/admin/churches', s.admin);
+    const mine = churches.data.find((c) => c.id === s.church);
+    expect(mine).toMatchObject({ name: 'Comunidade Verificada', leader: { name: 'Líder Novo' } });
+    expect(mine.members).toBeGreaterThanOrEqual(1);
+  });
+
+  test('a plataforma tem um único administrador', async () => {
+    const res = await call('POST', '/users', s.admin, { name: 'Outro Admin', email: `adm2${stamp}@t.com`, password: 'Senha1234', role: 'admin' });
+    expect(res.status).toBe(403);
+    expect(res.message).toMatch(/único administrador/);
+  });
+});

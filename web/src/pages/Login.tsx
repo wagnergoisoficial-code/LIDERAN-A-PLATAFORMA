@@ -36,7 +36,7 @@ const Login = () => {
       if (response.success) {
         login(response.data.user, response.data.token);
         UIkit.notification({ message: 'Bem-vindo de volta!', status: 'success', pos: 'top-right' });
-        navigate('/');
+        navigate(response.data.user.role === 'admin' ? '/admin' : '/');
       }
     } catch (err: any) {
       shake(formRef.current);

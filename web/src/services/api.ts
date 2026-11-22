@@ -452,6 +452,11 @@ export const api = {
   getVerifications: (status?: string) =>
     request(`/leader-verification${status ? `?status=${status}` : ''}`),
 
+  // Administração da plataforma (só o administrador)
+  getAdminOverview: () => request('/admin/overview'),
+  getAdminChurches: () => request('/admin/churches'),
+  getAdminUsers: (q = '', page = 1) => request(`/admin/users?${new URLSearchParams({ q, page: String(page) })}`),
+
   reviewVerification: (id: string, status: 'approved' | 'rejected', reason?: string) =>
     request(`/leader-verification/${id}`, { method: 'PATCH', body: JSON.stringify({ status, reason }) }),
 

@@ -32,6 +32,7 @@ const inviteRoutes = require('./routes/invite.routes');
 const videoRoutes = require('./routes/video.routes');
 const panelRoutes = require('./routes/panel.routes');
 const badgeRoutes = require('./routes/badges.routes');
+const adminRoutes = require('./routes/admin.routes');
 
 class App {
   constructor() {
@@ -148,6 +149,7 @@ class App {
     this.app.use('/api/videos', videoRoutes);
     this.app.use('/api/panel', panelRoutes);
     this.app.use('/api/badges', badgeRoutes);
+    this.app.use('/api/admin', adminRoutes);
 
     // 404 handler
     this.app.use((req, res) => {
