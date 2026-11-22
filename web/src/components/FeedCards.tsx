@@ -11,6 +11,10 @@ import MoreMenu, { MenuAction, useDismiss } from './MoreMenu';
 import AnimatedNumber from './AnimatedNumber';
 import DateChip from './DateChip';
 import { sendReport } from './ReportButton';
+import Chips from './Chips';
+
+// Respostas rápidas por baixo do campo de comentário (como nas redes sociais)
+const QUICK_COMMENTS = ['Amém 🙏', 'Glória a Deus!', 'Que bênção!', 'Adorei!', 'Ficou top!', 'Ficou lindo!', 'Deus abençoe!', 'Estou orando por você'];
 
 /* ─── Tipos do feed ─────────────────────────────────────────── */
 export interface Comment { id: string; content: string; userId: string; userName: string; userProfileImage?: string; createdAt: string }
@@ -208,6 +212,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post, me, onComment, onReact
   // Foto que já não existe no servidor: some, em vez de deixar uma caixa vazia
   const [imageFailed, setImageFailed] = useState(false);
   const commentInput = useRef<HTMLInputElement>(null);
+  const [commentFocus, setCommentFocus] = useState(false);
   const focusComment = useRef(false);
   const report = useReport('post', post.id);
 
@@ -375,12 +380,26 @@ export const PostCard: React.FC<PostCardProps> = ({ post, me, onComment, onReact
                 <Avatar name={me.name} profileImage={me.profileImage} size={32} />
                 <div className="comment-form-field">
                   <input ref={commentInput} type="text" aria-label="Escreva um comentário" placeholder="Escreva um comentário…"
-                    value={commentText} onChange={e => setCommentText(e.target.value)} />
+                    value={commentText} onChange={e => setCommentText(e.target.value)}
+                    onFocus={() => setCommentFocus(true)}
+                    // Pausa curta: no telemóvel o toque num chip tira o foco antes do clique
+                    onBlur={() => window.setTimeout(() => setCommentFocus(document.activeElement === commentInput.current), 200)} />
                   <button type="submit" className="action-btn comment-send" aria-label="Enviar comentário" disabled={!commentText.trim() || sending}>
                     <Icon name="send" size={18} />
                   </button>
                 </div>
               </form>
+              {commentFocus && (
+                <Chips
+                  className="comment-chips"
+                  label="Respostas rápidas"
+                  items={QUICK_COMMENTS.map(t => ({ key: t, label: t, text: t }))}
+                  onPick={t => {
+                    setCommentText(c => (c.trim() ? `${c.trim()} ${t}` : t));
+                    commentInput.current?.focus();
+                  }}
+                />
+              )}
             </section>
           )}
         </>

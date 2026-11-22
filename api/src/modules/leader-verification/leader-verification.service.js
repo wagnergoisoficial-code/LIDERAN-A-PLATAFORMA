@@ -113,7 +113,7 @@ class LeaderVerificationService {
     ]);
 
     await notifyUser(verification.userId, status === 'approved'
-      ? { type: 'verification_approved', title: 'Conta de líder verificada', body: 'Já pode criar a sua comunidade.', linkId: id, linkType: 'verification' }
+      ? { type: 'verification_approved', title: 'Conta de líder verificada', body: note || 'Já pode criar a sua comunidade.', linkId: id, linkType: 'verification' }
       : { type: 'verification_rejected', title: 'Verificação recusada', body: note, linkId: id, linkType: 'verification' });
 
     const admins = await this.prisma.user.findMany({ where: { role: 'admin' }, select: { id: true } });

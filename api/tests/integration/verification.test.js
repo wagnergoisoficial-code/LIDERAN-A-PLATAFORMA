@@ -250,4 +250,14 @@ describe('administração', () => {
     const admin = (await call('GET', `/admin/users?q=adm${stamp}`, s.admin)).data.users[0];
     expect((await call('POST', `/admin/users/${admin.id}/moderation`, s.admin, { action: 'block' })).status).toBe(403);
   });
+  test('a mensagem do administrador na aprovação chega ao líder', async () => {
+    const leader = await call('POST', '/auth/register', null, {
+      name: 'Líder Com Nota', email: `ln${stamp}@t.com`, password: 'Senha1234', confirmPassword: 'Senha1234',
+    });
+    const sent = await submit(leader.data.token, FIELDS, { identity: { data: s.png, type: 'image/png' }, leadership: { data: PDF, type: 'application/pdf' } });
+    expect(sent.status).toBe(201);
+    await call('PATCH', `/leader-verification/${sent.data.id}`, s.admin, { status: 'approved', reason: 'Tudo certo, seja bem-vindo!' });
+    const inbox = (await call('GET', '/notifications', leader.data.token)).data.notifications;
+    expect(inbox.find((n) => n.type === 'verification_approved').body).toBe('Tudo certo, seja bem-vindo!');
+  });
 });

@@ -10,6 +10,8 @@ import { EventFields, EventDraft, EMPTY_EVENT, eventPayload } from './EventForm'
 import Avatar from './Avatar';
 import Icon from './Icon';
 import Modal from './Modal';
+import Chips from './Chips';
+import { versesOfTheDay, quoteVerse, Verse } from '../lib/verses';
 
 // Tudo o que se publica vai para o feed
 type Kind = 'post' | 'video' | 'prayer' | 'donation' | 'devotional' | 'event' | 'poll';
@@ -120,6 +122,14 @@ export const Composer: React.FC<ComposerProps> = ({ start, initialContent, onPub
   const fileInput = useRef<HTMLInputElement>(null);
   const textarea = useRef<HTMLTextAreaElement>(null);
   const submitRef = useRef<HTMLButtonElement>(null);
+
+  // Versículos do dia para colar na publicação (mudam todos os dias)
+  const [verses, setVerses] = useState<Verse[]>([]);
+  useEffect(() => {
+    let alive = true;
+    versesOfTheDay().then((list) => { if (alive) setVerses(list); });
+    return () => { alive = false; };
+  }, []);
 
   const set = (patch: Partial<Draft>) => {
     setError(null);
@@ -285,6 +295,24 @@ export const Composer: React.FC<ComposerProps> = ({ start, initialContent, onPub
       {kind === 'post' && (
         <>
           {textField('Texto da publicação', 'O que você quer compartilhar?', postColor)}
+          {verses.length > 0 && (
+            <div className="composer-verses">
+              <p className="composer-verses-title">Versículos de hoje</p>
+              <Chips
+                label="Versículos de hoje: toque para colar na publicação"
+                items={verses.map(v => ({
+                  key: v[0],
+                  title: v[1],
+                  text: quoteVerse(v),
+                  label: <><strong>{v[0]}</strong><span className="chip-preview">{v[1]}</span></>,
+                }))}
+                onPick={verse => {
+                  set({ content: draft.content.trim() ? `${draft.content.trim()}\n\n${verse}` : verse });
+                  textarea.current?.focus();
+                }}
+              />
+            </div>
+          )}
           {!image && <Swatches value={draft.background} onChange={background => set({ background })} />}
           {tooLongForColor && <p className="form-hint" style={{ margin: 0 }}>Textos com mais de {MAX_COLORED} caracteres aparecem sem cor.</p>}
         </>

@@ -3,6 +3,21 @@ import UIkit from 'uikit';
 import { api } from '../services/api';
 import Icon from './Icon';
 import Modal from './Modal';
+import Chips, { Chip } from './Chips';
+
+// Textos prontos para o administrador: um toque cola no campo, depois é só aprovar ou recusar
+const APPROVE_NOTES: Chip[] = [
+  { key: 'ok', label: 'Tudo certo', text: 'Dados e documentos confirmados. Bem-vindo à Fourux! Você já pode criar a sua comunidade.' },
+  { key: 'bencao', label: 'Boas-vindas', text: 'Tudo certo com o seu cadastro. Que Deus abençoe o seu ministério com os jovens!' },
+  { key: 'passo', label: 'Próximo passo', text: 'Verificação concluída. Crie a comunidade e convide os jovens com o link de convite.' },
+];
+const IMPROVE_NOTES: Chip[] = [
+  { key: 'ilegivel', label: 'Documento ilegível', text: 'O documento de identificação está ilegível. Envie uma foto nítida, com todos os dados visíveis.' },
+  { key: 'comprovante', label: 'Falta o comprovante', text: 'Falta o comprovante de liderança: envie uma carta ou credencial da igreja, assinada pelo pastor.' },
+  { key: 'dados', label: 'Dados não conferem', text: 'Os dados da igreja não conferem com os documentos. Confira o nome e a cidade da igreja e envie de novo.' },
+  { key: 'validade', label: 'Documento vencido', text: 'O documento enviado está fora da validade. Envie um documento válido.' },
+  { key: 'telefone', label: 'Telefone', text: 'Não conseguimos confirmar o telefone informado. Atualize o contato e envie o pedido de novo.' },
+];
 
 interface VerificationDocument { id: string; kind: 'identity' | 'leadership'; mimeType: string; size: number }
 interface Verification {
@@ -68,7 +83,8 @@ const VerificationsPanel: React.FC = () => {
     if (status === 'approved' && !confirm(`Aprovar ${open.user.name} como líder de ${open.churchName}?`)) return;
     setBusy(true);
     try {
-      await api.reviewVerification(open.id, status, status === 'rejected' ? reason.trim() : undefined);
+      // Na aprovação, a mensagem (se houver) segue com o aviso ao líder
+      await api.reviewVerification(open.id, status, reason.trim() || undefined);
       UIkit.notification({ message: status === 'approved' ? 'Líder verificado' : 'Pedido recusado', status: 'success', pos: 'top-right' });
       setOpen(null);
       setReason('');
@@ -149,8 +165,14 @@ const VerificationsPanel: React.FC = () => {
 
             {open.status === 'pending' && (
               <div className="protection-section">
-                <textarea className="form-input" rows={2} maxLength={500} aria-label="Motivo da recusa"
-                  placeholder="Motivo, se recusar (o líder vai vê-lo)" value={reason} onChange={e => setReason(e.target.value)} />
+                <label className="form-label" htmlFor="verification-note">Mensagem para o líder</label>
+                <p className="verification-chips-label">Para aprovar</p>
+                <Chips label="Textos para aprovar" items={APPROVE_NOTES} onPick={setReason} />
+                <p className="verification-chips-label">Para pedir melhorias</p>
+                <Chips label="Textos para pedir melhorias" items={IMPROVE_NOTES} onPick={setReason} />
+                <textarea id="verification-note" className="form-input" rows={3} maxLength={500}
+                  placeholder="Escreva ou escolha um texto acima. Na recusa é obrigatório: o líder vai vê-lo."
+                  value={reason} onChange={e => setReason(e.target.value)} />
                 <div className="protection-row">
                   <button className="uk-button uk-button-success uk-button-small" onClick={() => decide('approved')} disabled={busy}>
                     <Icon name="check" size={16} /> Aprovar líder
